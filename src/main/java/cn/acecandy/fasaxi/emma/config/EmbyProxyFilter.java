@@ -113,8 +113,8 @@ public class EmbyProxyFilter implements Filter {
      * @param req 请求入参
      * @return {@link String }
      */
-    private String staticCacheKey(HttpServletRequest req) {
-        return StrUtil.format("{}?{}", req.getRequestURI(), req.getQueryString());
+    private String staticCacheKey(EmbyContentCacheReqWrapper req) {
+        return StrUtil.format("{}?{}", req.getRequestURI(), req.getCacheParam());
     }
 
     /**
@@ -229,7 +229,7 @@ public class EmbyProxyFilter implements Filter {
 
         try (CloseableHttpResponse embyResponse = embyHttpClient.execute(originalRequest)) {
             EmbyCachedResp cached = EmbyCachedResp.transfer(embyResponse);
-            log.info("请求转发->[{}] {}", cached.getStatusCode(), url);
+            log.info("请求转发->[{}-{}] {}", cached.getStatusCode(), request.getMethod(), url);
             writeCacheResponse(cacheKey, response, cached);
         }
     }

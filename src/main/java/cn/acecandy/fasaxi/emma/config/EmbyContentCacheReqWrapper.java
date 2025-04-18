@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Enumeration;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * emby请求体缓存包装器
@@ -21,7 +22,7 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
 
     private byte[] cachedContent;
     private final Map<String, String> cachedHeader = MapUtil.newHashMap();
-    private final Map<String, Object> cachedParam = MapUtil.newHashMap();
+    private final Map<String, Object> cachedParam = new TreeMap<>();
 
     public EmbyContentCacheReqWrapper(HttpServletRequest request) throws IOException {
         super(request);
@@ -58,10 +59,17 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     }
 
     private void cacheParam(HttpServletRequest request) {
-        Enumeration<String> paramNames = request.getParameterNames();
-        while (paramNames.hasMoreElements()) {
-            String paramName = paramNames.nextElement();
-            cachedParam.put(paramName, request.getParameter(paramName));
+        if (StrUtil.containsAnyIgnoreCase(request.getRequestURI(),
+                "/images/primary")) {
+            cachedParam.put("tag", request.getParameter("tag"));
+            cachedParam.put("maxWidth", "400");
+            cachedParam.put("quality", "90");
+        } else {
+            Enumeration<String> paramNames = request.getParameterNames();
+            while (paramNames.hasMoreElements()) {
+                String paramName = paramNames.nextElement();
+                cachedParam.put(paramName, request.getParameter(paramName));
+            }
         }
     }
 

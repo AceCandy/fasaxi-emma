@@ -14,8 +14,6 @@ spring:
 server:
   # 服务端口
   port: 8802
-#  servlet:
-#    context-path: /wodi
 
 mybatis-plus:
   configuration:
