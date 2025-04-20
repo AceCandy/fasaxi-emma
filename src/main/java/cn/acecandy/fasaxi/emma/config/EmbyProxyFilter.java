@@ -13,11 +13,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.annotation.Resource;
-import jakarta.servlet.Filter;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
+import jakarta.servlet.*;
 import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -35,7 +31,9 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static io.undertow.util.StatusCodes.FOUND;
 import static io.undertow.util.StatusCodes.OK;
@@ -65,6 +63,8 @@ public class EmbyProxyFilter implements Filter {
     private final Cache<String, String> urlCache = Caffeine.newBuilder()
             .maximumSize(1000).expireAfterWrite(1, TimeUnit.DAYS)
             .build();
+
+    private final ConcurrentHashMap<String, ReentrantLock> urlLockMap = MapUtil.newConcurrentHashMap();
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -126,28 +126,43 @@ public class EmbyProxyFilter implements Filter {
     @SneakyThrows
     private void processVideo(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
         Map<String, Object> params = request.getCacheParam();
-        String apiKey = MapUtil.getStr(params, "api_key");
         String mediaSourceId = StrUtil.removePrefixIgnoreCase(
                 MapUtil.getStr(params, "MediaSourceId"), "mediasource_");
 
+        // 获取或创建对应的锁
+        ReentrantLock lock = urlLockMap.computeIfAbsent(mediaSourceId, k -> new ReentrantLock());
+
+        try {
+            lock.lock();
+            exec302(request, response, mediaSourceId);
+        } finally {
+            lock.unlock();
+            urlLockMap.remove(mediaSourceId);
+        }
+    }
+
+    private void exec302(EmbyContentCacheReqWrapper request, HttpServletResponse response, String mediaSourceId) {
         Map<String, String> headers = request.getHeaderMap();
         String ua = headers.get("User-Agent");
 
-        String url = urlCache.getIfPresent(ua + "|" + mediaSourceId);
+        String cacheKey = ua + "|" + mediaSourceId;
+        String url = urlCache.getIfPresent(cacheKey);
         if (StrUtil.isNotBlank(url)) {
             response.setStatus(HttpServletResponse.SC_FOUND);
             response.setHeader("Location", url);
-            log.warn("重定向(缓存UA+Media):[{}] => {}", ua + "|" + mediaSourceId, url);
+            log.warn("重定向(缓存UA+Media):[{}] => {}", cacheKey, url);
             return;
         }
-        url = urlCache.getIfPresent(mediaSourceId);
+        cacheKey = mediaSourceId;
+        url = urlCache.getIfPresent(cacheKey);
         if (StrUtil.isNotBlank(url)) {
             response.setStatus(HttpServletResponse.SC_FOUND);
             response.setHeader("Location", url);
-            log.warn("重定向(缓存Media):[{}] => {}", mediaSourceId, url);
+            log.warn("重定向(缓存Media):[{}] => {}", cacheKey, url);
             return;
         }
 
+        String apiKey = MapUtil.getStr(request.getCacheParam(), "api_key");
         String result = HttpUtil.createGet(fastEmbyConfig.getHost() + "/Items")
                 .form("Ids", mediaSourceId)
                 .form("Fields", "Path,MediaSources").form("api_key", apiKey)
