@@ -30,6 +30,11 @@ public class EmbyCachedResp {
      */
     private byte[] content;
 
+    /**
+     * 过期时间
+     */
+    private Long exTime;
+
     @SneakyThrows
     public static EmbyCachedResp transfer(CloseableHttpResponse backendRes) {
         EmbyCachedResp embyCachedResp = new EmbyCachedResp();
