@@ -19,6 +19,10 @@ public class FastEmbyConfig {
      * 内网emby地址
      */
     private String host;
+    /**
+     * 缓存路径
+     */
+    private String cachePath;
 
     /**
      * 公网emby地址

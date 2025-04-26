@@ -20,7 +20,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!--    <maven.compiler.source>1.7</maven.compiler.source>-->
         <!--    <maven.compiler.target>1.7</maven.compiler.target>-->
-        <jdk.version>21</jdk.version>
+        <java.version>21</java.version>
     </properties>
 
     <dependencies>
@@ -141,18 +141,18 @@
     <build>
         <finalName>fasaxi-emma</finalName>
         <plugins>
-            <!--<plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.14.0</version>
                 <configuration>
-                    <source>${jdk.version}</source>
-                    <target>${jdk.version}</target>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
                     <compilerArgs>
                         <arg>-Xlint:-options</arg>
                     </compilerArgs>
                 </configuration>
-            </plugin>-->
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

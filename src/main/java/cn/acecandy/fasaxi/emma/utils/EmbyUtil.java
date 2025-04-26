@@ -2,8 +2,12 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.vo.HeadVO;
 import cn.acecandy.fasaxi.emma.common.vo.HttpReqVO;
+import cn.acecandy.fasaxi.emma.config.FastEmbyConfig;
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.lang.Console;
 import cn.hutool.core.map.MapUtil;
+import cn.hutool.core.util.NumberUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.core.util.URLUtil;
 import cn.hutool.http.HttpRequest;
@@ -13,14 +17,20 @@ import cn.hutool.http.HttpUtil;
 import cn.hutool.http.Method;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Component;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Map;
 
+import static io.undertow.util.StatusCodes.FOUND;
 import static org.springframework.http.HttpStatus.OK;
 
 /**
@@ -30,9 +40,13 @@ import static org.springframework.http.HttpStatus.OK;
  * @since 2024/10/16
  */
 @Slf4j
-public final class EmbyUtil {
-    private EmbyUtil() {
-    }
+@Component
+public class EmbyUtil {
+    @Resource
+    private CloseableHttpClient embyHttpClient;
+
+    @Resource
+    private FastEmbyConfig fastEmbyConfig;
 
     private static final String EMBY_INNER_URL = "http://192.168.1.205:8096";
     private static final String EMBY_PUBLIC_URL = "http://emby-real.acecandy.cn:800";
@@ -100,7 +114,7 @@ public final class EmbyUtil {
      * @param mediaSourceId 媒体源id
      * @return {@link String }
      */
-    public static String getItemInfo(String ua, String mediaSourceId) {
+    public String getItemInfo(String ua, String mediaSourceId) {
         String embyPath = fetchEmbyFilePath(mediaSourceId);
         String embyPathRes = replacePath2Alist(embyPath);
         if (StrUtil.isBlank(embyPathRes)) {
@@ -123,26 +137,76 @@ public final class EmbyUtil {
      * @param mediaSourceId 媒体源id
      * @return {@link String }
      */
-    public static String fetchEmbyFilePath(String mediaSourceId) {
+    public String fetchEmbyFilePath(String mediaSourceId) {
         if (StrUtil.isBlank(mediaSourceId)) {
             return "";
         }
-        try (HttpResponse res = HttpRequest.get(EMBY_PUBLIC_URL + "/Items")
+        try (HttpResponse res = HttpRequest.get(fastEmbyConfig.getHost() + "/Items")
                 .form("Fields", "Path,MediaSources")
-                .form("Ids", mediaSourceId)
-                .form("Limit", 1)
-                .form("api_key", EMBY_API_KEY)
-                .timeout(10 * 1000)
+                .form("Ids", mediaSourceId).form("Limit", 1)
+                .form("api_key", EMBY_API_KEY).timeout(10 * 1000)
                 .execute()) {
             if (res.isOk() && JSONUtil.isTypeJSON(res.body())) {
                 JSONObject resJn = JSONUtil.parseObj(res.body());
-                return resJn.getJSONArray("Items").getJSONObject(0)
+                String mediaPath = resJn.getJSONArray("Items").getJSONObject(0)
                         .getJSONArray("MediaSources").getJSONObject(0)
                         .getStr("Path");
+                // 外网转为内网
+                return StrUtil.replaceIgnoreCase(mediaPath,
+                        fastEmbyConfig.getAlistPublic(), fastEmbyConfig.getAlistInner());
             }
         }
         return "";
     }
+
+    /**
+     * 获取302的真实路径
+     *
+     * @param mediaPath 媒体路径
+     * @param header    头球
+     * @return {@link String }
+     */
+    public String fetch302Path(String mediaPath, Map<String, String> header) {
+        if (StrUtil.isBlank(mediaPath)) {
+            return "";
+        }
+        try (HttpResponse res = HttpUtil.createRequest(Method.HEAD, mediaPath)
+                .headerMap(header, true).execute()) {
+            if (res.getStatus() == FOUND) {
+                return res.header("Location");
+            }
+        }
+        return "";
+    }
+
+    public FileCacheUtil.FileInfo getFileInfo(Long mediaSourceId) {
+        try (HttpResponse res = HttpRequest.get(fastEmbyConfig.getHost() + "/Items")
+                .form("Fields", "Path,MediaSources")
+                .form("Ids", mediaSourceId).form("Limit", 1)
+                .form("api_key", EMBY_API_KEY).timeout(10 * 1000)
+                .execute()) {
+            if (res.isOk() && JSONUtil.isTypeJSON(res.body())) {
+                JSONObject resJn = JSONUtil.parseObj(res.body());
+                JSONObject item = resJn.getJSONArray("Items").getJSONObject(0);
+                String mediaPath = item.getJSONArray("MediaSources").getJSONObject(0)
+                        .getStr("Path");
+                // 外网转为内网
+                mediaPath = StrUtil.replaceIgnoreCase(mediaPath,
+                        fastEmbyConfig.getAlistPublic(), fastEmbyConfig.getAlistInner());
+                return FileCacheUtil.FileInfo.builder()
+                        .itemId(NumberUtil.parseLong(item.getStr("Id"))).path(mediaPath)
+                        .itemType(item.getStr("Type", "未知"))
+                        .seasonId(item.getLong("SeasonId"))
+                        .bitrate(item.getLong("Bitrate", 27962026L))
+                        .size(item.getLong("Size", 0L))
+                        .container(item.getStr("Container"))
+                        .cacheFileSize(item.getLong("Bitrate", 27962026L) / 8 * 15)
+                        .build();
+            }
+        }
+        return FileCacheUtil.FileInfo.builder().build();
+    }
+
 
     public static String replacePath2Alist(String inputPath) {
         for (Map.Entry<String, String> entry : PATH_ALIST_CONFIG.entrySet()) {
@@ -247,5 +311,30 @@ public final class EmbyUtil {
             }
             CacheUtil.setMediaKey(ua, mediaSourceId, redirectUrl);
         }
+    }
+
+    public static class Result {
+        String subdirectory;
+        String hash;
+
+        public Result(String subdirectory, String hash) {
+            this.subdirectory = subdirectory;
+            this.hash = hash;
+        }
+
+        public String getSubdirectory() {
+            return subdirectory;
+        }
+
+        public String getHash() {
+            return hash;
+        }
+    }
+
+    public static void main(String[] args) {
+        String filePath = "/Users/mac/Downloads/2024-10-12 10.21.14.mp4";
+        Path path = Paths.get(filePath);
+        Console.log(FileUtil.subPath(path, path.getNameCount() - 3, path.getNameCount()));
+        Console.log(StrUtil.subPre(filePath, 2));
     }
 }

@@ -33,6 +33,7 @@ target/
 logs/
 diffex.sh
 
-application-local.yml
-application-prod.yml
+application-*.yml
+#application-local.yml
+#application-prod.yml
 create.sql

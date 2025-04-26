@@ -1,5 +1,6 @@
 package cn.acecandy.fasaxi.emma.common.vo;
 
+import cn.hutool.core.date.DateUtil;
 import lombok.Builder;
 import lombok.Data;
 
@@ -21,4 +22,13 @@ public class EmbyUrlCacheVO {
      * 过期时间
      */
     private Long exTime;
+
+    /**
+     * 已过期
+     *
+     * @return boolean
+     */
+    public boolean isEffect() {
+        return DateUtil.currentSeconds() <= exTime;
+    }
 }
