@@ -11,7 +11,6 @@ import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.thread.ThreadUtil;
 import cn.hutool.core.util.NumberUtil;
 import cn.hutool.core.util.StrUtil;
-import cn.hutool.http.HttpResponse;
 import cn.hutool.http.HttpUtil;
 import cn.hutool.http.Method;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -20,6 +19,7 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.annotation.WebFilter;
@@ -36,7 +36,6 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.List;
@@ -150,19 +149,25 @@ public class EmbyProxyFilter implements Filter {
         ReentrantLock lock = urlLockMap.computeIfAbsent(mediaSourceId, k -> new ReentrantLock());
 
         try {
-            lock.lock();
-            exec302(request, response, mediaSourceId);
+            if (lock.tryLock()) {
+                // lock.lock();
+                exec302(request, response, mediaSourceId);
+            } else {
+                log.warn("请求锁被占用: {}", mediaSourceId);
+                response.setStatus(429);
+            }
         } finally {
             lock.unlock();
             urlLockMap.remove(mediaSourceId);
         }
     }
 
-    private void exec302(EmbyContentCacheReqWrapper request, HttpServletResponse response, String mediaSourceId) {
+    private void exec302(EmbyContentCacheReqWrapper request,
+                         HttpServletResponse response, String mediaSourceId) {
         Map<String, String> headers = request.getHeaderMap();
         String ua = headers.get("User-Agent");
 
-        String cacheKey = ua + "|" + mediaSourceId;
+        String cacheKey = ua + "|" + mediaSourceId + 11111;
         EmbyUrlCacheVO urlVO = urlCache.getIfPresent(cacheKey);
         if (null != urlVO && urlVO.isEffect()) {
             response.setStatus(HttpServletResponse.SC_FOUND);
@@ -170,7 +175,7 @@ public class EmbyProxyFilter implements Filter {
             log.warn("重定向(缓存UA+Media):[{}] => {}", cacheKey, urlVO.getUrl());
             return;
         }
-        cacheKey = mediaSourceId;
+        cacheKey = mediaSourceId + 11111;
         urlVO = urlCache.getIfPresent(cacheKey);
         if (null != urlVO && urlVO.isEffect()) {
             String url = urlVO.getUrl();
@@ -202,6 +207,7 @@ public class EmbyProxyFilter implements Filter {
         }
 
         FileCacheUtil.FileInfo embyInfo = embyUtil.getFileInfo(NumberUtil.parseLong(mediaSourceId));
+        Console.log(embyInfo);
         String mediaPath = embyInfo.getPath();
         Map<String, String> header302 = MapUtil.<String, String>builder().put("User-Agent", ua).build();
         fileCacheUtil.cacheNextEpisode(embyInfo, header302);
@@ -212,7 +218,10 @@ public class EmbyProxyFilter implements Filter {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 return;
             }
-            rangeCache(request, response, embyInfo);
+            if (findRangeCache(request, response, embyInfo)) {
+                response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
+                return;
+            }
 
             long exTime = DateUtil.currentSeconds() + 2 * 24 * 60 * 60;
             if (StrUtil.startWithIgnoreCase(realUrl, fastEmbyConfig.getOriginPt())) {
@@ -237,9 +246,86 @@ public class EmbyProxyFilter implements Filter {
     }
 
     @SneakyThrows
-    private void rangeCache(EmbyContentCacheReqWrapper request, HttpServletResponse response,
-                            FileCacheUtil.FileInfo embyInfo) {
+    private boolean findRangeCache(EmbyContentCacheReqWrapper request, HttpServletResponse response,
+                                   FileCacheUtil.FileInfo embyInfo) {
+        log.info("查找本地缓存文件->");
+        embyInfo.setCacheStatus(FileCacheUtil.CacheStatus.PARTIAL);
         String range = request.getHeader("Range");
+        if (!StrUtil.startWithIgnoreCase(range, "bytes=")) {
+            embyInfo.setStartByte(0L);
+            embyInfo.setCacheStatus(FileCacheUtil.CacheStatus.PARTIAL);
+            if (fileCacheUtil.checkCacheFile(embyInfo)) {
+                response.setHeader("Cache-Control", "private, no-transform, no-cache");
+                response.setHeader("X-EmbyToAList-Cache", "Hit");
+                response.setHeader("Content-Length", String.valueOf(embyInfo.getSize()));
+                // response.setHeader("Content-Length", String.valueOf(embyInfo.getCacheFileSize()));
+                // response.setHeader("X-Chunk-Size", String.valueOf(embyInfo.getCacheFileSize()));
+                response.setHeader("Content-Range", StrUtil.format("bytes {}-{}/{}",
+                        embyInfo.getStartByte(), embyInfo.getCacheFileSize() - 1, embyInfo.getSize()));
+                // Content-Range: bytes 0-9999/100000  // 当前分片是 0-9999 字节（大小 10000 字节）
+
+                response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
+                Stream<byte[]> cache = fileCacheUtil.readCacheFile(embyInfo);
+                cache.forEach(c -> {
+                    try {
+                        response.getOutputStream().write(c, 0, c.length);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+
+                return true;
+            } else {
+                ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getHeaderMap()));
+                response.setStatus(HttpServletResponse.SC_FOUND);
+                response.setHeader("Location", embyInfo.getRealUrl());
+                return false;
+            }
+        } else {
+            String byteRange = CollUtil.getLast(StrUtil.split(range, "="));
+            List<String> rangeList = StrUtil.split(byteRange, "-");
+            Long startByte = NumberUtil.parseLong(CollUtil.getFirst(rangeList), null);
+            Long endByte = NumberUtil.parseLong(CollUtil.getLast(rangeList), null);
+            embyInfo.setStartByte(startByte);
+            embyInfo.setEndByte(endByte);
+            embyInfo.setCacheStatus(FileCacheUtil.CacheStatus.PARTIAL);
+            if (fileCacheUtil.checkCacheFile(embyInfo)) {
+                response.setHeader("Cache-Control", "private, no-transform, no-cache");
+                response.setHeader("Content-Length", String.valueOf(embyInfo.getSize()));
+                response.setHeader("X-EmbyToAList-Cache", "Hit");
+                // response.setHeader("X-Chunk-Size", String.valueOf(embyInfo.getCacheFileSize()));
+                Long endPoint = Math.min(embyInfo.getSize(),
+                        embyInfo.getStartByte() + embyInfo.getCacheFileSize()) - 1;
+                response.setHeader("Content-Range", StrUtil.format("bytes {}-{}/{}",
+                        embyInfo.getStartByte(), endPoint, embyInfo.getSize()));
+                // Content-Range: bytes 0-9999/100000  // 当前分片是 0-9999 字节（大小 10000 字节）
+
+                response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
+                Stream<byte[]> cache = fileCacheUtil.readCacheFile(embyInfo);
+                cache.forEach(c -> {
+                    try {
+                        response.getOutputStream().write(c, 0, c.length);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+
+                return true;
+            } else {
+                ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getHeaderMap()));
+                response.setStatus(HttpServletResponse.SC_FOUND);
+                response.setHeader("Location", embyInfo.getRealUrl());
+                return false;
+            }
+        }
+        // return false;
+    }
+
+    @SneakyThrows
+    private boolean rangeCache(EmbyContentCacheReqWrapper request, HttpServletResponse response,
+                               FileCacheUtil.FileInfo embyInfo) {
+        String range = request.getHeader("Range");
+        log.info("读取缓存中:{}", range);
         if (!StrUtil.startWithIgnoreCase(range, "bytes=")) {
             log.warn("范围标头非法: {}", request.getHeaderMap());
             embyInfo.setStartByte(0L);
@@ -251,13 +337,13 @@ public class EmbyProxyFilter implements Filter {
 
                 Map<String, String> headers = request.getHeaderMap();
                 headers.put("Range", StrUtil.format("bytes={}-", embyInfo.getCacheFileSize()));
-                mixFileCache(embyInfo, headers);
-                return;
+                mixFileCache(embyInfo, response, headers);
+                return true;
             } else {
                 ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getHeaderMap()));
                 response.setStatus(HttpServletResponse.SC_FOUND);
                 response.setHeader("Location", embyInfo.getRealUrl());
-                return;
+                return true;
             }
         } else {
             String byteRange = CollUtil.getLast(StrUtil.split(range, "="));
@@ -269,7 +355,7 @@ public class EmbyProxyFilter implements Filter {
             if (startByte >= embyInfo.getSize()) {
                 log.warn("range请求超出文件大小[{}]: {}", embyInfo.getSize(), request.getHeaderMap());
                 response.setStatus(HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
-                return;
+                return true;
             }
             Long cacheFileSize = embyInfo.getCacheFileSize();
             Long respEndByte;
@@ -307,14 +393,14 @@ public class EmbyProxyFilter implements Filter {
                         }
                         Map<String, String> headers = request.getHeaderMap();
                         headers.put("Range", sourceRange);
-                        mixFileCache(embyInfo, headers);
-                        return;
+                        mixFileCache(embyInfo, response, headers);
+                        return true;
                     } else if (StrUtil.equalsAny(embyInfo.getCacheStatus().name(),
                             FileCacheUtil.CacheStatus.HIT.name(), FileCacheUtil.CacheStatus.HIT_TAIL.name())) {
                         // 完全在范围内
                         response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
-                        mixFileCache(embyInfo, request.getHeaderMap());
-                        return;
+                        mixFileCache(embyInfo, response, request.getHeaderMap());
+                        return true;
                     } else {
                         // 请求的范围与缓存重叠并超出缓存
                         Long sourceStart = cacheFileSize;
@@ -325,8 +411,8 @@ public class EmbyProxyFilter implements Filter {
                         }
                         Map<String, String> headers = request.getHeaderMap();
                         headers.put("Range", sourceRange);
-                        mixFileCache(embyInfo, headers);
-                        return;
+                        mixFileCache(embyInfo, response, headers);
+                        return true;
                     }
                 } else {
                     ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getHeaderMap()));
@@ -353,7 +439,7 @@ public class EmbyProxyFilter implements Filter {
                     response.setHeader("X-EmbyToAList-Cache", "Hit");
 
                     response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
-                    mixFileCache(embyInfo, request.getHeaderMap());
+                    mixFileCache(embyInfo, response, request.getHeaderMap());
                 } else {
                     ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getHeaderMap()));
                     response.setStatus(HttpServletResponse.SC_FOUND);
@@ -379,30 +465,100 @@ public class EmbyProxyFilter implements Filter {
                     }
                     Map<String, String> headers = request.getHeaderMap();
                     headers.put("Range", sourceRange);
-                    mixFileCache(embyInfo, headers);
-                    return;
+                    mixFileCache(embyInfo, response, headers);
+                    return true;
                 }
             }
         }
+        return false;
     }
 
     @SneakyThrows
-    private void mixFileCache(FileCacheUtil.FileInfo embyInfo, Map<String, String> headers) {
+    private void mixFileCache(FileCacheUtil.FileInfo embyInfo, HttpServletResponse response,
+                              Map<String, String> headers) {
         Stream<byte[]> cache = fileCacheUtil.readCacheFile(embyInfo);
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        cache.parallel().forEach(bytes -> {
-            synchronized (outputStream) {  // 保证线程安全
-                outputStream.write(bytes, 0, bytes.length);
+        // InputStream cache = fileCacheUtil.readCacheFileInput(embyInfo);
+        response.setContentType(getContentType(embyInfo.getContainer()));
+        // response.setContentLength(embyInfo.getCacheFileSize().intValue());
+        // response.setHeader("Transfer-Encoding", "chunked");
+
+        // response.setHeader("Content-Range", "bytes " + 0 + "-" + embyInfo.getCacheFileSize() + "/" + embyInfo.getSize());
+        // response.setHeader("Accept-Ranges", "bytes");
+        // response.setHeader("Range", StrUtil.format("bytes={}-", embyInfo.getCacheFileSize()));
+        try (ServletOutputStream out = response.getOutputStream()) {
+            cache.forEach(b -> {
+                try {
+                    out.write(b, 0, 1024 * 1024);
+                    out.flush();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+
+        /*try {
+            ServletOutputStream outputStream = response.getOutputStream();
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = cache.read(buffer)) != -1) {
+                if (!response.isCommitted()) { // 新增连接状态检查
+                    outputStream.write(buffer, 0, bytesRead);
+                    outputStream.flush();
+                } else {
+                    log.debug("连接已断开，终止写入");
+                    break;
+                }
             }
-        });
+        } catch (Exception e) {
+            log.debug("客户端主动断开: {}", e.getMessage());
+        } finally {
+            IoUtil.close(cache);
+        }*/
+        /*ServletOutputStream out = null;
+        try {
+            out = response.getOutputStream();
+            IoUtil.copy(cache, out, IoUtil.DEFAULT_BUFFER_SIZE);
+        } catch (IOException e) {
+            throw new UtilException(e);
+        } finally {
+            // IoUtil.close(out);
+            IoUtil.close(cache);
+        }*/
+        // OutputStream outputStream = response.getOutputStream();
+        /*byte[] mergedBytes = cache.toList().stream()
+                .reduce(new ByteArrayOutputStream(), (bos, bytes) -> {
+                            bos.write(bytes, 0, bytes.length);
+                            return bos;
+                        },
+                        (bos1, bos2) -> bos1)
+                .toByteArray();
+        outputStream.write(mergedBytes);
+        outputStream.flush();*/
+/*
+        OutputStream outputStream = null;
+        try {
+            outputStream = response.getOutputStream();
+            cache.forEach(bytes -> {
+                try {
+                    outputStream.write(bytes);
+                } catch (IOException e) {
+                    log.error("写入缓存文件失败: {}", embyInfo.getPath(), e);
+                }
+            });
+            outputStream.flush();
+        } catch (IOException e) {
+            log.error("获取输出流或写入数据时出错", e);
+        } finally {
+            IoUtil.close(outputStream);
+        }*/
         log.info("缓存已用尽");
 
 
         // request.getHeaderMap().put("host", URI.create(urlTask).getHost());
-        try (HttpResponse res = HttpUtil.createGet(embyInfo.getRealUrl())
+        /*try (HttpResponse res = HttpUtil.createGet(embyInfo.getRealUrl())
                 .headerMap(headers, true).execute()) {
             outputStream.write(res.bodyBytes());
-        }
+        }*/
     }
 
     private String getContentType(String container) {

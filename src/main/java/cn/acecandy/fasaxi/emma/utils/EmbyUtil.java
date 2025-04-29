@@ -193,6 +193,8 @@ public class EmbyUtil {
                 // 外网转为内网
                 mediaPath = StrUtil.replaceIgnoreCase(mediaPath,
                         fastEmbyConfig.getAlistPublic(), fastEmbyConfig.getAlistInner());
+                Long minute = item.getLong("RunTimeTicks", 0L) / 10000 / 1000 / 60;
+                Long cacheFileSize = item.getLong("Size", 0L) / minute;
                 return FileCacheUtil.FileInfo.builder()
                         .itemId(NumberUtil.parseLong(item.getStr("Id"))).path(mediaPath)
                         .itemType(item.getStr("Type", "未知"))
@@ -200,7 +202,7 @@ public class EmbyUtil {
                         .bitrate(item.getLong("Bitrate", 27962026L))
                         .size(item.getLong("Size", 0L))
                         .container(item.getStr("Container"))
-                        .cacheFileSize(item.getLong("Bitrate", 27962026L) / 8 * 15)
+                        .cacheFileSize(cacheFileSize)
                         .build();
             }
         }

@@ -4,6 +4,7 @@ import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.config.FastEmbyConfig;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.io.file.PathUtil;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
@@ -22,6 +23,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -158,6 +160,7 @@ public class FileCacheUtil {
     @SneakyThrows
     public boolean writeCacheFile(FileInfo fileInfo,
                                   Map<String, String> reqHeader) {
+        log.info("写入本地缓存文件->");
         Long itemId = fileInfo.getItemId();
         String path = fileInfo.getPath();
         long fileSize = fileInfo.getSize();
@@ -168,9 +171,12 @@ public class FileCacheUtil {
         String subDir = StrUtil.subPre(pathMd5, 2);
         String dir = pathMd5;
 
-        long startPoint = 0;
-        long endPoint = 0;
-        switch (fileInfo.getCacheStatus()) {
+        Long startPoint = fileInfo.getStartByte();
+        Long endPoint = fileInfo.getEndByte();
+        if (null == endPoint) {
+            endPoint = Math.min(fileSize, startPoint + cacheSize) - 1;
+        }
+        /*switch (fileInfo.getCacheStatus()) {
             case PARTIAL, HIT -> {
                 startPoint = 0;
                 endPoint = cacheSize - 1;
@@ -180,7 +186,7 @@ public class FileCacheUtil {
                 endPoint = fileSize - 1;
             }
             default -> throw new BaseException("未知的缓存状态");
-        }
+        }*/
         String realUrl = embyUtil.fetch302Path(path, reqHeader);
 
         String cacheFileName = "cacheFile_" + startPoint + "_" + endPoint;
@@ -199,7 +205,7 @@ public class FileCacheUtil {
             long finalEndPoint = endPoint;
             loopFile.forEach(file -> {
                 String fileName = FileUtil.getName(file);
-                if (!StrUtil.startWith(fileName, "cacheFile_") && !StrUtil.endWith(fileName, ".tag")) {
+                if (!StrUtil.startWith(fileName, "cacheFile_") || StrUtil.endWith(fileName, ".tag")) {
                     return;
                 }
                 List<String> parts = StrUtil.split(fileName, "_");
@@ -216,7 +222,7 @@ public class FileCacheUtil {
             } else {
                 reqHeader = new HashMap<>(reqHeader);
             }
-            reqHeader.put("host", StrUtil.splitTrim(realUrl, "/").get(2));
+            reqHeader.put("host", StrUtil.split(realUrl, "/").get(2));
             reqHeader.put("range", StrUtil.format("bytes={}-{}", startPoint, endPoint));
 
             HttpUriRequest req = RequestBuilder.get(realUrl).build();
@@ -231,6 +237,7 @@ public class FileCacheUtil {
                 return true;
             }
         } catch (Exception e) {
+            log.error("写入缓存失败[{}]: {}", itemId, cacheFilePath, e);
             FileUtil.del(cacheFilePath);
             FileUtil.del(cacheWriteTagPath);
             throw e;
@@ -274,6 +281,33 @@ public class FileCacheUtil {
         return Stream.empty();
     }
 
+    public InputStream readCacheFileInput(FileInfo fileInfo) {
+        String path = fileInfo.getPath();
+
+        String pathMd5 = getPathMd5(path, fileInfo.getItemType());
+        String subDir = StrUtil.subPre(pathMd5, 2);
+        String dir = pathMd5;
+
+        Path fileDir = Paths.get(feConfig.getCachePath(), subDir, dir);
+        for (File file : FileUtil.loopFiles(fileDir, -1, null)) {
+            String fileName = FileUtil.getName(file);
+            if (!StrUtil.startWith(fileName, "cacheFile_") || StrUtil.endWith(fileName, ".tag")) {
+                continue;
+            }
+            List<String> parts = StrUtil.split(fileName, "_");
+            long fileStart = Long.parseLong(parts.get(1));
+            long fileEnd = Long.parseLong(parts.get(2));
+            if (fileStart <= fileInfo.getStartByte() && fileInfo.getStartByte() <= fileEnd) {
+                Long adjustedEnd = null;
+                if (fileInfo.getCacheStatus() == CacheStatus.HIT) {
+                    adjustedEnd = fileInfo.getEndByte() - fileInfo.getStartByte();
+                }
+                return IoUtil.toStream(file);
+            }
+        }
+        return null;
+    }
+
     /**
      * 检查缓存文件是否存在
      *
@@ -308,14 +342,17 @@ public class FileCacheUtil {
             List<String> parts = StrUtil.split(fileName, "_");
             long fileStart = Long.parseLong(parts.get(1));
             long fileEnd = Long.parseLong(parts.get(2));
-            if (verifyCacheFile(fileInfo, CollUtil.newArrayList(fileStart, fileEnd))) {
+            if (fileStart <= fileInfo.getStartByte() && fileInfo.getStartByte() <= fileEnd) {
+                return true;
+            }
+            /*if (verifyCacheFile(fileInfo, CollUtil.newArrayList(fileStart, fileEnd))) {
                 if (fileStart <= fileInfo.getStartByte() && fileInfo.getStartByte() <= fileEnd) {
                     return true;
                 }
             } else {
                 FileUtil.del(file);
                 continue;
-            }
+            }*/
         }
         return false;
     }
@@ -365,7 +402,7 @@ public class FileCacheUtil {
         long end = CollUtil.getLast(cacheFileRange);
 
         // 开头缓存文件
-        boolean isStartCache = start == 0 && end < fileInfo.cacheFileSize - 1;
+        boolean isStartCache = start == 0 && end == fileInfo.cacheFileSize - 1;
         boolean isEndCache = end == fileInfo.size - 1;
         return isStartCache || isEndCache;
     }
