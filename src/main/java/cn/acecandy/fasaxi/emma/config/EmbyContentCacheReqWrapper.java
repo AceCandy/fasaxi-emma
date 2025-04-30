@@ -59,10 +59,14 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     }
 
     private void cacheParam(HttpServletRequest request) {
-        if (StrUtil.containsAnyIgnoreCase(request.getRequestURI(),
-                "/images/primary")) {
+        String uri = request.getRequestURI().toLowerCase();
+        if (StrUtil.containsAnyIgnoreCase(uri, "/images/primary")) {
             cachedParam.put("tag", request.getParameter("tag"));
             cachedParam.put("maxWidth", "400");
+            cachedParam.put("quality", "90");
+        } else if (StrUtil.containsAnyIgnoreCase(uri, "/images/logo")) {
+            cachedParam.put("tag", request.getParameter("tag"));
+            cachedParam.put("maxWidth", "200");
             cachedParam.put("quality", "90");
         } else {
             Enumeration<String> paramNames = request.getParameterNames();

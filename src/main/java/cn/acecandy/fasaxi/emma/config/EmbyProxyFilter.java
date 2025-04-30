@@ -4,15 +4,6 @@ import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
 import cn.acecandy.fasaxi.emma.common.vo.EmbyUrlCacheVO;
 import cn.acecandy.fasaxi.emma.utils.EmbyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
-import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.lang.Console;
-import cn.hutool.core.map.MapUtil;
-import cn.hutool.core.thread.ThreadUtil;
-import cn.hutool.core.util.NumberUtil;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.http.HttpUtil;
-import cn.hutool.http.Method;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.annotation.Resource;
@@ -32,6 +23,20 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.methods.RequestBuilder;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
+import org.dromara.hutool.core.collection.CollUtil;
+import org.dromara.hutool.core.date.DateUtil;
+import org.dromara.hutool.core.date.StopWatch;
+import org.dromara.hutool.core.lang.Console;
+import org.dromara.hutool.core.map.MapUtil;
+import org.dromara.hutool.core.math.NumberUtil;
+import org.dromara.hutool.core.net.url.UrlQueryUtil;
+import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.core.text.split.SplitUtil;
+import org.dromara.hutool.core.thread.ThreadUtil;
+import org.dromara.hutool.extra.aop.aspects.TimeIntervalAspect;
+import org.dromara.hutool.http.HttpUtil;
+import org.dromara.hutool.http.meta.Method;
+import org.dromara.hutool.http.server.servlet.ServletUtil;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -40,7 +45,6 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
@@ -79,13 +83,14 @@ public class EmbyProxyFilter implements Filter {
             .maximumSize(1000).expireAfterWrite(1, TimeUnit.DAYS)
             .build();
 
-    private final ConcurrentHashMap<String, ReentrantLock> urlLockMap = MapUtil.newConcurrentHashMap();
+    private final Map<String, ReentrantLock> urlLockMap = MapUtil.newSafeConcurrentHashMap();
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse res = (HttpServletResponse) response;
+        ServletUtil
 
         // 缓存原始请求数据
         EmbyContentCacheReqWrapper reqWrapper = new EmbyContentCacheReqWrapper(req);
@@ -113,7 +118,7 @@ public class EmbyProxyFilter implements Filter {
      */
     private boolean isCacheReq(HttpServletRequest req) {
         String uri = req.getRequestURI().toLowerCase();
-        if (StrUtil.containsAny(uri, "/images/primary", "/images/backdrop")) {
+        if (StrUtil.containsAnyIgnoreCase(uri, "/images/primary", "/images/backdrop", "/images/logo")) {
             return true;
         }
         return uri.matches(".*\\.(js|css|woff2|png|jpg|gif|ico|json|html)$");
@@ -167,6 +172,7 @@ public class EmbyProxyFilter implements Filter {
         Map<String, String> headers = request.getHeaderMap();
         String ua = headers.get("User-Agent");
 
+
         String cacheKey = ua + "|" + mediaSourceId + 11111;
         EmbyUrlCacheVO urlVO = urlCache.getIfPresent(cacheKey);
         if (null != urlVO && urlVO.isEffect()) {
@@ -209,7 +215,8 @@ public class EmbyProxyFilter implements Filter {
         FileCacheUtil.FileInfo embyInfo = embyUtil.getFileInfo(NumberUtil.parseLong(mediaSourceId));
         Console.log(embyInfo);
         String mediaPath = embyInfo.getPath();
-        Map<String, String> header302 = MapUtil.<String, String>builder().put("User-Agent", ua).build();
+        Map<String, String> header302 = MapUtil.<String, String>builder()
+                .put("User-Agent", ua).put("range", headers.get("Range")).build();
         fileCacheUtil.cacheNextEpisode(embyInfo, header302);
         if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
             String realUrl = embyUtil.fetch302Path(mediaPath, header302);
@@ -228,7 +235,7 @@ public class EmbyProxyFilter implements Filter {
                 urlCache.put(mediaSourceId, EmbyUrlCacheVO.builder().url(realUrl)
                         .exTime(exTime).build());
             } else {
-                Map<String, String> paramMap = HttpUtil.decodeParamMap(realUrl, Charset.defaultCharset());
+                Map<String, String> paramMap = UrlQueryUtil.decodeQuery(realUrl, Charset.defaultCharset());
                 exTime = MapUtil.getLong(paramMap, "t", exTime) - 5 * 60;
                 urlCache.put(ua + "|" + mediaSourceId, EmbyUrlCacheVO.builder().url(realUrl)
                         .exTime(exTime).build());
@@ -282,8 +289,8 @@ public class EmbyProxyFilter implements Filter {
                 return false;
             }
         } else {
-            String byteRange = CollUtil.getLast(StrUtil.split(range, "="));
-            List<String> rangeList = StrUtil.split(byteRange, "-");
+            String byteRange = CollUtil.getLast(SplitUtil.split(range, "="));
+            List<String> rangeList = SplitUtil.split(byteRange, "-");
             Long startByte = NumberUtil.parseLong(CollUtil.getFirst(rangeList), null);
             Long endByte = NumberUtil.parseLong(CollUtil.getLast(rangeList), null);
             embyInfo.setStartByte(startByte);
@@ -346,8 +353,8 @@ public class EmbyProxyFilter implements Filter {
                 return true;
             }
         } else {
-            String byteRange = CollUtil.getLast(StrUtil.split(range, "="));
-            List<String> rangeList = StrUtil.split(byteRange, "-");
+            String byteRange = CollUtil.getLast(SplitUtil.split(range, "="));
+            List<String> rangeList = SplitUtil.split(byteRange, "-");
             Long startByte = NumberUtil.parseLong(CollUtil.getFirst(rangeList), null);
             Long endByte = NumberUtil.parseLong(CollUtil.getLast(rangeList), null);
             embyInfo.setStartByte(startByte);
@@ -585,11 +592,14 @@ public class EmbyProxyFilter implements Filter {
      */
     @SneakyThrows
     private void forwardOriReq(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
+        TimeIntervalAspect timer = DateUtil.timer();
+        StopWatch stopWatch = new StopWatch();
+        StopWatch.
+        stopWatch.
         String cacheKey = staticCacheKey(request);
 
         // 获取或创建对应的锁
         ReentrantLock lock = urlLockMap.computeIfAbsent(cacheKey, k -> new ReentrantLock());
-
         try {
             lock.lock();
 
@@ -603,16 +613,17 @@ public class EmbyProxyFilter implements Filter {
             String url = HttpUtil.urlWithFormUrlEncoded(fastEmbyConfig.getHost() + request.getRequestURI(),
                     request.getCacheParam(), Charset.defaultCharset());
             HttpUriRequest originalRequest = RequestBuilder.create(request.getMethod())
-                    .setUri(url)
-                    .setEntity(new ByteArrayEntity(request.getContentAsByteArray()))
+                    .setUri(url).setEntity(new ByteArrayEntity(request.getContentAsByteArray()))
                     .build();
             request.getHeaderMap().forEach(originalRequest::addHeader);
             originalRequest.removeHeaders("Transfer-Encoding");
             // log.info("请求头:{}=>{}", request.getHeaderMap(), originalRequest.getAllHeaders());
 
+            long lockTime = timer.intervalRestart();
             try (CloseableHttpResponse embyResponse = embyHttpClient.execute(originalRequest)) {
                 cached = EmbyCachedResp.transfer(embyResponse);
-                log.info("请求转发->[{}-{}] {}", cached.getStatusCode(), request.getMethod(), url);
+                log.info("请求转发->[{}-{}:{}-{}] {}", cached.getStatusCode(),
+                        request.getMethod(), lockTime, timer.interval(), url);
                 writeCacheResponse(request, response, cached);
             }
         } finally {
