@@ -107,6 +107,13 @@
             <version>2.12.1</version>
         </dependency>
 
+        <!-- 压缩 -->
+        <dependency>
+            <groupId>org.brotli</groupId>
+            <artifactId>dec</artifactId>
+            <version>0.1.2</version>
+        </dependency>
+
         <!-- json -->
         <!--<dependency>
             <groupId>com.alibaba</groupId>

@@ -18,6 +18,10 @@ public class EmbyConfig {
      */
     private String host;
     /**
+     * 内网emby ws地址
+     */
+    private String wsHost;
+    /**
      * apiKey
      */
     private String apiKey;

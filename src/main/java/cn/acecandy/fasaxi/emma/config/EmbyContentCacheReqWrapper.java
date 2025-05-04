@@ -1,5 +1,6 @@
 package cn.acecandy.fasaxi.emma.config;
 
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import lombok.Getter;
@@ -30,6 +31,9 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     @Getter
     private final Map<String, Object> cachedParam = new TreeMap<>();
 
+    @Resource
+    private EmbyConfig embyConfig;
+
     public EmbyContentCacheReqWrapper(HttpServletRequest request) throws IOException {
         super(request);
         cacheHeader(request);
@@ -45,8 +49,8 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         Map<String, String> headerMap = MapUtil.newHashMap();
         Enumeration<String> headerNames = request.getHeaderNames();
         while (headerNames.hasMoreElements()) {
-            String headerName = headerNames.nextElement();
-            if (!StrUtil.equalsAnyIgnoreCase(headerName, "Host", "Content-Length", "Referer")) {
+            String headerName = headerNames.nextElement().toLowerCase();
+            if (!StrUtil.equalsAnyIgnoreCase(headerName, "Host", "Content-Length", "Referer", "Transfer-Encoding")) {
                 String headerValue = request.getHeader(headerName);
                 headerMap.put(headerName, headerValue);
                 if (StrUtil.equalsIgnoreCase(headerName, "User-Agent")) {
@@ -63,17 +67,19 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         String uri = request.getRequestURI().toLowerCase();
         if (StrUtil.containsAnyIgnoreCase(uri, "/images/primary")) {
             cachedParam.put("tag", request.getParameter("tag"));
-            cachedParam.put("maxWidth", "400");
-            cachedParam.put("quality", "90");
+            cachedParam.put("maxwidth", "500");
+            // cachedParam.put("quality", "90");
         } else if (StrUtil.containsAnyIgnoreCase(uri, "/images/logo")) {
             cachedParam.put("tag", request.getParameter("tag"));
-            cachedParam.put("maxWidth", "200");
-            cachedParam.put("quality", "90");
+            cachedParam.put("maxwidth", "400");
+        } else if (StrUtil.containsAnyIgnoreCase(uri, "/images/backdrop")) {
+            cachedParam.put("tag", request.getParameter("tag"));
+            cachedParam.put("maxwidth", "1280");
         } else {
             Map<String, String> paramMap = ServletUtil.getParamMap(request);
-            cachedParam.putAll(paramMap);
-            if (paramMap.containsKey("searchTerm") || paramMap.containsKey("SearchTerm")) {
-                cachedParam.put("IncludeItemTypes", StrUtil.replaceIgnoreCase(cachedParam.get("IncludeItemTypes").toString(), "BoxSet", ""));
+            paramMap.forEach((k, v) -> cachedParam.put(k.toLowerCase(), v));
+            if (paramMap.containsKey("searchterm")) {
+                cachedParam.put("includeitemtypes", StrUtil.replaceIgnoreCase(cachedParam.get("includeitemtypes").toString(), "BoxSet", ""));
             }
         }
     }

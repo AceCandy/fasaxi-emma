@@ -11,9 +11,12 @@ import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.EmbyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import jakarta.annotation.Resource;
+import jakarta.servlet.AsyncContext;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
@@ -22,6 +25,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.hutool.core.array.ArrayUtil;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.date.StopWatch;
@@ -44,11 +48,18 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.WebSocket;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
@@ -106,11 +117,17 @@ public class EmbyProxyFilter implements Filter {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse res = (HttpServletResponse) response;
 
-        // 缓存原始请求数据
+        /*if (isWebSocketHandshake(req)) {
+            log.warn("WebSocket请求: {}", req.getRequestURI());
+            handleWebSocket(req, res);
+            return;
+        }*/
+
         EmbyContentCacheReqWrapper reqWrapper = new EmbyContentCacheReqWrapper(req);
         try {
             if (needClose(req)) {
                 res.setStatus(HttpStatus.HTTP_REQUESTED_RANGE_NOT_SATISFIABLE);
+                log.info("请求屏蔽: {}", req.getRequestURI());
                 return;
             }
             EmbyPicType picType = needPicRedirect(req);
@@ -124,6 +141,91 @@ public class EmbyProxyFilter implements Filter {
         } catch (Exception e) {
             log.warn("转发请求失败[{}]: {}", req.getMethod(), reqWrapper.getRequestURI(), e);
             forwardOriReq(reqWrapper, res);
+        }
+    }
+
+    private boolean isWebSocketHandshake(HttpServletRequest request) {
+        String connection = request.getHeader("Connection");
+        String upgrade = request.getHeader("Upgrade");
+        return "Upgrade".equalsIgnoreCase(connection) &&
+                "websocket".equalsIgnoreCase(upgrade);
+    }
+
+    // WebSocket请求转发实现
+    @SneakyThrows
+    private void handleWebSocket(HttpServletRequest req, HttpServletResponse res) {
+        try {
+            URI targetUri = new URI(embyConfig.getWsHost() + req.getRequestURI());
+            HttpClient client = HttpClient.newHttpClient();
+            AsyncContext asyncContext = req.startAsync();
+
+            WebSocket targetSocket = client.newWebSocketBuilder()
+                    // .header("Sec-WebSocket-Key", req.getHeader("Sec-WebSocket-Key"))
+                    // .header("Sec-WebSocket-Version", req.getHeader("Sec-WebSocket-Version"))
+                    // .header("Upgrade", "websocket")
+                    // .header("Connection", "Upgrade")
+                    .buildAsync(targetUri, new WebSocket.Listener() {
+                        private StringBuilder textBuffer = new StringBuilder();
+
+                        @Override
+                        public void onOpen(WebSocket webSocket) {
+                            webSocket.request(1);
+                            log.info("WebSocket连接已建立: {}", targetUri);
+                        }
+
+                        @SneakyThrows
+                        @Override
+                        public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
+                            textBuffer.append(data);
+                            if (last) {
+                                log.info("转发服务端消息: {}", textBuffer);
+                                asyncContext.getResponse().getWriter().write(textBuffer.toString());
+                                textBuffer.setLength(0);
+                            }
+                            webSocket.request(1);
+                            return null;
+                        }
+
+                        @Override
+                        public void onError(WebSocket webSocket, Throwable error) {
+                            log.error("WebSocket错误: {}", error.getMessage());
+                            webSocket.abort();
+                            asyncContext.complete();
+                        }
+                    }).get(30, TimeUnit.SECONDS);
+
+            ServletInputStream input = req.getInputStream();
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            input.setReadListener(new ReadListener() {
+                @Override
+                public void onDataAvailable() throws IOException {
+                    byte[] chunk = new byte[input.available()];
+                    int read = input.read(chunk);
+                    if (read > 0) {
+                        buffer.write(chunk, 0, read);
+                    }
+                }
+
+                @Override
+                public void onAllDataRead() {
+                    targetSocket.sendText(buffer.toString(StandardCharsets.UTF_8), true);
+                    buffer.reset();
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    log.error("输入流异常: {}", t.getMessage());
+                    targetSocket.abort();
+                    asyncContext.complete();
+                }
+            });
+
+        } catch (TimeoutException e) {
+            log.error("连接超时: {}", e.getMessage());
+            res.sendError(504, "WebSocket握手超时");
+        } catch (Exception e) {
+            log.error("内部错误: {}", e.getMessage());
+            res.sendError(500, "服务器内部错误");
         }
     }
 
@@ -248,8 +350,8 @@ public class EmbyProxyFilter implements Filter {
      * @param tmdbConfig tmdb配置
      * @return {@link String }
      */
-    private String getFormattedUrl(String path, TmdbConfig tmdbConfig) {
-        return StrUtil.isNotBlank(path) ? StrUtil.format(tmdbConfig.getImageCdnUrl(), 400) + path : null;
+    private String getFormattedUrl(String path, TmdbConfig tmdbConfig, String maxWidth) {
+        return StrUtil.isNotBlank(path) ? StrUtil.format(tmdbConfig.getImageCdnUrl(), maxWidth) + path : null;
     }
 
     /**
@@ -262,7 +364,6 @@ public class EmbyProxyFilter implements Filter {
      */
     @SneakyThrows
     private void processPic(EmbyContentCacheReqWrapper request, HttpServletResponse response, EmbyPicType picType) {
-        Map<String, Object> params = request.getCachedParam();
         String mediaSourceIdStr = ReUtil.get(RegexPool.NUMBERS, request.getRequestURI(), 0);
         if (StrUtil.isBlank(mediaSourceIdStr)) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
@@ -271,10 +372,11 @@ public class EmbyProxyFilter implements Filter {
         Integer mediaSourceId = NumberUtil.parseInt(mediaSourceIdStr);
         EmbyItemPic itemPic = embyItemPicDao.findByItemId(mediaSourceId);
         if (null != itemPic) {
+            String maxWidth = MapUtil.getStr(request.getCachedParam(), "maxwidth", "400");
             String url = switch (picType) {
-                case 封面 -> getFormattedUrl(itemPic.getPosterPath(), tmdbConfig);
-                case 背景图 -> getFormattedUrl(itemPic.getBackdropPath(), tmdbConfig);
-                case Logo -> getFormattedUrl(itemPic.getLogoPath(), tmdbConfig);
+                case 封面 -> getFormattedUrl(itemPic.getPosterPath(), tmdbConfig, maxWidth);
+                case 背景图 -> getFormattedUrl(itemPic.getBackdropPath(), tmdbConfig, maxWidth);
+                case Logo -> getFormattedUrl(itemPic.getLogoPath(), tmdbConfig, maxWidth);
                 default -> throw new BaseException("图片类型异常: " + picType);
             };
             if (StrUtil.isNotBlank(url)) {
@@ -730,10 +832,10 @@ public class EmbyProxyFilter implements Filter {
                     request.getCachedParam(), Charset.defaultCharset());
             Request originalRequest = Request.of(url).method(Method.valueOf(request.getMethod()))
                     .body(request.getCachedBody())
-                    .header(MapUtil.removeAny(request.getCachedHeader(), "Transfer-Encoding"));
+                    .header(request.getCachedHeader());
             stopWatch.start("转发");
             try (Response res = httpClient.send(originalRequest).sync()) {
-                cached = EmbyCachedResp.transfer(res);
+                cached = EmbyCachedResp.transfer(res, request.getMethod());
                 writeCacheResponse(request, response, cached);
             } catch (Throwable e) {
                 if (StrUtil.contains(ExceptionUtil.getSimpleMessage(e), "Cannot invoke " +
@@ -775,7 +877,7 @@ public class EmbyProxyFilter implements Filter {
         }
         res.setStatus(cached.getStatusCode());
         cached.getHeaders().forEach(res::setHeader);
-        if (null != cached.getContent()) {
+        if (ArrayUtil.isNotEmpty(cached.getContent())) {
             res.getOutputStream().write(cached.getContent());
         }
 

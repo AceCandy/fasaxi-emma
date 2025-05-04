@@ -1,5 +1,6 @@
 package cn.acecandy.fasaxi.emma.common.resp;
 
+import cn.acecandy.fasaxi.emma.utils.CompressUtil;
 import lombok.Data;
 import lombok.SneakyThrows;
 import org.dromara.hutool.core.map.MapUtil;
@@ -37,7 +38,7 @@ public class EmbyCachedResp implements Serializable {
     private Long exTime;
 
     @SneakyThrows
-    public static EmbyCachedResp transfer(Response res) {
+    public static EmbyCachedResp transfer(Response res, String method) {
         EmbyCachedResp embyCachedResp = new EmbyCachedResp();
         embyCachedResp.statusCode = res.getStatus();
         res.headers().forEach((k, v) -> {
@@ -47,9 +48,16 @@ public class EmbyCachedResp implements Serializable {
             embyCachedResp.headers.put(k, StrUtil.join(StrUtil.COMMA, v));
         });
         ResponseBody body = res.body().sync();
-        if (StrUtil.containsIgnoreCase(embyCachedResp.getHeaders().get("Content-Type"), "application/json")) {
-            String content = StrUtil.replaceIgnoreCase(body.getString(), "micu", "REDMT");
-            embyCachedResp.content = content.getBytes();
+        if (StrUtil.equalsAnyIgnoreCase(method, "get") && StrUtil.containsIgnoreCase(
+                embyCachedResp.getHeaders().get("Content-Type"), "application/json")) {
+            if (StrUtil.equalsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "br")) {
+                String bodyStr = new String(CompressUtil.decode(body.getBytes()));
+                String content = StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
+                embyCachedResp.content = content.getBytes();
+            }else{
+                String content = StrUtil.replaceIgnoreCase(body.getString(), "micu", "REDMT");
+                embyCachedResp.content = content.getBytes();
+            }
         } else {
             embyCachedResp.content = body.getBytes();
         }
