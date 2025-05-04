@@ -1,11 +1,15 @@
 package cn.acecandy.fasaxi.emma.config;
 
+import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
+import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
-import cn.acecandy.fasaxi.emma.common.vo.EmbyUrlCacheVO;
+import cn.acecandy.fasaxi.emma.dao.entity.EmbyItemPic;
+import cn.acecandy.fasaxi.emma.dao.service.EmbyItemPicDao;
+import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
+import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
+import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.EmbyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.annotation.Resource;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
@@ -18,25 +22,24 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.client.methods.RequestBuilder;
-import org.apache.http.entity.ByteArrayEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.date.StopWatch;
-import org.dromara.hutool.core.lang.Console;
+import org.dromara.hutool.core.exception.ExceptionUtil;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.math.NumberUtil;
 import org.dromara.hutool.core.net.url.UrlQueryUtil;
+import org.dromara.hutool.core.regex.ReUtil;
+import org.dromara.hutool.core.regex.RegexPool;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
 import org.dromara.hutool.core.thread.ThreadUtil;
-import org.dromara.hutool.extra.aop.aspects.TimeIntervalAspect;
 import org.dromara.hutool.http.HttpUtil;
+import org.dromara.hutool.http.client.Request;
+import org.dromara.hutool.http.client.Response;
+import org.dromara.hutool.http.client.engine.ClientEngine;
+import org.dromara.hutool.http.meta.HttpStatus;
 import org.dromara.hutool.http.meta.Method;
-import org.dromara.hutool.http.server.servlet.ServletUtil;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -46,9 +49,14 @@ import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.Logo;
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.封面;
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.背景图;
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.非图片;
 import static io.undertow.util.StatusCodes.OK;
 
 /**
@@ -64,38 +72,51 @@ import static io.undertow.util.StatusCodes.OK;
 public class EmbyProxyFilter implements Filter {
 
     @Resource
-    private CloseableHttpClient embyHttpClient;
+    private ClientEngine httpClient;
 
     @Resource
-    private FastEmbyConfig fastEmbyConfig;
+    private EmbyConfig embyConfig;
 
     @Resource
     private EmbyUtil embyUtil;
 
     @Resource
+    private EmbyProxy embyProxy;
+
+    @Resource
     private FileCacheUtil fileCacheUtil;
 
-    private final Cache<String, EmbyCachedResp> staticCache = Caffeine.newBuilder()
-            .maximumSize(1000).expireAfterWrite(12, TimeUnit.HOURS)
-            .build();
+    @Resource
+    private EmbyItemPicDao embyItemPicDao;
 
-    private final Cache<String, EmbyUrlCacheVO> urlCache = Caffeine.newBuilder()
-            .maximumSize(1000).expireAfterWrite(1, TimeUnit.DAYS)
-            .build();
+    @Resource
+    private TmdbConfig tmdbConfig;
 
-    private final Map<String, ReentrantLock> urlLockMap = MapUtil.newSafeConcurrentHashMap();
+    @Resource
+    private RedisClient redisClient;
+
+    private final Map<String, Lock> urlLockMap = MapUtil.newSafeConcurrentHashMap();
+    private final Map<String, Lock> picLockMap = MapUtil.newSafeConcurrentHashMap();
+
 
     @Override
+    @SneakyThrows
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse res = (HttpServletResponse) response;
-        ServletUtil
 
         // 缓存原始请求数据
         EmbyContentCacheReqWrapper reqWrapper = new EmbyContentCacheReqWrapper(req);
         try {
-            if (needVideoRedirect(req)) {
+            if (needClose(req)) {
+                res.setStatus(HttpStatus.HTTP_REQUESTED_RANGE_NOT_SATISFIABLE);
+                return;
+            }
+            EmbyPicType picType = needPicRedirect(req);
+            if (!非图片.equals(picType)) {
+                processPic(reqWrapper, res, picType);
+            } else if (needVideoRedirect(req)) {
                 processVideo(reqWrapper, res);
             } else {
                 forwardOriReq(reqWrapper, res);
@@ -106,8 +127,28 @@ public class EmbyProxyFilter implements Filter {
         }
     }
 
+    private EmbyPicType needPicRedirect(HttpServletRequest req) {
+        EmbyPicType type = 非图片;
+        String url = req.getRequestURI().toLowerCase();
+        if (!StrUtil.contains(url, "/items/")) {
+            return type;
+        }
+        if (StrUtil.contains(url, "/images/primary")) {
+            type = 封面;
+        } else if (StrUtil.contains(url, "/images/backdrop")) {
+            type = 背景图;
+        } else if (StrUtil.contains(url, "/images/logo")) {
+            type = Logo;
+        }
+        return type;
+    }
+
     private boolean needVideoRedirect(HttpServletRequest req) {
-        return StrUtil.containsAll(req.getRequestURI(), "/emby/videos/", "/original");
+        return StrUtil.containsAll(req.getRequestURI().toLowerCase(), "/emby/videos/", "/original");
+    }
+
+    private boolean needClose(HttpServletRequest req) {
+        return StrUtil.containsAnyIgnoreCase(req.getRequestURI(), "/embywebsocket");
     }
 
     /**
@@ -131,7 +172,7 @@ public class EmbyProxyFilter implements Filter {
      * @return {@link String }
      */
     private String staticCacheKey(EmbyContentCacheReqWrapper req) {
-        return StrUtil.format("{}?{}", req.getRequestURI(), req.getCacheParam());
+        return StrUtil.format("{}?{}", req.getRequestURI(), req.getCachedParam());
     }
 
     /**
@@ -142,7 +183,7 @@ public class EmbyProxyFilter implements Filter {
      */
     @SneakyThrows
     private void processVideo(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
-        Map<String, Object> params = request.getCacheParam();
+        Map<String, Object> params = request.getCachedParam();
         String mediaSourceId = StrUtil.removePrefixIgnoreCase(
                 MapUtil.getStr(params, "MediaSourceId"), "mediasource_");
         if (StrUtil.isBlank(mediaSourceId)) {
@@ -150,74 +191,151 @@ public class EmbyProxyFilter implements Filter {
             return;
         }
 
+        String ua = request.getUa();
+        String cacheKey = ua + "|" + mediaSourceId;
+        String cacheUrl = redisClient.getStrFindOne(ua + "|" + mediaSourceId, mediaSourceId);
+        if (StrUtil.isNotBlank(cacheUrl)) {
+            cacheUrl = getPtUrl(cacheUrl);
+            response.setStatus(HttpServletResponse.SC_FOUND);
+            response.setHeader("Location", cacheUrl);
+            log.warn("重定向(缓存):[{}] => {}", cacheKey, cacheUrl);
+            return;
+        }
         // 获取或创建对应的锁
-        ReentrantLock lock = urlLockMap.computeIfAbsent(mediaSourceId, k -> new ReentrantLock());
-
+        Lock lock = urlLockMap.computeIfAbsent(mediaSourceId, k -> new ReentrantLock());
+        if (!lock.tryLock(15, TimeUnit.SECONDS)) {
+            log.warn("请求锁被占用: {}", mediaSourceId);
+            response.setStatus(429);
+            return;
+        }
         try {
-            if (lock.tryLock()) {
-                // lock.lock();
-                exec302(request, response, mediaSourceId);
-            } else {
-                log.warn("请求锁被占用: {}", mediaSourceId);
-                response.setStatus(429);
-            }
+            exec302(request, response, mediaSourceId);
         } finally {
             lock.unlock();
             urlLockMap.remove(mediaSourceId);
         }
     }
 
-    private void exec302(EmbyContentCacheReqWrapper request,
-                         HttpServletResponse response, String mediaSourceId) {
-        Map<String, String> headers = request.getHeaderMap();
-        String ua = headers.get("User-Agent");
+    private String getPtUrl(String cacheUrl) {
+        if (!StrUtil.startWithIgnoreCase(cacheUrl, embyConfig.getOriginPt())) {
+            return cacheUrl;
+        }
+        int minute = DateUtil.thisMinute();
+        if (minute == 0) {
+            // 使用原始路径
+        } else if (minute % 10 == 0) {
+            cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
+                    embyConfig.getOriginPt(), embyConfig.getTransPt1());
+        } else {
+            if (minute % 3 == 0) {
+                cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
+                        embyConfig.getOriginPt(), embyConfig.getTransPt2());
+            } else if (minute % 3 == 1) {
+                cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
+                        embyConfig.getOriginPt(), embyConfig.getTransPt3());
+            } else if (minute % 3 == 2) {
+                cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
+                        embyConfig.getOriginPt(), embyConfig.getTransPt4());
+            }
+        }
+        return cacheUrl;
+    }
 
+    /**
+     * 获取格式化url
+     *
+     * @param path       路径
+     * @param tmdbConfig tmdb配置
+     * @return {@link String }
+     */
+    private String getFormattedUrl(String path, TmdbConfig tmdbConfig) {
+        return StrUtil.isNotBlank(path) ? StrUtil.format(tmdbConfig.getImageCdnUrl(), 400) + path : null;
+    }
 
-        String cacheKey = ua + "|" + mediaSourceId + 11111;
-        EmbyUrlCacheVO urlVO = urlCache.getIfPresent(cacheKey);
-        if (null != urlVO && urlVO.isEffect()) {
-            response.setStatus(HttpServletResponse.SC_FOUND);
-            response.setHeader("Location", urlVO.getUrl());
-            log.warn("重定向(缓存UA+Media):[{}] => {}", cacheKey, urlVO.getUrl());
+    /**
+     * 处理特殊请求
+     * // https://api.themoviedb.org/3/tv/1399/images?api_key=950257e1e6e1b7e0daf665312d82e922
+     * // https://static-mdb.v.geilijiasu.com/t/p/w400//9RO2vbQ67otPrBLXCaC8UMp3Qat.png
+     *
+     * @param request  要求
+     * @param response 响应
+     */
+    @SneakyThrows
+    private void processPic(EmbyContentCacheReqWrapper request, HttpServletResponse response, EmbyPicType picType) {
+        Map<String, Object> params = request.getCachedParam();
+        String mediaSourceIdStr = ReUtil.get(RegexPool.NUMBERS, request.getRequestURI(), 0);
+        if (StrUtil.isBlank(mediaSourceIdStr)) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
-        cacheKey = mediaSourceId + 11111;
-        urlVO = urlCache.getIfPresent(cacheKey);
-        if (null != urlVO && urlVO.isEffect()) {
-            String url = urlVO.getUrl();
-            if (StrUtil.startWithIgnoreCase(url, fastEmbyConfig.getOriginPt())) {
-                int minute = DateUtil.thisMinute();
-                if (minute == 0) {
-                    // 使用原始路径
-                } else if (minute % 10 == 0) {
-                    url = StrUtil.replaceIgnoreCase(url,
-                            fastEmbyConfig.getOriginPt(), fastEmbyConfig.getTransPt1());
-                } else {
-                    if (minute % 3 == 0) {
-                        url = StrUtil.replaceIgnoreCase(url,
-                                fastEmbyConfig.getOriginPt(), fastEmbyConfig.getTransPt2());
-                    } else if (minute % 3 == 1) {
-                        url = StrUtil.replaceIgnoreCase(url,
-                                fastEmbyConfig.getOriginPt(), fastEmbyConfig.getTransPt3());
-                    } else if (minute % 3 == 2) {
-                        url = StrUtil.replaceIgnoreCase(url,
-                                fastEmbyConfig.getOriginPt(), fastEmbyConfig.getTransPt4());
-                    }
-                }
+        Integer mediaSourceId = NumberUtil.parseInt(mediaSourceIdStr);
+        EmbyItemPic itemPic = embyItemPicDao.findByItemId(mediaSourceId);
+        if (null != itemPic) {
+            String url = switch (picType) {
+                case 封面 -> getFormattedUrl(itemPic.getPosterPath(), tmdbConfig);
+                case 背景图 -> getFormattedUrl(itemPic.getBackdropPath(), tmdbConfig);
+                case Logo -> getFormattedUrl(itemPic.getLogoPath(), tmdbConfig);
+                default -> throw new BaseException("图片类型异常: " + picType);
+            };
+            if (StrUtil.isNotBlank(url)) {
+                response.setStatus(HttpServletResponse.SC_FOUND);
+                response.setHeader("Location", url);
+                log.info("{}-图片重定向(DB):[{}] => {}", picType, mediaSourceId, url);
+                return;
             }
+        }
 
+        // 获取或创建对应的锁
+        String lockKey = mediaSourceId + "|" + picType.getValue();
+        Lock lock = picLockMap.computeIfAbsent(lockKey, k -> new ReentrantLock());
+        if (!lock.tryLock(15, TimeUnit.SECONDS)) {
+            log.warn("请求锁被占用: {}", mediaSourceId);
+            response.setStatus(429);
+            return;
+        }
+        try {
+            exec302Pic(request, response, mediaSourceId, picType);
+        } finally {
+            lock.unlock();
+            picLockMap.remove(lockKey);
+        }
+
+    }
+
+    private void exec302Pic(EmbyContentCacheReqWrapper request, HttpServletResponse response,
+                            Integer mediaSourceId, EmbyPicType picType) {
+        EmbyRemoteImageOut.Img imageInfo = embyProxy.getRemoteImage(mediaSourceId, picType);
+        if (null != imageInfo) {
+            String originUrl = StrUtil.removePrefixIgnoreCase(imageInfo.getUrl(), tmdbConfig.getImageStaticUrl());
+            String url = StrUtil.format(tmdbConfig.getImageCdnUrl(), "400") + originUrl;
             response.setStatus(HttpServletResponse.SC_FOUND);
             response.setHeader("Location", url);
-            log.warn("重定向(缓存Media):[{}] => {}", cacheKey, url);
+            log.warn("{}-图片重定向(请求):[{}] => {}", picType, mediaSourceId, url);
+            ThreadUtil.execAsync(() -> {
+                EmbyItemPic picDto = switch (picType) {
+                    case 封面 -> EmbyItemPic.builder().itemId(mediaSourceId).posterPath(originUrl).build();
+                    case 背景图 -> EmbyItemPic.builder().itemId(mediaSourceId).backdropPath(originUrl).build();
+                    case Logo -> EmbyItemPic.builder().itemId(mediaSourceId).logoPath(originUrl).build();
+                    default -> throw new BaseException("图片类型异常: " + picType);
+                };
+                embyItemPicDao.insertOrUpdate(picDto);
+            });
             return;
         }
+        forwardOriReq(request, response);
+    }
 
+    private void exec302(EmbyContentCacheReqWrapper request,
+                         HttpServletResponse response, String mediaSourceId) {
         FileCacheUtil.FileInfo embyInfo = embyUtil.getFileInfo(NumberUtil.parseLong(mediaSourceId));
-        Console.log(embyInfo);
+        if (null == embyInfo) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
         String mediaPath = embyInfo.getPath();
         Map<String, String> header302 = MapUtil.<String, String>builder()
-                .put("User-Agent", ua).put("range", headers.get("Range")).build();
-        fileCacheUtil.cacheNextEpisode(embyInfo, header302);
+                .put("User-Agent", request.getUa()).put("range", request.getRange()).build();
+        // fileCacheUtil.cacheNextEpisode(embyInfo, header302);
         if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
             String realUrl = embyUtil.fetch302Path(mediaPath, header302);
             embyInfo.setRealUrl(realUrl);
@@ -225,27 +343,25 @@ public class EmbyProxyFilter implements Filter {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 return;
             }
-            if (findRangeCache(request, response, embyInfo)) {
+            /*if (findRangeCache(request, response, embyInfo)) {
                 response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
                 return;
-            }
+            }*/
 
-            long exTime = DateUtil.currentSeconds() + 2 * 24 * 60 * 60;
-            if (StrUtil.startWithIgnoreCase(realUrl, fastEmbyConfig.getOriginPt())) {
-                urlCache.put(mediaSourceId, EmbyUrlCacheVO.builder().url(realUrl)
-                        .exTime(exTime).build());
+            int exTime = 2 * 24 * 60 * 60;
+            if (StrUtil.startWithIgnoreCase(realUrl, embyConfig.getOriginPt())) {
+                redisClient.set(mediaSourceId, realUrl, exTime);
             } else {
-                Map<String, String> paramMap = UrlQueryUtil.decodeQuery(realUrl, Charset.defaultCharset());
-                exTime = MapUtil.getLong(paramMap, "t", exTime) - 5 * 60;
-                urlCache.put(ua + "|" + mediaSourceId, EmbyUrlCacheVO.builder().url(realUrl)
-                        .exTime(exTime).build());
+                exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(realUrl, Charset.defaultCharset()),
+                        "t") - DateUtil.currentSeconds() - 5 * 60);
+                redisClient.set(request.getUa() + "|" + mediaSourceId, realUrl, exTime);
             }
 
             response.setStatus(HttpServletResponse.SC_FOUND);
             response.setHeader("Location", realUrl);
             log.info("▲ 请求重定向->[{}-{}] {} 【{}】", response.getStatus(),
-                    request.getMethod(), request.getRequestURI(), request.getCacheParam());
-            log.warn("重定向({}):[{}] => {}", DateUtil.date(exTime * 1000), mediaPath, realUrl);
+                    request.getMethod(), request.getRequestURI(), request.getCachedHeader());
+            log.warn("重定向({}):[{}] => {}", DateUtil.date(DateUtil.currentSeconds() + exTime), mediaPath, realUrl);
             return;
         } else {
             // TODO 这里是不需要302的本地路径
@@ -283,7 +399,7 @@ public class EmbyProxyFilter implements Filter {
 
                 return true;
             } else {
-                ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getHeaderMap()));
+                ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
                 response.setStatus(HttpServletResponse.SC_FOUND);
                 response.setHeader("Location", embyInfo.getRealUrl());
                 return false;
@@ -319,7 +435,7 @@ public class EmbyProxyFilter implements Filter {
 
                 return true;
             } else {
-                ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getHeaderMap()));
+                ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
                 response.setStatus(HttpServletResponse.SC_FOUND);
                 response.setHeader("Location", embyInfo.getRealUrl());
                 return false;
@@ -334,7 +450,7 @@ public class EmbyProxyFilter implements Filter {
         String range = request.getHeader("Range");
         log.info("读取缓存中:{}", range);
         if (!StrUtil.startWithIgnoreCase(range, "bytes=")) {
-            log.warn("范围标头非法: {}", request.getHeaderMap());
+            log.warn("范围标头非法: {}", request.getCachedHeader());
             embyInfo.setStartByte(0L);
             embyInfo.setCacheStatus(FileCacheUtil.CacheStatus.PARTIAL);
             if (fileCacheUtil.checkCacheFile(embyInfo)) {
@@ -342,12 +458,12 @@ public class EmbyProxyFilter implements Filter {
                 response.setHeader("Content-Length", String.valueOf(embyInfo.getSize()));
                 response.setHeader("X-EmbyToAList-Cache", "Hit");
 
-                Map<String, String> headers = request.getHeaderMap();
+                Map<String, String> headers = request.getCachedHeader();
                 headers.put("Range", StrUtil.format("bytes={}-", embyInfo.getCacheFileSize()));
                 mixFileCache(embyInfo, response, headers);
                 return true;
             } else {
-                ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getHeaderMap()));
+                ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
                 response.setStatus(HttpServletResponse.SC_FOUND);
                 response.setHeader("Location", embyInfo.getRealUrl());
                 return true;
@@ -360,7 +476,7 @@ public class EmbyProxyFilter implements Filter {
             embyInfo.setStartByte(startByte);
             embyInfo.setEndByte(endByte);
             if (startByte >= embyInfo.getSize()) {
-                log.warn("range请求超出文件大小[{}]: {}", embyInfo.getSize(), request.getHeaderMap());
+                log.warn("range请求超出文件大小[{}]: {}", embyInfo.getSize(), request.getCachedHeader());
                 response.setStatus(HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
                 return true;
             }
@@ -398,7 +514,7 @@ public class EmbyProxyFilter implements Filter {
                         } else {
                             sourceRange = StrUtil.format("bytes={}", startByte);
                         }
-                        Map<String, String> headers = request.getHeaderMap();
+                        Map<String, String> headers = request.getCachedHeader();
                         headers.put("Range", sourceRange);
                         mixFileCache(embyInfo, response, headers);
                         return true;
@@ -406,7 +522,7 @@ public class EmbyProxyFilter implements Filter {
                             FileCacheUtil.CacheStatus.HIT.name(), FileCacheUtil.CacheStatus.HIT_TAIL.name())) {
                         // 完全在范围内
                         response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
-                        mixFileCache(embyInfo, response, request.getHeaderMap());
+                        mixFileCache(embyInfo, response, request.getCachedHeader());
                         return true;
                     } else {
                         // 请求的范围与缓存重叠并超出缓存
@@ -416,13 +532,13 @@ public class EmbyProxyFilter implements Filter {
                         } else {
                             sourceRange = StrUtil.format("bytes={}", sourceStart);
                         }
-                        Map<String, String> headers = request.getHeaderMap();
+                        Map<String, String> headers = request.getCachedHeader();
                         headers.put("Range", sourceRange);
                         mixFileCache(embyInfo, response, headers);
                         return true;
                     }
                 } else {
-                    ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getHeaderMap()));
+                    ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
                     response.setStatus(HttpServletResponse.SC_FOUND);
                     response.setHeader("Location", embyInfo.getRealUrl());
                 }
@@ -446,9 +562,9 @@ public class EmbyProxyFilter implements Filter {
                     response.setHeader("X-EmbyToAList-Cache", "Hit");
 
                     response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
-                    mixFileCache(embyInfo, response, request.getHeaderMap());
+                    mixFileCache(embyInfo, response, request.getCachedHeader());
                 } else {
-                    ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getHeaderMap()));
+                    ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
                     response.setStatus(HttpServletResponse.SC_FOUND);
                     response.setHeader("Location", embyInfo.getRealUrl());
                 }
@@ -470,7 +586,7 @@ public class EmbyProxyFilter implements Filter {
                     } else {
                         sourceRange = StrUtil.format("bytes={}", startByte);
                     }
-                    Map<String, String> headers = request.getHeaderMap();
+                    Map<String, String> headers = request.getCachedHeader();
                     headers.put("Range", sourceRange);
                     mixFileCache(embyInfo, response, headers);
                     return true;
@@ -592,39 +708,47 @@ public class EmbyProxyFilter implements Filter {
      */
     @SneakyThrows
     private void forwardOriReq(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
-        TimeIntervalAspect timer = DateUtil.timer();
-        StopWatch stopWatch = new StopWatch();
-        StopWatch.
-        stopWatch.
+        StopWatch stopWatch = StopWatch.of("原始请求");
         String cacheKey = staticCacheKey(request);
 
-        // 获取或创建对应的锁
-        ReentrantLock lock = urlLockMap.computeIfAbsent(cacheKey, k -> new ReentrantLock());
-        try {
-            lock.lock();
+        EmbyCachedResp cached = redisClient.getBean(cacheKey);
+        if (cached != null) {
+            writeCacheResponse(response, cached);
+            return;
+        }
+        cached = new EmbyCachedResp();
 
-            EmbyCachedResp cached = staticCache.getIfPresent(cacheKey);
-            if (cached != null && cached.getExTime() > DateUtil.currentSeconds()) {
-                writeCacheResponse(response, cached);
-                return;
-            }
+        // 获取或创建对应的锁
+        stopWatch.start("上锁");
+        Lock lock = urlLockMap.computeIfAbsent(cacheKey, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            stopWatch.stop();
 
             // 原始请求转发
-            String url = HttpUtil.urlWithFormUrlEncoded(fastEmbyConfig.getHost() + request.getRequestURI(),
-                    request.getCacheParam(), Charset.defaultCharset());
-            HttpUriRequest originalRequest = RequestBuilder.create(request.getMethod())
-                    .setUri(url).setEntity(new ByteArrayEntity(request.getContentAsByteArray()))
-                    .build();
-            request.getHeaderMap().forEach(originalRequest::addHeader);
-            originalRequest.removeHeaders("Transfer-Encoding");
-            // log.info("请求头:{}=>{}", request.getHeaderMap(), originalRequest.getAllHeaders());
-
-            long lockTime = timer.intervalRestart();
-            try (CloseableHttpResponse embyResponse = embyHttpClient.execute(originalRequest)) {
-                cached = EmbyCachedResp.transfer(embyResponse);
-                log.info("请求转发->[{}-{}:{}-{}] {}", cached.getStatusCode(),
-                        request.getMethod(), lockTime, timer.interval(), url);
+            String url = HttpUtil.urlWithFormUrlEncoded(embyConfig.getHost() + request.getRequestURI(),
+                    request.getCachedParam(), Charset.defaultCharset());
+            Request originalRequest = Request.of(url).method(Method.valueOf(request.getMethod()))
+                    .body(request.getCachedBody())
+                    .header(MapUtil.removeAny(request.getCachedHeader(), "Transfer-Encoding"));
+            stopWatch.start("转发");
+            try (Response res = httpClient.send(originalRequest).sync()) {
+                cached = EmbyCachedResp.transfer(res);
                 writeCacheResponse(request, response, cached);
+            } catch (Throwable e) {
+                if (StrUtil.contains(ExceptionUtil.getSimpleMessage(e), "Cannot invoke " +
+                        "\"org.apache.hc.core5.http.HttpEntity.getContent()\" because \"this.entity\" is null")) {
+                    // log.warn("转发请求无响应-忽略[{}]: {},e:{}", request.getMethod(), request.getRequestURI(), ExceptionUtil.getSimpleMessage(e));
+                    cached.setStatusCode(HttpStatus.HTTP_OK);
+                    writeCacheResponse(request, response, cached);
+                } else {
+                    throw e;
+                }
+            } finally {
+                stopWatch.stop();
+                log.info("请求转发->[{}-{}:{}-{}] {}", cached.getStatusCode(), request.getMethod(),
+                        stopWatch.getTaskInfo()[0].getTimeMillis(), stopWatch.getTaskInfo()[1].getTimeMillis(),
+                        StrUtil.format("{}&api_key={}", url, embyConfig.getApiKey()));
             }
         } finally {
             lock.unlock();
@@ -640,21 +764,21 @@ public class EmbyProxyFilter implements Filter {
      * @param cached  高速缓存
      */
     @SneakyThrows
-    private void writeCacheResponse(EmbyContentCacheReqWrapper request, HttpServletResponse res, EmbyCachedResp
-            cached) {
+    private void writeCacheResponse(EmbyContentCacheReqWrapper request,
+                                    HttpServletResponse res, EmbyCachedResp cached) {
         if (null != request && cached.getStatusCode() == OK && StrUtil.equalsIgnoreCase(request.getMethod(), "GET")) {
+            int exTime = 5;
             if (isCacheReq(request)) {
-                cached.setExTime(DateUtil.currentSeconds() + 2 * 24 * 60 * 60);
-            } else {
-                cached.setExTime(DateUtil.currentSeconds() + 5);
+                exTime = 2 * 24 * 60 * 60;
             }
-            staticCache.put(staticCacheKey(request), cached);
+            redisClient.setBean(staticCacheKey(request), cached, exTime);
         }
         res.setStatus(cached.getStatusCode());
         cached.getHeaders().forEach(res::setHeader);
         if (null != cached.getContent()) {
             res.getOutputStream().write(cached.getContent());
         }
+
     }
 
     /**
@@ -665,22 +789,5 @@ public class EmbyProxyFilter implements Filter {
      */
     private void writeCacheResponse(HttpServletResponse res, EmbyCachedResp cached) {
         writeCacheResponse(null, res, cached);
-    }
-
-    public static void main(String[] args) {
-        /*String s = "http://x.acecandy.cn:25888/emby/Users/authenticatebyname?X-Emby-Device-Id=87f46ff4-3982-405f-b4d8-ccf42a08c212&X-Emby-Language=zh-cn&Username=ccc&X-Emby-Device-Name=Microsoft%20Edge%20macOS&X-Emby-Token=d20656cfaf524fd58fbfc801627009c7&X-Emby-Client-Version=4.9.0.42&Pw=065975&X-Emby-Client=Emby%20Web";
-        Map<String, Object> p = MapUtil.newHashMap();
-        p.put("Pw", "065975");
-        p.put("Username", "ccc");
-        String result2 = HttpRequest.post(s)
-                // .header("Access-Control-Allow-Origin", "http://x.acecandy.cn:25888")
-                // .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-                // .header("Origin", "http://x.acecandy.cn:25888")
-                .header("User-Agent", "Yamby/1.0")
-                // .body("Username=ccc&Pw=065975")
-                .execute().body();
-        Console.log(result2);*/
-
-        Console.log(HttpUtil.createRequest(Method.HEAD, "https://alist.acecandy.cn:880/d/pt/Emby1/%E5%8A%A8%E6%BC%AB/2.5%E6%AC%A1%E5%85%83%E7%9A%84%E8%AF%B1%E6%83%91%20(2024)/Season%201/2.5%E6%AC%A1%E5%85%83%E7%9A%84%E8%AF%B1%E6%83%91%20-%20S01E13%20-%20%E7%AC%AC13%E9%9B%86%20-%20ANi.mp4").execute().headers());
     }
 }

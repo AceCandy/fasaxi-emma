@@ -2,36 +2,32 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.vo.HeadVO;
 import cn.acecandy.fasaxi.emma.common.vo.HttpReqVO;
-import cn.acecandy.fasaxi.emma.config.FastEmbyConfig;
-import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.lang.Console;
-import cn.hutool.core.map.MapUtil;
-import cn.hutool.core.util.NumberUtil;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.core.util.URLUtil;
-import cn.hutool.http.HttpRequest;
-import cn.hutool.http.HttpResponse;
-import cn.hutool.http.HttpStatus;
-import cn.hutool.http.HttpUtil;
-import cn.hutool.http.Method;
-import cn.hutool.json.JSONObject;
-import cn.hutool.json.JSONUtil;
+import cn.acecandy.fasaxi.emma.config.EmbyConfig;
+import cn.acecandy.fasaxi.emma.config.TmdbConfig;
+import cn.acecandy.fasaxi.emma.sao.proxy.TmdbProxy;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.http.impl.client.CloseableHttpClient;
+import org.dromara.hutool.core.collection.CollUtil;
+import org.dromara.hutool.core.map.MapUtil;
+import org.dromara.hutool.core.math.NumberUtil;
+import org.dromara.hutool.core.net.url.UrlEncoder;
+import org.dromara.hutool.core.net.url.UrlUtil;
+import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.http.client.Request;
+import org.dromara.hutool.http.client.Response;
+import org.dromara.hutool.http.client.engine.ClientEngine;
+import org.dromara.hutool.http.meta.Method;
+import org.dromara.hutool.json.JSONObject;
+import org.dromara.hutool.json.JSONUtil;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Map;
 
-import static io.undertow.util.StatusCodes.FOUND;
-import static org.springframework.http.HttpStatus.OK;
+import static org.dromara.hutool.http.meta.HttpStatus.HTTP_MOVED_TEMP;
 
 /**
  * emby 工具类
@@ -43,10 +39,16 @@ import static org.springframework.http.HttpStatus.OK;
 @Component
 public class EmbyUtil {
     @Resource
-    private CloseableHttpClient embyHttpClient;
+    private ClientEngine httpClient;
 
     @Resource
-    private FastEmbyConfig fastEmbyConfig;
+    private EmbyConfig embyConfig;
+
+    @Resource
+    private TmdbConfig tmdbConfig;
+
+    @Resource
+    private TmdbProxy tmdbProxy;
 
     private static final String EMBY_INNER_URL = "http://192.168.1.205:8096";
     private static final String EMBY_PUBLIC_URL = "http://emby-real.acecandy.cn:800";
@@ -114,6 +116,7 @@ public class EmbyUtil {
      * @param mediaSourceId 媒体源id
      * @return {@link String }
      */
+    @SneakyThrows
     public String getItemInfo(String ua, String mediaSourceId) {
         String embyPath = fetchEmbyFilePath(mediaSourceId);
         String embyPathRes = replacePath2Alist(embyPath);
@@ -122,9 +125,10 @@ public class EmbyUtil {
         }
         var alistPath = buildAlistPath(embyPathRes);
         // 临时切换为bt 正常时可以注释掉
-        alistPath = StrUtil.replaceFirst(alistPath, "micu-bt", "micu-pt");
-        try (HttpResponse res = HttpRequest.head(alistPath).header("User-Agent", ua).execute()) {
-            if (res.getStatus() == HttpStatus.HTTP_MOVED_TEMP) {
+        alistPath = StrUtil.replaceFirst(alistPath, "micu-bt", "micu-pt", true);
+
+        try (Response res = httpClient.send(Request.of(alistPath).method(Method.HEAD).header("User-Agent", ua)).sync()) {
+            if (res.getStatus() == HTTP_MOVED_TEMP) {
                 return CollUtil.getFirst(res.headers().get("Location"));
             }
         }
@@ -137,23 +141,22 @@ public class EmbyUtil {
      * @param mediaSourceId 媒体源id
      * @return {@link String }
      */
+    @SneakyThrows
     public String fetchEmbyFilePath(String mediaSourceId) {
         if (StrUtil.isBlank(mediaSourceId)) {
             return "";
         }
-        try (HttpResponse res = HttpRequest.get(fastEmbyConfig.getHost() + "/Items")
-                .form("Fields", "Path,MediaSources")
-                .form("Ids", mediaSourceId).form("Limit", 1)
-                .form("api_key", EMBY_API_KEY).timeout(10 * 1000)
-                .execute()) {
-            if (res.isOk() && JSONUtil.isTypeJSON(res.body())) {
-                JSONObject resJn = JSONUtil.parseObj(res.body());
+        try (Response res = httpClient.send(Request.of(embyConfig.getHost() + "/Items").method(Method.GET)
+                .form(MapUtil.<String, Object>builder("Fields", "Path,MediaSources").put("Ids", mediaSourceId)
+                        .put("Limit", 1).put("api_key", EMBY_API_KEY).map())).sync()) {
+            if (res.isOk() && JSONUtil.isTypeJSON(res.bodyStr())) {
+                JSONObject resJn = JSONUtil.parseObj(res.bodyStr());
                 String mediaPath = resJn.getJSONArray("Items").getJSONObject(0)
                         .getJSONArray("MediaSources").getJSONObject(0)
                         .getStr("Path");
                 // 外网转为内网
                 return StrUtil.replaceIgnoreCase(mediaPath,
-                        fastEmbyConfig.getAlistPublic(), fastEmbyConfig.getAlistInner());
+                        embyConfig.getAlistPublic(), embyConfig.getAlistInner());
             }
         }
         return "";
@@ -166,33 +169,36 @@ public class EmbyUtil {
      * @param header    头球
      * @return {@link String }
      */
+    @SneakyThrows
     public String fetch302Path(String mediaPath, Map<String, String> header) {
         if (StrUtil.isBlank(mediaPath)) {
             return "";
         }
-        try (HttpResponse res = HttpUtil.createRequest(Method.HEAD, mediaPath)
-                .headerMap(header, true).execute()) {
-            if (res.getStatus() == FOUND) {
+        try (Response res = httpClient.send(Request.of(mediaPath).method(Method.HEAD).header(header)).sync()) {
+            if (res.getStatus() == HTTP_MOVED_TEMP) {
                 return res.header("Location");
             }
         }
         return "";
     }
 
+    @SneakyThrows
     public FileCacheUtil.FileInfo getFileInfo(Long mediaSourceId) {
-        try (HttpResponse res = HttpRequest.get(fastEmbyConfig.getHost() + "/Items")
-                .form("Fields", "Path,MediaSources")
-                .form("Ids", mediaSourceId).form("Limit", 1)
-                .form("api_key", EMBY_API_KEY).timeout(10 * 1000)
-                .execute()) {
-            if (res.isOk() && JSONUtil.isTypeJSON(res.body())) {
-                JSONObject resJn = JSONUtil.parseObj(res.body());
+        try (Response res = httpClient.send(Request.of(embyConfig.getHost() + "/Items").method(Method.GET)
+                .form(MapUtil.<String, Object>builder("Fields", "Path,MediaSources").put("Ids", mediaSourceId)
+                        .put("Limit", 1).put("api_key", EMBY_API_KEY).map()))) {
+            if (!res.isOk()) {
+                return null;
+            }
+            String resBody = res.bodyStr();
+            if (res.isOk() && JSONUtil.isTypeJSON(resBody)) {
+                JSONObject resJn = JSONUtil.parseObj(resBody);
                 JSONObject item = resJn.getJSONArray("Items").getJSONObject(0);
                 String mediaPath = item.getJSONArray("MediaSources").getJSONObject(0)
                         .getStr("Path");
                 // 外网转为内网
                 mediaPath = StrUtil.replaceIgnoreCase(mediaPath,
-                        fastEmbyConfig.getAlistPublic(), fastEmbyConfig.getAlistInner());
+                        embyConfig.getAlistPublic(), embyConfig.getAlistInner());
                 Long minute = item.getLong("RunTimeTicks", 0L) / 10000 / 1000 / 60;
                 Long cacheFileSize = item.getLong("Size", 0L) / minute;
                 return FileCacheUtil.FileInfo.builder()
@@ -206,9 +212,8 @@ public class EmbyUtil {
                         .build();
             }
         }
-        return FileCacheUtil.FileInfo.builder().build();
+        return null;
     }
-
 
     public static String replacePath2Alist(String inputPath) {
         for (Map.Entry<String, String> entry : PATH_ALIST_CONFIG.entrySet()) {
@@ -218,7 +223,7 @@ public class EmbyUtil {
                 continue;
             }
             String changePath = StrUtil.replace(inputPath, k, v);
-            return StrUtil.replace(URLUtil.decode(changePath), "\\", "/");
+            return UrlUtil.normalize(changePath, true, true);
         }
         return "";
     }
@@ -227,7 +232,7 @@ public class EmbyUtil {
         if (StrUtil.isBlank(embyUri)) {
             return "";
         }
-        return ALIST_PUBLIC_ADDR + "/d" + URLUtil.encode(embyUri);
+        return ALIST_PUBLIC_ADDR + "/d" + UrlEncoder.encodeQuery(embyUri);
     }
 
     /**
@@ -251,92 +256,4 @@ public class EmbyUtil {
         return headers;
     }
 
-    /**
-     * 重建 请求出参头
-     *
-     * @param resp 请求出参
-     * @return {@link HttpHeaders }
-     */
-    public static HttpHeaders rebuildRespHeader(HttpResponse resp) {
-        HttpHeaders headers = new HttpHeaders();
-
-        Map<String, String> headerMap = MapUtil.newHashMap();
-        resp.headers().forEach((k, v) -> {
-            if (k != null) {
-                headerMap.put(k, CollUtil.getFirst(v));
-            }
-        });
-        headers.setAll(headerMap);
-        return headers;
-    }
-
-
-    /**
-     * 代理直接请求
-     *
-     * @param originalUrl 原始url
-     * @param httpReqVO   http 请求入参vo
-     * @return {@link ResponseEntity }<{@link ? }>
-     */
-    public static ResponseEntity<?> proxyRequest(String originalUrl, HttpReqVO httpReqVO) {
-        try {
-            HttpRequest proxyRequest = HttpUtil
-                    .createRequest(Method.valueOf(httpReqVO.getMethod()), originalUrl).timeout(2000);
-            proxyRequest.header(httpReqVO.getHeaders());
-            httpReqVO.getParamsDict().forEach(proxyRequest::form);
-            try (HttpResponse httpResponse = proxyRequest.executeAsync()) {
-                return ResponseEntity.status(httpResponse.getStatus())
-                        .headers(EmbyUtil.rebuildRespHeader(httpResponse))
-                        .body(httpResponse.body());
-            }
-        } catch (Exception e) {
-            log.error("代理直接请求异常:{}", originalUrl, e);
-            return ResponseEntity.status(OK).body("Proxy error: " + e.getMessage());
-        }
-    }
-
-    /**
-     * 302重定向
-     *
-     * @param redirectUrl 重定向url
-     * @return {@link ResponseEntity }<{@link ? }>
-     */
-    public static ResponseEntity<?> redirect302(String ua, String mediaSourceId, String redirectUrl) {
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.add("Location", redirectUrl);
-            log.info("重定向到: {}", redirectUrl);
-            return new ResponseEntity<>(headers, org.springframework.http.HttpStatus.FOUND);
-        } finally {
-            if (!StrUtil.contains(redirectUrl, "cdnfhnfile.115.com")) {
-                ua = "";
-            }
-            CacheUtil.setMediaKey(ua, mediaSourceId, redirectUrl);
-        }
-    }
-
-    public static class Result {
-        String subdirectory;
-        String hash;
-
-        public Result(String subdirectory, String hash) {
-            this.subdirectory = subdirectory;
-            this.hash = hash;
-        }
-
-        public String getSubdirectory() {
-            return subdirectory;
-        }
-
-        public String getHash() {
-            return hash;
-        }
-    }
-
-    public static void main(String[] args) {
-        String filePath = "/Users/mac/Downloads/2024-10-12 10.21.14.mp4";
-        Path path = Paths.get(filePath);
-        Console.log(FileUtil.subPath(path, path.getNameCount() - 3, path.getNameCount()));
-        Console.log(StrUtil.subPre(filePath, 2));
-    }
 }

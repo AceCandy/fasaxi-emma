@@ -1,7 +1,7 @@
 package cn.acecandy.fasaxi.emma.common.req;
 
-import cn.hutool.core.util.StrUtil;
 import lombok.Data;
+import org.dromara.hutool.core.text.StrUtil;
 
 /**
  * 视频重定向 入参
@@ -21,6 +21,6 @@ public class VideoRedirectReq {
     private String MediaSourceId;
 
     public String getMediaSourceId() {
-        return StrUtil.removePrefix(MediaSourceId, "mediasource_");
+        return StrUtil.removePrefixIgnoreCase(MediaSourceId, "mediasource_");
     }
 }

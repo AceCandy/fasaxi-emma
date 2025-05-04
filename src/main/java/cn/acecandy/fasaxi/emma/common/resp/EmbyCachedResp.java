@@ -1,12 +1,13 @@
 package cn.acecandy.fasaxi.emma.common.resp;
 
-import cn.hutool.core.map.MapUtil;
 import lombok.Data;
 import lombok.SneakyThrows;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.util.EntityUtils;
+import org.dromara.hutool.core.map.MapUtil;
+import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.http.client.Response;
+import org.dromara.hutool.http.client.body.ResponseBody;
 
-import java.util.Arrays;
+import java.io.Serializable;
 import java.util.Map;
 
 /**
@@ -16,7 +17,7 @@ import java.util.Map;
  * @since 2025/4/16
  */
 @Data
-public class EmbyCachedResp {
+public class EmbyCachedResp implements Serializable {
     /**
      * 状态码
      */
@@ -36,13 +37,21 @@ public class EmbyCachedResp {
     private Long exTime;
 
     @SneakyThrows
-    public static EmbyCachedResp transfer(CloseableHttpResponse backendRes) {
+    public static EmbyCachedResp transfer(Response res) {
         EmbyCachedResp embyCachedResp = new EmbyCachedResp();
-        embyCachedResp.statusCode = backendRes.getStatusLine().getStatusCode();
-        Arrays.stream(backendRes.getAllHeaders())
-                .forEach(h -> embyCachedResp.headers.put(h.getName(), h.getValue()));
-        if (null != backendRes.getEntity()) {
-            embyCachedResp.content = EntityUtils.toByteArray(backendRes.getEntity());
+        embyCachedResp.statusCode = res.getStatus();
+        res.headers().forEach((k, v) -> {
+            if (k == null || StrUtil.equalsIgnoreCase(k, "content-length")) {
+                return;
+            }
+            embyCachedResp.headers.put(k, StrUtil.join(StrUtil.COMMA, v));
+        });
+        ResponseBody body = res.body().sync();
+        if (StrUtil.containsIgnoreCase(embyCachedResp.getHeaders().get("Content-Type"), "application/json")) {
+            String content = StrUtil.replaceIgnoreCase(body.getString(), "micu", "REDMT");
+            embyCachedResp.content = content.getBytes();
+        } else {
+            embyCachedResp.content = body.getBytes();
         }
         return embyCachedResp;
     }

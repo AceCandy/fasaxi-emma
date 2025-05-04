@@ -1,8 +1,8 @@
 package cn.acecandy.fasaxi.emma.common.vo;
 
-import cn.hutool.core.date.DateUtil;
 import lombok.Builder;
 import lombok.Data;
+import org.dromara.hutool.core.date.DateUtil;
 
 /**
  * emby url缓存 VO

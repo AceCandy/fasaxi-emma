@@ -2,8 +2,6 @@ package cn.acecandy.fasaxi.emma.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 
@@ -14,11 +12,23 @@ import java.util.List;
 // @Configuration
 @Data
 @ConfigurationProperties(prefix = "emby")
-public class FastEmbyConfig {
+public class EmbyConfig {
     /**
      * 内网emby地址
      */
     private String host;
+    /**
+     * apiKey
+     */
+    private String apiKey;
+    /**
+     * 媒体信息url
+     */
+    private String itemInfoUrl;
+    /**
+     * 远程图片url
+     */
+    private String remoteImagesUrl;
     /**
      * 缓存路径
      */
@@ -63,9 +73,4 @@ public class FastEmbyConfig {
      * strm相关路径
      */
     private List<String> strmPaths;
-
-    @Bean
-    public RestTemplate restTemplate() {
-        return new RestTemplate();
-    }
 }

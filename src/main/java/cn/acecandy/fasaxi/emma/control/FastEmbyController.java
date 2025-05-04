@@ -1,24 +1,11 @@
 package cn.acecandy.fasaxi.emma.control;
 
-import cn.acecandy.fasaxi.emma.common.req.EmbyAuthReq;
-import cn.acecandy.fasaxi.emma.common.req.VideoRedirectReq;
 import cn.acecandy.fasaxi.emma.service.FastEmbyService;
-import cn.acecandy.fasaxi.emma.utils.EmbyUtil;
-import cn.hutool.core.util.StrUtil;
-import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 @Slf4j
 @Tag(name = "Emby处理入口")
@@ -29,7 +16,7 @@ public class FastEmbyController {
     @Resource
     private FastEmbyService fastEmbyService;
 
-    @Operation(summary = "登录鉴权")
+    /*@Operation(summary = "登录鉴权")
     @PostMapping("/authenticatebyname")
     public ResponseEntity<?> authenticateByName(@RequestBody EmbyAuthReq req,
                                                 HttpServletRequest httpRequest) {
@@ -46,8 +33,8 @@ public class FastEmbyController {
                     .body(Map.of("message", "密码错误"));
         }
         return null;
-    }
-
+    }*/
+/*
     @Operation(summary = "emby请求")
     @GetMapping({"videos/{videoId}/**", "Videos/{videoId}/**"})
     public ResponseEntity<?> handleEmbyRequest(@PathVariable String videoId, HttpServletRequest request,
@@ -55,6 +42,6 @@ public class FastEmbyController {
         log.info("收到请求: [{}]{}, 提取的参数:{}", request.getMethod(),
                 request.getRequestURI(), request.getParameterMap());
         return fastEmbyService.handleEmbyRequest(EmbyUtil.parseHttpReq(request), videoId, req);
-    }
+    }*/
 
 }

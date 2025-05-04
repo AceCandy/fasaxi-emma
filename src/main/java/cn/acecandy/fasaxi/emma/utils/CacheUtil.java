@@ -1,7 +1,8 @@
 package cn.acecandy.fasaxi.emma.utils;
 
-import cn.hutool.cache.impl.FIFOCache;
-import cn.hutool.core.util.StrUtil;
+
+import org.dromara.hutool.core.cache.impl.FIFOCache;
+import org.dromara.hutool.core.text.StrUtil;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.DAY_7_MS;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.MEDIA_CACHE_KEY;
@@ -12,7 +13,7 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.MEDIA_CACHE
  * @author tangningzhu
  * @since 2024/10/16
  */
-public final class CacheUtil extends cn.hutool.cache.CacheUtil {
+public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     private CacheUtil() {
     }
 

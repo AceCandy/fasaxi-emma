@@ -1,25 +1,25 @@
 package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
-import cn.acecandy.fasaxi.emma.config.FastEmbyConfig;
-import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.io.IoUtil;
-import cn.hutool.core.io.file.PathUtil;
-import cn.hutool.core.map.MapUtil;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.crypto.SecureUtil;
+import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import jakarta.annotation.Resource;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.Getter;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.client.methods.RequestBuilder;
-import org.apache.http.impl.client.CloseableHttpClient;
+import org.dromara.hutool.core.collection.CollUtil;
+import org.dromara.hutool.core.io.IoUtil;
+import org.dromara.hutool.core.io.file.FileNameUtil;
+import org.dromara.hutool.core.io.file.FileUtil;
+import org.dromara.hutool.core.io.file.PathUtil;
+import org.dromara.hutool.core.map.MapUtil;
+import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.core.text.split.SplitUtil;
+import org.dromara.hutool.crypto.SecureUtil;
+import org.dromara.hutool.http.client.Request;
+import org.dromara.hutool.http.client.Response;
+import org.dromara.hutool.http.client.engine.ClientEngine;
+import org.dromara.hutool.http.meta.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -33,8 +33,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 
-import static cn.acecandy.fasaxi.emma.utils.FileCacheUtil.EmbyMediaType.电影;
-import static cn.acecandy.fasaxi.emma.utils.FileCacheUtil.EmbyMediaType.电视剧;
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电影;
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧;
+
 
 /**
  * emby 文件缓存 工具类
@@ -47,16 +48,16 @@ import static cn.acecandy.fasaxi.emma.utils.FileCacheUtil.EmbyMediaType.电视�
 public class FileCacheUtil {
 
     @Resource
-    private CloseableHttpClient embyHttpClient;
+    private ClientEngine httpClient;
 
     @Resource
     private EmbyUtil embyUtil;
 
     @Resource
-    private FastEmbyConfig feConfig;
+    private EmbyConfig feConfig;
 
     private static final String cache_path = "cache";
-    private static final Map<String, ReentrantLock> FILE_CACHE_LOCK = MapUtil.newConcurrentHashMap();
+    private static final Map<String, ReentrantLock> FILE_CACHE_LOCK = MapUtil.newSafeConcurrentHashMap();
     // private static final OkHttpClient client = new OkHttpClient();
 
     private static ReentrantLock getLock(String subdirname, String dirname) {
@@ -79,27 +80,16 @@ public class FileCacheUtil {
         StringBuilder newFilePath = new StringBuilder();
         if (!电影.getValue().equals(mediaType)) {
             newFilePath.append("series/").append(
-                    FileUtil.subPath(path, path.getNameCount() - 3, path.getNameCount()));
+                    PathUtil.subPath(path, path.getNameCount() - 3, path.getNameCount()));
         } else {
             newFilePath.append("movie/").append(
-                    FileUtil.subPath(path, path.getNameCount() - 2, path.getNameCount()));
+                    PathUtil.subPath(path, path.getNameCount() - 2, path.getNameCount()));
         }
         return SecureUtil.md5(newFilePath.toString());
     }
 
     public enum CacheStatus {
         UNKNOWN, MISS, PARTIAL, HIT, HIT_TAIL
-    }
-
-    @AllArgsConstructor
-    @Getter
-    enum EmbyMediaType {
-        // 接口出的类型
-        电影("Movie"),
-        电视剧("Episode"),
-        ;
-
-        private final String value;
     }
 
     @Builder
@@ -191,7 +181,7 @@ public class FileCacheUtil {
 
         String cacheFileName = "cacheFile_" + startPoint + "_" + endPoint;
         Path cacheFilePath = Paths.get(feConfig.getCachePath(), subDir, dir, cacheFileName);
-        Path parentPath = FileUtil.mkParentDirs(cacheFilePath);
+        Path parentPath = PathUtil.mkParentDirs(cacheFilePath);
 
         String cacheWriteTagPath = cacheFilePath + ".tag";
         FileUtil.touch(cacheWriteTagPath);
@@ -204,15 +194,15 @@ public class FileCacheUtil {
             long finalStartPoint = startPoint;
             long finalEndPoint = endPoint;
             loopFile.forEach(file -> {
-                String fileName = FileUtil.getName(file);
+                String fileName = FileNameUtil.getName(file);
                 if (!StrUtil.startWith(fileName, "cacheFile_") || StrUtil.endWith(fileName, ".tag")) {
                     return;
                 }
-                List<String> parts = StrUtil.split(fileName, "_");
+                List<String> parts = SplitUtil.split(fileName, "_");
                 long fileStart = Long.parseLong(parts.get(1));
                 long fileEnd = Long.parseLong(parts.get(2));
                 if (finalStartPoint >= fileStart && finalEndPoint <= fileEnd) {
-                    FileUtil.del(cacheFilePath);
+                    PathUtil.del(cacheFilePath);
                 } else if (finalStartPoint <= fileStart && finalEndPoint >= fileEnd) {
                     FileUtil.del(file);
                 }
@@ -222,23 +212,21 @@ public class FileCacheUtil {
             } else {
                 reqHeader = new HashMap<>(reqHeader);
             }
-            reqHeader.put("host", StrUtil.split(realUrl, "/").get(2));
+            reqHeader.put("host", SplitUtil.split(realUrl, "/").get(2));
             reqHeader.put("range", StrUtil.format("bytes={}-{}", startPoint, endPoint));
 
-            HttpUriRequest req = RequestBuilder.get(realUrl).build();
-            reqHeader.forEach(req::addHeader);
-            try (CloseableHttpResponse resp = embyHttpClient.execute(req)) {
-                if (resp.getStatusLine().getStatusCode() != 206) {
+            try (Response res = httpClient.send(Request.of(realUrl).header(reqHeader)).sync()) {
+                if (res.getStatus() != HttpStatus.HTTP_PARTIAL) {
                     throw new BaseException("请求返回code不为206");
                 }
-                FileUtil.writeFromStream(resp.getEntity().getContent(), cacheFilePath.toFile());
+                FileUtil.writeFromStream(res.body().getStream(), cacheFilePath.toFile());
                 log.info("写入缓存文件成功[{}]: {}", itemId, cacheFilePath);
                 FileUtil.del(cacheWriteTagPath);
                 return true;
             }
         } catch (Exception e) {
             log.error("写入缓存失败[{}]: {}", itemId, cacheFilePath, e);
-            FileUtil.del(cacheFilePath);
+            PathUtil.del(cacheFilePath);
             FileUtil.del(cacheWriteTagPath);
             throw e;
         } finally {
@@ -260,12 +248,12 @@ public class FileCacheUtil {
         String dir = pathMd5;
 
         Path fileDir = Paths.get(feConfig.getCachePath(), subDir, dir);
-        for (File file : FileUtil.loopFiles(fileDir, -1, null)) {
-            String fileName = FileUtil.getName(file);
+        for (File file : PathUtil.loopFiles(fileDir, -1, null)) {
+            String fileName = FileNameUtil.getName(file);
             if (!StrUtil.startWith(fileName, "cacheFile_") || StrUtil.endWith(fileName, ".tag")) {
                 continue;
             }
-            List<String> parts = StrUtil.split(fileName, "_");
+            List<String> parts = SplitUtil.split(fileName, "_");
             long fileStart = Long.parseLong(parts.get(1));
             long fileEnd = Long.parseLong(parts.get(2));
             if (fileStart <= fileInfo.getStartByte() && fileInfo.getStartByte() <= fileEnd) {
@@ -288,13 +276,13 @@ public class FileCacheUtil {
         String subDir = StrUtil.subPre(pathMd5, 2);
         String dir = pathMd5;
 
-        Path fileDir = Paths.get(feConfig.getCachePath(), subDir, dir);
-        for (File file : FileUtil.loopFiles(fileDir, -1, null)) {
-            String fileName = FileUtil.getName(file);
+        Path fileDir = PathUtil.of(feConfig.getCachePath(), subDir, dir);
+        for (File file : PathUtil.loopFiles(fileDir, -1, null)) {
+            String fileName = FileNameUtil.getName(file);
             if (!StrUtil.startWith(fileName, "cacheFile_") || StrUtil.endWith(fileName, ".tag")) {
                 continue;
             }
-            List<String> parts = StrUtil.split(fileName, "_");
+            List<String> parts = SplitUtil.split(fileName, "_");
             long fileStart = Long.parseLong(parts.get(1));
             long fileEnd = Long.parseLong(parts.get(2));
             if (fileStart <= fileInfo.getStartByte() && fileInfo.getStartByte() <= fileEnd) {
@@ -322,24 +310,24 @@ public class FileCacheUtil {
         String dir = pathMd5;
 
         Path fileDir = Paths.get(feConfig.getCachePath(), subDir, dir);
-        if (!FileUtil.exist(fileDir.toFile())) {
+        if (FileUtil.isEmpty(fileDir.toFile())) {
             return false;
         }
 
         // 检查是否有任何缓存文件正在写入
         List<File> files = FileUtil.loopFiles(fileDir.toFile());
-        if (files.stream().map(FileUtil::getName)
+        if (files.stream().map(FileNameUtil::getName)
                 .anyMatch(fileName -> StrUtil.endWith(fileName, ".tag"))) {
             return false;
         }
 
         // 这时候已经没有tag结尾的文件了 查找与 startPoint 匹配的缓存文件，endPoint 为文件名的一部分
         for (File file : files) {
-            String fileName = FileUtil.getName(file);
+            String fileName = FileNameUtil.getName(file);
             if (!StrUtil.startWith(fileName, "cacheFile_")) {
                 continue;
             }
-            List<String> parts = StrUtil.split(fileName, "_");
+            List<String> parts = SplitUtil.split(fileName, "_");
             long fileStart = Long.parseLong(parts.get(1));
             long fileEnd = Long.parseLong(parts.get(2));
             if (fileStart <= fileInfo.getStartByte() && fileInfo.getStartByte() <= fileEnd) {
@@ -422,14 +410,15 @@ public class FileCacheUtil {
         File cacheDir = FileUtil.file(feConfig.getCachePath(), subDir, dir);
         ReentrantLock lock = getLock(subDir, dir);
 
-        if (!FileUtil.exist(cacheDir) || !FileUtil.isDirectory(cacheDir)) {
+        if (FileUtil.isEmpty(cacheDir) || !FileUtil.isDirectory(cacheDir)) {
             return false;
         }
 
         FileUtil.loopFiles(cacheDir).stream().filter(f ->
-                StrUtil.startWith(FileUtil.getName(f), "cacheFile_")).map(FileUtil::del);
+                StrUtil.startWith(FileNameUtil.getName(f), "cacheFile_")).forEach(FileUtil::del);
         if (CollUtil.isEmpty(FileUtil.loopFiles(cacheDir))) {
-            return FileUtil.del(cacheDir);
+            FileUtil.del(cacheDir);
+            return true;
         }
         return false;
     }

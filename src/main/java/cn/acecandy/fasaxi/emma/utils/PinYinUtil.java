@@ -1,19 +1,20 @@
 package cn.acecandy.fasaxi.emma.utils;
 
-import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.lang.Console;
-import cn.hutool.core.util.StrUtil;
-import cn.hutool.extra.pinyin.PinyinUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.hutool.core.lang.Console;
+import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.core.text.split.SplitUtil;
+import org.dromara.hutool.extra.pinyin.PinyinUtil;
 
 import java.util.List;
 import java.util.Locale;
 
-import static cn.hutool.core.text.CharSequenceUtil.EMPTY;
-import static cn.hutool.core.text.CharSequenceUtil.SPACE;
-import static cn.hutool.core.text.CharSequenceUtil.isBlank;
-import static cn.hutool.core.text.CharSequenceUtil.subPre;
-import static cn.hutool.core.text.CharSequenceUtil.upperFirst;
+import static org.dromara.hutool.core.text.CharSequenceUtil.subPre;
+import static org.dromara.hutool.core.text.CharSequenceUtil.upperFirst;
+import static org.dromara.hutool.core.text.StrPool.SPACE;
+import static org.dromara.hutool.core.text.StrValidator.EMPTY;
+import static org.dromara.hutool.core.text.StrValidator.isBlank;
+
 
 /**
  * 拼音工具类
@@ -42,9 +43,9 @@ public final class PinYinUtil extends PinyinUtil {
 
     public static List<String> getPingYinList(String chinese) {
         if (isBlank(chinese)) {
-            return CollUtil.newArrayList();
+            return List.of();
         }
-        return StrUtil.splitTrim(PinyinUtil.getPinyin(chinese), SPACE);
+        return SplitUtil.splitTrim(PinyinUtil.getPinyin(chinese), SPACE);
     }
 
     /**

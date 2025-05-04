@@ -1,8 +1,13 @@
 package cn.acecandy.fasaxi.emma.utils;
 
-import cn.hutool.core.lang.Console;
 
-import java.io.*;
+import org.dromara.hutool.core.lang.Console;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
@@ -51,19 +56,5 @@ public class RangeDownloader {
             throw new IOException("Range请求失败，响应码：" + responseCode);
         }
         conn.disconnect();
-    }
-
-    public static void main(String[] args) {
-        String fileUrl = "http://168.119.137.205:13001/p/Emby1/%E5%8D%8E%E8%AF%AD%E7%94%B5%E5%BD%B1/%E5%9B%A7%E5%A6%88%20%282020%29/%E5%9B%A7%E5%A6%88%20%282020%29%20-%201080p%20-%20CHDWEB.mp4"; // 目标文件URL
-        String savePath = "/private/tmp/emby/67/6729ca9d94dd96595f0bf14e91dd6db6/111/1.mp4";       // 本地保存路径
-        long start = 0;                                   // 从0字节开始（确保包含文件头）
-        long end = 10 * 1024 * 1024 - 1;                  // 前10MB（10485759）
-
-        try {
-            downloadWithRange(fileUrl, savePath, start, end);
-            System.out.println("文件已保存，尝试用VLC等播放器打开！");
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 }

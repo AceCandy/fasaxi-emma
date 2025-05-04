@@ -1,8 +1,8 @@
 package cn.acecandy.fasaxi.emma.utils;
 
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.io.file.FileMode;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.hutool.core.io.file.FileMode;
+import org.dromara.hutool.core.io.file.FileUtil;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;

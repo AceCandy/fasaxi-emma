@@ -1,10 +1,10 @@
 package cn.acecandy.fasaxi.emma.utils;
 
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.io.resource.ResourceUtil;
-import cn.hutool.core.util.StrUtil;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.hutool.core.io.file.FileUtil;
+import org.dromara.hutool.core.io.resource.ResourceUtil;
+import org.dromara.hutool.core.text.StrUtil;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -31,7 +31,7 @@ import java.util.Random;
  * @since 2025/3/3
  */
 @Slf4j
-public final class ImgUtil extends cn.hutool.core.img.ImgUtil {
+public final class ImgUtil extends org.dromara.hutool.swing.img.ImgUtil {
     private ImgUtil() {
     }
 
@@ -304,14 +304,9 @@ public final class ImgUtil extends cn.hutool.core.img.ImgUtil {
 
         // 5. 保存结果
         File outFile = FileUtil.file(StrUtil.replaceLast(FileUtil.getAbsolutePath(file),
-                ".jpg", "-briefStrokes.jpg"));
+                ".jpg", "-briefStrokes.jpg", true));
         ImageIO.write(inverted, "jpg", outFile);
         return outFile;
-    }
-
-    @SneakyThrows
-    public static void main(String[] args) {
-        // briefStrokesByJhLab("/Users/mac/Downloads/浏览器/003.jpg");
     }
 
     public static BufferedImage fastGray(BufferedImage src) {
