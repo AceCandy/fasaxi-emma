@@ -10,6 +10,7 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.net.url.UrlQueryUtil;
@@ -116,7 +117,7 @@ public class VideoRedirectService {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
-        String mediaPath = itemInfo.getPath();
+        String mediaPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
         Map<String, String> header302 = MapUtil.<String, String>builder()
                 .put("User-Agent", request.getUa()).put("range", request.getRange()).build();
         // fileCacheUtil.cacheNextEpisode(embyInfo, header302);
