@@ -1,11 +1,11 @@
 package cn.acecandy.fasaxi.emma.utils;
 
 
+import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import org.dromara.hutool.core.cache.impl.FIFOCache;
 import org.dromara.hutool.core.text.StrUtil;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.DAY_7_MS;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.MEDIA_CACHE_KEY;
 
 /**
  * emby 工具类
@@ -17,13 +17,33 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     private CacheUtil() {
     }
 
+    // 缓存key
+
+    private static final String VIDEO_CACHE_KEY = "cache:video:{}";
+    private static final String VIDEO_UA_CACHE_KEY = "cache:video:{}|{}";
+    private static final String PIC_CACHE_KEY = "cache:pic:{}|{}";
+
+
+    public static String buildVideoCacheKey(String mediaSourceId) {
+        return StrUtil.format(VIDEO_CACHE_KEY, mediaSourceId);
+    }
+
+    public static String buildVideoCacheKey(String mediaSourceId, String ua) {
+        return StrUtil.format(VIDEO_UA_CACHE_KEY, mediaSourceId, ua);
+    }
+
+    public static String buildPicCacheKey(String itemId, EmbyPicType picType) {
+        return StrUtil.format(PIC_CACHE_KEY, itemId, picType.getValue());
+    }
+
+
     /**
      * 媒体直链 缓存
      */
     public final static FIFOCache<String, String> MEDIA_CACHE = newFIFOCache(5000, DAY_7_MS);
 
     private static String mediaCacheKey(String ua, String mediaSourceId) {
-        return StrUtil.format(MEDIA_CACHE_KEY, mediaSourceId, ua);
+        return StrUtil.format(VIDEO_CACHE_KEY, mediaSourceId, ua);
     }
 
     public static void setMediaKey(String ua, String mediaSourceId, String value) {

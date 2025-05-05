@@ -162,25 +162,7 @@ public class EmbyUtil {
         return "";
     }
 
-    /**
-     * 获取302的真实路径
-     *
-     * @param mediaPath 媒体路径
-     * @param header    头球
-     * @return {@link String }
-     */
-    @SneakyThrows
-    public String fetch302Path(String mediaPath, Map<String, String> header) {
-        if (StrUtil.isBlank(mediaPath)) {
-            return "";
-        }
-        try (Response res = httpClient.send(Request.of(mediaPath).method(Method.HEAD).header(header)).sync()) {
-            if (res.getStatus() == HTTP_MOVED_TEMP) {
-                return res.header("Location");
-            }
-        }
-        return "";
-    }
+
 
     @SneakyThrows
     public FileCacheUtil.FileInfo getFileInfo(Long mediaSourceId) {

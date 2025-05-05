@@ -46,8 +46,8 @@ public class RedisClient {
         }
     }
 
-    public String get(String key) {
-        return StrUtil.isBlank(key) ? null : (String) redisTemplate.opsForValue().get(key);
+    public Object get(String key) {
+        return StrUtil.isBlank(key) ? null : redisTemplate.opsForValue().get(key);
     }
 
     public String getStr(String key) {

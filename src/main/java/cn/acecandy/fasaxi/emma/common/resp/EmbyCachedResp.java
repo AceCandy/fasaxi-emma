@@ -3,6 +3,7 @@ package cn.acecandy.fasaxi.emma.common.resp;
 import cn.acecandy.fasaxi.emma.utils.CompressUtil;
 import lombok.Data;
 import lombok.SneakyThrows;
+import org.dromara.hutool.core.compress.ZipUtil;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.http.client.Response;
@@ -22,7 +23,7 @@ public class EmbyCachedResp implements Serializable {
     /**
      * 状态码
      */
-    private int statusCode;
+    private Integer statusCode;
     /**
      * 请求头
      */
@@ -37,10 +38,17 @@ public class EmbyCachedResp implements Serializable {
      */
     private Long exTime;
 
+    public boolean isOk() {
+        return statusCode >= 200 && statusCode < 300;
+    }
+
     @SneakyThrows
     public static EmbyCachedResp transfer(Response res, String method) {
         EmbyCachedResp embyCachedResp = new EmbyCachedResp();
         embyCachedResp.statusCode = res.getStatus();
+        if (!res.isOk()) {
+            return embyCachedResp;
+        }
         res.headers().forEach((k, v) -> {
             if (k == null || StrUtil.equalsIgnoreCase(k, "content-length")) {
                 return;
@@ -54,7 +62,11 @@ public class EmbyCachedResp implements Serializable {
                 String bodyStr = new String(CompressUtil.decode(body.getBytes()));
                 String content = StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
                 embyCachedResp.content = content.getBytes();
-            }else{
+            } else if (StrUtil.containsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "gzip")) {
+                String bodyStr = new String(ZipUtil.unGzip(body.getBytes()));
+                String content = StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
+                embyCachedResp.content = content.getBytes();
+            } else {
                 String content = StrUtil.replaceIgnoreCase(body.getString(), "micu", "REDMT");
                 embyCachedResp.content = content.getBytes();
             }

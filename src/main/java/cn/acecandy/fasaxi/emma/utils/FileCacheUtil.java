@@ -2,6 +2,7 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
+import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import jakarta.annotation.Resource;
 import lombok.Builder;
 import lombok.Data;
@@ -49,6 +50,9 @@ public class FileCacheUtil {
 
     @Resource
     private ClientEngine httpClient;
+
+    @Resource
+    private EmbyProxy embyProxy;
 
     @Resource
     private EmbyUtil embyUtil;
@@ -177,7 +181,7 @@ public class FileCacheUtil {
             }
             default -> throw new BaseException("未知的缓存状态");
         }*/
-        String realUrl = embyUtil.fetch302Path(path, reqHeader);
+        String realUrl = embyProxy.fetch302Path(path, reqHeader);
 
         String cacheFileName = "cacheFile_" + startPoint + "_" + endPoint;
         Path cacheFilePath = Paths.get(feConfig.getCachePath(), subDir, dir, cacheFileName);

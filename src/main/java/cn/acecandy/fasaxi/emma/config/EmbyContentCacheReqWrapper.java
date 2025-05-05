@@ -1,14 +1,15 @@
 package cn.acecandy.fasaxi.emma.config;
 
-import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import lombok.Getter;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.http.HttpUtil;
 import org.dromara.hutool.http.server.servlet.ServletUtil;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.Enumeration;
 import java.util.Map;
 import java.util.TreeMap;
@@ -29,10 +30,11 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     @Getter
     private String range;
     @Getter
+    private String paramUri;
+    @Getter
+    private String mediaSourceId;
+    @Getter
     private final Map<String, Object> cachedParam = new TreeMap<>();
-
-    @Resource
-    private EmbyConfig embyConfig;
 
     public EmbyContentCacheReqWrapper(HttpServletRequest request) throws IOException {
         super(request);
@@ -49,7 +51,7 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         Map<String, String> headerMap = MapUtil.newHashMap();
         Enumeration<String> headerNames = request.getHeaderNames();
         while (headerNames.hasMoreElements()) {
-            String headerName = headerNames.nextElement().toLowerCase();
+            String headerName = headerNames.nextElement();
             if (!StrUtil.equalsAnyIgnoreCase(headerName, "Host", "Content-Length", "Referer", "Transfer-Encoding")) {
                 String headerValue = request.getHeader(headerName);
                 headerMap.put(headerName, headerValue);
@@ -78,9 +80,16 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         } else {
             Map<String, String> paramMap = ServletUtil.getParamMap(request);
             paramMap.forEach((k, v) -> cachedParam.put(k.toLowerCase(), v));
-            if (paramMap.containsKey("searchterm")) {
-                cachedParam.put("includeitemtypes", StrUtil.replaceIgnoreCase(cachedParam.get("includeitemtypes").toString(), "BoxSet", ""));
+            if (cachedParam.containsKey("searchterm")) {
+                cachedParam.put("includeitemtypes", StrUtil.replaceIgnoreCase(
+                        cachedParam.get("includeitemtypes").toString(), ",BoxSet", ""));
+            }
+            if (cachedParam.containsKey("mediasourceid")) {
+                mediaSourceId = StrUtil.removePrefixIgnoreCase(
+                        cachedParam.get("mediasourceid").toString(), "mediasource_");
             }
         }
+        paramUri = HttpUtil.urlWithFormUrlEncoded(request.getRequestURI(), cachedParam, Charset.defaultCharset());
     }
+
 }

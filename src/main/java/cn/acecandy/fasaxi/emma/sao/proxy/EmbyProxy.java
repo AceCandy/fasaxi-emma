@@ -7,6 +7,7 @@ import cn.acecandy.fasaxi.emma.sao.out.EmbyItemInfoOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
 import jakarta.annotation.Resource;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.map.MapUtil;
@@ -17,6 +18,10 @@ import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.dromara.hutool.http.meta.Method;
 import org.dromara.hutool.json.JSONUtil;
 import org.springframework.stereotype.Component;
+
+import java.util.Map;
+
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_302;
 
 /**
  * emby 代理服务
@@ -40,7 +45,7 @@ public class EmbyProxy {
      * @param mediaSourceId 媒体源id
      * @return {@link TmdbImageInfoOut }
      */
-    public EmbyItemInfoOut.Item getItemInfo(Long mediaSourceId) {
+    public EmbyItemInfoOut.Item getItemInfo(String mediaSourceId) {
         String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
         try (Response res = httpClient.send(Request.of(url).method(Method.GET)
                 .form(MapUtil.<String, Object>builder("Fields", "Path,MediaSources,ProviderIds")
@@ -63,11 +68,11 @@ public class EmbyProxy {
     /**
      * 获取远程图片
      *
-     * @param mediaSourceId 媒体源id
+     * @param itemId 媒体源id
      * @return {@link EmbyRemoteImageOut }
      */
-    public EmbyRemoteImageOut.Img getRemoteImage(Integer mediaSourceId, EmbyPicType picType) {
-        String url = embyConfig.getHost() + StrUtil.format(embyConfig.getRemoteImagesUrl(), mediaSourceId);
+    public EmbyRemoteImageOut.Img getRemoteImage(String itemId, EmbyPicType picType) {
+        String url = embyConfig.getHost() + StrUtil.format(embyConfig.getRemoteImagesUrl(), itemId);
         try (Response res = httpClient.send(Request.of(url).method(Method.GET)
                 .form(MapUtil.<String, Object>builder("api_key", embyConfig.getApiKey()).put("Limit", 1)
                         .put("ProviderName", "TheMovieDb").put("Type", picType.getValue()).map()))) {
@@ -81,6 +86,26 @@ public class EmbyProxy {
             return CollUtil.getFirst(JSONUtil.toBean(resBody, EmbyRemoteImageOut.class).getImages());
         } catch (Exception e) {
             log.warn("getRemoteImage 网络请求异常: ", e);
+        }
+        return null;
+    }
+
+    /**
+     * 获取302的真实路径
+     *
+     * @param mediaPath 媒体路径
+     * @param header    头球
+     * @return {@link String }
+     */
+    @SneakyThrows
+    public String fetch302Path(String mediaPath, Map<String, String> header) {
+        if (StrUtil.isBlank(mediaPath)) {
+            return null;
+        }
+        try (Response res = httpClient.send(Request.of(mediaPath).method(Method.HEAD).header(header))) {
+            if (res.getStatus() == CODE_302) {
+                return res.header("Location");
+            }
         }
         return null;
     }
