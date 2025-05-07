@@ -15,6 +15,7 @@ public enum EmbyMediaType {
     // 接口出的类型
     电影("Movie", "movie"),
     电视剧("Episode", "tv"),
+    电视剧_季("Season", ""),
     ;
 
     private final String value;

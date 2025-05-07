@@ -1,0 +1,131 @@
+package cn.acecandy.fasaxi.emma.sao.out;
+
+import lombok.Data;
+import org.dromara.hutool.core.annotation.Alias;
+
+import java.util.List;
+
+/**
+ * emby item信息输出类
+ *
+ * @author tangningzhu
+ * @since 2025/4/16
+ */
+@Data
+public class EmbyItem {
+
+    /**
+     * 标题
+     */
+    @Alias("Name")
+    private String name;
+    /**
+     * 项目id
+     */
+    @Alias("Id")
+    private String itemId;
+
+    /**
+     * 文件路径
+     */
+    @Alias("Path")
+    private String path;
+
+    /**
+     * 文件名
+     */
+    @Alias("FileName")
+    private String fileName;
+
+    /**
+     * 类型
+     * 参考 EmbyMediaType
+     */
+    @Alias("Type")
+    private String type;
+
+    /**
+     * 对应的父id
+     * ps：剧集上一级是季 季上一级才是剧集
+     */
+    @Alias("ParentId")
+    private String parentId;
+
+    /**
+     * 年份
+     */
+    @Alias("ProductionYear")
+    private Integer productionYear;
+
+    /**
+     * 剧集中第几季
+     */
+    @Alias("ParentIndexNumber")
+    private Integer parentIndexNumber;
+
+    /**
+     * 剧集中第几集
+     */
+    @Alias("IndexNumber")
+    private Integer indexNumber;
+
+    /**
+     * 剧集id本我
+     */
+    @Alias("SeriesId")
+    private String seriesId;
+
+    /**
+     * 季id
+     */
+    @Alias("SeasonId")
+    private String seasonId;
+
+    /**
+     * 媒体类型 video
+     */
+    @Alias("MediaType")
+    private String mediaType;
+
+    /**
+     * 图像标记
+     * 有图片就会有值
+     */
+    @Alias("ImageTags")
+    private EmbyImgTag imageTags;
+
+    /**
+     * 背景图片标记
+     */
+    @Alias("BackdropImageTags")
+    private List<String> backdropImageTags;
+
+    /**
+     * 容器类型 mkv、mp4
+     */
+    @Alias("Container")
+    private String container;
+    /**
+     * 媒体信息
+     */
+    @Alias("MediaSources")
+    private List<EmbyMediaSource> mediaSources;
+
+    /**
+     * 时长
+     */
+    @Alias("RunTimeTicks")
+    private Long runTimeTicks;
+
+    /**
+     * 文件大小
+     */
+    @Alias("Size")
+    private Long size;
+
+    /**
+     * 比特率
+     */
+    @Alias("Bitrate")
+    private Long bitrate;
+}

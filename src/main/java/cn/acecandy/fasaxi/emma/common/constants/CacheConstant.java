@@ -10,12 +10,16 @@ public interface CacheConstant {
 
     // http状态码
 
+    Integer CODE_200 = 200;
+    Integer CODE_204 = 204;
+    Integer CODE_300 = 300;
     Integer CODE_302 = 302;
+    Integer CODE_307 = 307;
+    Integer CODE_308 = 308;
+    Integer CODE_400 = 400;
     Integer CODE_404 = 404;
     Integer CODE_416 = 416;
     Integer CODE_429 = 429;
-    Integer CODE_200 = 200;
-    Integer CODE_204 = 204;
 
     // http请求方法
 

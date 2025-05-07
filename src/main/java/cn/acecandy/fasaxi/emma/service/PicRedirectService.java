@@ -23,9 +23,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.concurrent.locks.Lock;
 
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_302;
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_308;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_404;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_429;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.非图片;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getCdnPicUrl;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getPic302Uri;
@@ -80,7 +80,7 @@ public class PicRedirectService {
         String uri = redisClient.getStr(CacheUtil.buildPicCacheKey(itemId, picType));
         if (StrUtil.isNotBlank(uri)) {
             String url = getCdnPicUrl(uri, tmdbConfig, maxWidth);
-            response.setStatus(CODE_302);
+            response.setStatus(CODE_308);
             response.setHeader("Location", url);
             log.info("{}-图片重定向(缓存):[{}-{}] => {}", picType, itemId, maxWidth, url);
             return;
@@ -90,7 +90,7 @@ public class PicRedirectService {
         uri = getPic302Uri(itemPic, picType);
         if (StrUtil.isNotBlank(uri)) {
             String url = getCdnPicUrl(uri, tmdbConfig, maxWidth);
-            response.setStatus(CODE_302);
+            response.setStatus(CODE_308);
             response.setHeader("Location", url);
             log.info("{}-图片重定向(DB):[{}-{}] => {}", picType, itemId, maxWidth, url);
             asyncWriteItemPicRedis(itemId, uri, picType);
@@ -100,7 +100,7 @@ public class PicRedirectService {
         // 获取或创建对应的锁
         Lock lock = LockUtil.lockPic(itemId, picType);
         if (LockUtil.isLock(lock)) {
-            response.setStatus(CODE_429);
+            response.setStatus(CODE_204);
             return;
         }
         try {
@@ -128,7 +128,7 @@ public class PicRedirectService {
         String uri = getPicUri(imageInfo.getUrl(), tmdbConfig);
         String url = getCdnPicUrl(uri, tmdbConfig, maxWidth);
 
-        response.setStatus(CODE_302);
+        response.setStatus(CODE_308);
         response.setHeader("Location", url);
         log.warn("{}-图片重定向(请求):[{}-{}] => {}", picType, itemId, maxWidth, url);
         asyncWriteItemPic(NumberUtil.parseInt(itemId), uri, picType);

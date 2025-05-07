@@ -26,7 +26,6 @@ import org.dromara.hutool.core.math.NumberUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
 import org.dromara.hutool.core.thread.ThreadUtil;
-import org.dromara.hutool.http.meta.HttpStatus;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -44,6 +43,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_416;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.非图片;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getContentType;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getPicType;
@@ -96,10 +96,15 @@ public class EmbyProxyFilter implements Filter {
         }*/
 
         EmbyContentCacheReqWrapper reqWrapper = new EmbyContentCacheReqWrapper(req);
+        if (!StrUtil.containsAny(reqWrapper.getUa(), "Infuse-Library", "EmbyTheater", "Tsukimi",
+                "Yamby", "Hills", "AfuseKt",
+                "SenPlayer", "VidHub", "Filebar", "iemc", "iPlay", "Forward")) {
+            res.setStatus(CODE_416);
+            return;
+        }
         try {
             if (needClose(req)) {
-                res.setStatus(HttpStatus.HTTP_REQUESTED_RANGE_NOT_SATISFIABLE);
-                // log.info("请求屏蔽: {}", req.getRequestURI());
+                res.setStatus(CODE_416);
                 return;
             }
             EmbyPicType picType = getPicType(req);
@@ -202,7 +207,6 @@ public class EmbyProxyFilter implements Filter {
             res.sendError(500, "服务器内部错误");
         }
     }
-
 
 
     @SneakyThrows

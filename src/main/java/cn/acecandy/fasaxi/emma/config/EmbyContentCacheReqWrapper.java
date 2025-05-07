@@ -80,7 +80,8 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         } else {
             Map<String, String> paramMap = ServletUtil.getParamMap(request);
             paramMap.forEach((k, v) -> cachedParam.put(k.toLowerCase(), v));
-            if (cachedParam.containsKey("searchterm")) {
+            // if (cachedParam.containsKey("searchterm")) {
+            if (cachedParam.containsKey("includeitemtypes")) {
                 cachedParam.put("includeitemtypes", StrUtil.replaceIgnoreCase(
                         cachedParam.get("includeitemtypes").toString(), ",BoxSet", ""));
             }

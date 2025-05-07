@@ -132,21 +132,6 @@ public class RedisClient {
     }
 
     public <T> T getBean(String key) {
-        /*try {
-            String value = get(key);
-            if (StrUtil.isBlank(value)) {
-                return null;
-            }
-            byte[] bytes = Base64.decode(value);
-            try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
-                Object obj = ois.readObject();
-                if(obj instanceof clazz)
-                return (T) ois.readObject();
-            }
-        } catch (Exception e) {
-            log.warn("redis getBean方法异常,key:{},", key, e);
-            return null;
-        }*/
         return (T) redisTemplate.opsForValue().get(key);
     }
 

@@ -48,3 +48,8 @@ knife4j:
     - name: 标题2
       locations: classpath:markdown1/*
       group: 对外API
+
+emby:
+  item-info-url: /Items
+  remote-images-url: /Items/{}/RemoteImages
+  refresh-url: /emby/Items/{}/Refresh

@@ -2,23 +2,35 @@ package cn.acecandy.fasaxi.emma.sao.proxy;
 
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
+import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
-import cn.acecandy.fasaxi.emma.sao.out.EmbyItemInfoOut;
+import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
+import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
+import cn.acecandy.fasaxi.emma.sao.out.EmbyItemsInfoOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
+import cn.acecandy.fasaxi.emma.utils.CompressUtil;
+import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
+import org.dromara.hutool.core.compress.ZipUtil;
+import org.dromara.hutool.core.exception.ExceptionUtil;
+import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.core.thread.ThreadUtil;
+import org.dromara.hutool.http.HttpUtil;
 import org.dromara.hutool.http.client.Request;
 import org.dromara.hutool.http.client.Response;
+import org.dromara.hutool.http.client.body.ResponseBody;
 import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.dromara.hutool.http.meta.Method;
 import org.dromara.hutool.json.JSONUtil;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.Charset;
 import java.util.Map;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_302;
@@ -45,7 +57,7 @@ public class EmbyProxy {
      * @param mediaSourceId 媒体源id
      * @return {@link TmdbImageInfoOut }
      */
-    public EmbyItemInfoOut.Item getItemInfo(String mediaSourceId) {
+    public EmbyItem getItemInfo(String mediaSourceId) {
         String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
         try (Response res = httpClient.send(Request.of(url).method(Method.GET)
                 .form(MapUtil.<String, Object>builder("Fields", "Path,MediaSources,ProviderIds")
@@ -58,7 +70,7 @@ public class EmbyProxy {
             if (!JSONUtil.isTypeJSON(resBody)) {
                 throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
             }
-            return CollUtil.getFirst(JSONUtil.toBean(resBody, EmbyItemInfoOut.class).getItems());
+            return CollUtil.getFirst(JSONUtil.toBean(resBody, EmbyItemsInfoOut.class).getItems());
         } catch (Exception e) {
             log.warn("getItemInfo 网络请求异常: ", e);
         }
@@ -91,6 +103,32 @@ public class EmbyProxy {
     }
 
     /**
+     * 刷新tmdb数据
+     *
+     * @param itemId 媒体源id
+     */
+    public void refresh(String itemId) {
+        String url = embyConfig.getHost() + StrUtil.format(embyConfig.getRefreshUrl(), itemId);
+        Map<String, Object> paramMap = MapUtil.<String, Object>builder("api_key", embyConfig.getApiKey())
+                .put("imageRefreshMode", "FullRefresh").put("metadataRefreshMode", "FullRefresh")
+                .put("recursive", true).put("replaceAllImages", "true")
+                .put("replaceAllMetadata", true).map();
+        url = HttpUtil.urlWithFormUrlEncoded(url, paramMap, Charset.defaultCharset());
+        try (Response res = httpClient.send(Request.of(url).method(Method.POST))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            log.warn("");
+        } catch (Exception e) {
+            if (StrUtil.contains(ExceptionUtil.getSimpleMessage(e), "Cannot invoke " +
+                    "\"org.apache.hc.core5.http.HttpEntity.getContent()\" because \"this.entity\" is null")) {
+            } else {
+                log.warn("getRemoteImage 网络请求异常: ", e);
+            }
+        }
+    }
+
+    /**
      * 获取302的真实路径
      *
      * @param mediaPath 媒体路径
@@ -108,5 +146,72 @@ public class EmbyProxy {
             }
         }
         return null;
+    }
+
+    @SneakyThrows
+    public EmbyCachedResp transferResp(Response res, EmbyContentCacheReqWrapper request) {
+        EmbyCachedResp embyCachedResp = new EmbyCachedResp();
+        embyCachedResp.setStatusCode(res.getStatus());
+        if (!res.isOk()) {
+            return embyCachedResp;
+        }
+        res.headers().forEach((k, v) -> {
+            if (k == null || StrUtil.equalsIgnoreCase(k, "content-length")) {
+                return;
+            }
+            embyCachedResp.getHeaders().put(k, StrUtil.join(StrUtil.COMMA, v));
+        });
+        ResponseBody body = res.body().sync();
+        if (StrUtil.equalsAnyIgnoreCase(request.getMethod(), "get") && StrUtil.containsIgnoreCase(
+                embyCachedResp.getHeaders().get("Content-Type"), "application/json")) {
+            String content = "";
+            if (StrUtil.equalsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "br")) {
+                String bodyStr = new String(CompressUtil.decode(body.getBytes()));
+                refreshItem(request, bodyStr);
+                content = StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
+            } else if (StrUtil.containsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "gzip")) {
+                String bodyStr = new String(ZipUtil.unGzip(body.getBytes()));
+                refreshItem(request, bodyStr);
+                content = StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
+            } else {
+                String bodyStr = body.getString();
+                refreshItem(request, bodyStr);
+                content = StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
+            }
+            embyCachedResp.setContent(content.getBytes());
+        } else {
+            embyCachedResp.setContent(body.getBytes());
+        }
+        return embyCachedResp;
+    }
+
+
+    /**
+     * 刷新项目
+     *
+     * @param request 要求
+     * @param bodyStr 身体str
+     */
+    private void refreshItem(EmbyContentCacheReqWrapper request, String bodyStr) {
+        if (!ReUtil.isItemUrl(request.getRequestURI())) {
+            return;
+        }
+        EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
+        if (StrUtil.isBlank(item.getImageTags().getPrimary())) {
+            ThreadUtil.execAsync(() -> refresh(item.getItemId()));
+        }
+    }
+
+    public static void main(String[] args) {
+        String param = "Recursive=true&ImageRefreshMode=FullRefresh&MetadataRefreshMode=FullRefresh&ReplaceAllImages=false&ReplaceAllMetadata=true&X-Emby-Client=Emby+Web&X-Emby-Device-Name=Microsoft+Edge+macOS&X-Emby-Device-Id=6a95e0b8-b44e-450e-bf64-6090e799000a&X-Emby-Client-Version=4.9.0.42&X-Emby-Token=e2262107a13c45a7bfc48884be6f98ad&X-Emby-Language=zh-cn";
+        Map<String, Object> paramMap = MapUtil.<String, Object>builder("X-Emby-Token", "b8647127d2fa4ae6b27b6918ed8a0593")
+                .put("imageRefreshMode", "FullRefresh").put("metadataRefreshMode", "FullRefresh")
+                .put("recursive", true).put("replaceAllImages", "true")
+                .put("api_key", "e2262107a13c45a7bfc48884be6f98ad")
+                .put("replaceAllMetadata", true).map();
+        // String res = HttpUtil.post("https://emby-real.acecandy.cn:880/emby/Items/1417549/Refresh", param);
+        // Console.log(res);
+        Console.log(HttpUtil.createClient("JdkClientEngine").send(HttpUtil.createPost(HttpUtil.urlWithFormUrlEncoded("https://emby-real.acecandy.cn:880/emby/Items/1417549/Refresh", paramMap, Charset.defaultCharset()))).getStatus());
+
     }
 }

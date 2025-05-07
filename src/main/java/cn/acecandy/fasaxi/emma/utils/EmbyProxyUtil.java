@@ -167,4 +167,9 @@ public final class EmbyProxyUtil {
             default -> "application/octet-stream";
         };
     }
+
+    public static boolean isHttpOk(int statusCode) {
+        return statusCode >= 200 && statusCode < 300;
+    }
+
 }

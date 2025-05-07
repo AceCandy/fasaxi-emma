@@ -3,8 +3,9 @@ package cn.acecandy.fasaxi.emma.service;
 import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
-import cn.acecandy.fasaxi.emma.config.TmdbConfig;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
+import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
+import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
@@ -25,7 +26,6 @@ import java.util.concurrent.locks.Lock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_429;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_GET;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheStaticReq;
 
@@ -49,7 +49,7 @@ public class OriginReqService {
     private ClientEngine httpClient;
 
     @Resource
-    private TmdbConfig tmdbConfig;
+    private EmbyProxy embyProxy;
 
     /**
      * 转发原始请求
@@ -75,7 +75,7 @@ public class OriginReqService {
         // 获取或创建对应的锁
         Lock lock = LockUtil.lockOrigin(request);
         if (LockUtil.isLock(lock)) {
-            response.setStatus(CODE_429);
+            response.setStatus(CODE_204);
             return;
         }
         try {
@@ -87,16 +87,23 @@ public class OriginReqService {
 
     private void execOriginReq(EmbyContentCacheReqWrapper request, HttpServletResponse response,
                                StopWatch stopWatch) throws Throwable {
+        String cacheKey = staticCacheKey(request);
+        EmbyCachedResp cached = redisClient.getBean(cacheKey);
+        if (cached != null) {
+            writeCacheResponse(response, cached);
+            return;
+        }
+
         stopWatch.start("转发");
-        EmbyCachedResp cached = new EmbyCachedResp();
+        cached = new EmbyCachedResp();
         try (Response res = sendOriginReq(request)) {
-            cached = EmbyCachedResp.transfer(res, request.getMethod());
+            cached = embyProxy.transferResp(res, request);
             writeCacheResponse(request, response, cached);
         } catch (Throwable e) {
             httpClient5WarningCatch(request, response, e, cached);
         } finally {
             stopWatch.stop();
-            if (cached.isOk()) {
+            if (EmbyProxyUtil.isHttpOk(cached.getStatusCode())) {
                 log.info("请求原始转发->[{}-{}:{}ms] {}", cached.getStatusCode(), request.getMethod(),
                         stopWatch.getLastTaskTimeMillis(),
                         StrUtil.format("{}&api_key={}", request.getParamUri(), embyConfig.getApiKey()));
@@ -194,7 +201,7 @@ public class OriginReqService {
             if (!StrUtil.equalsIgnoreCase(request.getMethod(), HTTP_GET)) {
                 return;
             }
-            if (cached.getStatusCode() != CODE_200) {
+            if (!cached.getStatusCode().equals(CODE_200)) {
                 return;
             }
             int exTime = 5;

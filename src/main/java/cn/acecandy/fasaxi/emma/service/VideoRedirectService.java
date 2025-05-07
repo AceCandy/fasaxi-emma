@@ -3,7 +3,7 @@ package cn.acecandy.fasaxi.emma.service;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
-import cn.acecandy.fasaxi.emma.sao.out.EmbyItemInfoOut;
+import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import jakarta.annotation.Resource;
@@ -21,7 +21,7 @@ import java.nio.charset.Charset;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_429;
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 
 /**
  * 视频重定向服务
@@ -66,7 +66,7 @@ public class VideoRedirectService {
         // 获取或创建对应的锁
         Lock lock = LockUtil.lockVideo(mediaSourceId);
         if (LockUtil.isLock(lock)) {
-            response.setStatus(CODE_429);
+            response.setStatus(CODE_204);
             return;
         }
         try {
@@ -112,7 +112,7 @@ public class VideoRedirectService {
 
     private void exec302(EmbyContentCacheReqWrapper request,
                          HttpServletResponse response, String mediaSourceId) {
-        EmbyItemInfoOut.Item itemInfo = embyProxy.getItemInfo(mediaSourceId);
+        EmbyItem itemInfo = embyProxy.getItemInfo(mediaSourceId);
         if (null == itemInfo) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return;

@@ -18,7 +18,7 @@
         <!-- 请求日志输出到单独文件 -->
         <RollingFile name="AccessFile" fileName="${LOG_DIR}/access.log"
                      filePattern="${LOG_DIR}/$${date:yyyy-MM}/access-%d{yyyy-MM-dd}-%i.log.gz">
-            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} - %msg%n"/>
+            <PatternLayout pattern="%d{MM-dd mm:ss.SSS} %highlight{%-5level} %msg%n"/>
             <Policies>
                 <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
                 <SizeBasedTriggeringPolicy size="${MAX_FILE_SIZE}"/>
@@ -41,9 +41,9 @@
 
     <Loggers>
         <!-- 特定方法所在类的日志记录器 -->
-        <Logger name="cn.acecandy.fasaxi.emma.config.AccessLog" level="debug" additivity="false">
+        <Logger name="cn.acecandy.fasaxi.emma.config.AccessLog" level="INFO" additivity="false">
             <AppenderRef ref="AccessFile"/>
-<!--            <AppenderRef ref="Console"/>-->
+            <!--            <AppenderRef ref="Console"/>-->
         </Logger>
         <!-- 其他日志配置 -->
         <Root level="INFO">

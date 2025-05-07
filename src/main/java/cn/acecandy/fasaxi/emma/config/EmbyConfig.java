@@ -1,6 +1,8 @@
 package cn.acecandy.fasaxi.emma.config;
 
 import lombok.Data;
+import org.dromara.hutool.core.lang.Console;
+import org.dromara.hutool.core.regex.ReUtil;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
@@ -30,9 +32,13 @@ public class EmbyConfig {
      */
     private String itemInfoUrl;
     /**
-     * 远程图片url
+     * 获取远程图片url
      */
     private String remoteImagesUrl;
+    /**
+     * 刷新tmdb url
+     */
+    private String refreshUrl;
     /**
      * 缓存路径
      */
@@ -77,4 +83,16 @@ public class EmbyConfig {
      * strm相关路径
      */
     private List<String> strmPaths;
+
+    public static void main(String[] args) {
+        String s = "^/emby/Users/[a-zA-Z0-9]+/Items/[0-9]+$";
+        String s1 = "/Items/([0-9]+)$";
+        String url = "/emby/Users/656fcefa283149708880b416786e5fde/Items/1417552";
+        String url1 = "/emby/Users1/656fcefa283149708880b416786e5fde/Items/1417552";
+        String url2 = "/emby/Users1/656fcefa283149708880b416786e5fde/Items/1417552/123";
+        Console.log(ReUtil.isMatch(s,url));
+        Console.log(ReUtil.getGroup1(s1,url));
+        Console.log(ReUtil.isMatch(s,url1));
+        Console.log(ReUtil.isMatch(s,url2));
+    }
 }

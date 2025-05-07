@@ -40,7 +40,6 @@ public class HutoolConfig {
 
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory factory) {
-        // RedisSerializer<Object> serializer = redisSerializer();
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(factory);
         template.setKeySerializer(RedisSerializer.string());
