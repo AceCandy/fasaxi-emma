@@ -137,11 +137,11 @@ public class VideoRedirectService {
 
             int exTime = 2 * 24 * 60 * 60;
             if (StrUtil.startWithIgnoreCase(realUrl, embyConfig.getOriginPt())) {
-                redisClient.set(mediaSourceId, realUrl, exTime);
+                redisClient.set(CacheUtil.buildVideoCacheKey(mediaSourceId), realUrl, exTime);
             } else {
                 exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(realUrl, Charset.defaultCharset()),
                         "t") - DateUtil.currentSeconds() - 5 * 60);
-                redisClient.set(request.getUa() + "|" + mediaSourceId, realUrl, exTime);
+                redisClient.set(CacheUtil.buildVideoCacheKey(mediaSourceId, request.getUa()), realUrl, exTime);
             }
 
             response.setStatus(HttpServletResponse.SC_FOUND);
