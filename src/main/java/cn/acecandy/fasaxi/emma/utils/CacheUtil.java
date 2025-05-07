@@ -3,7 +3,10 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import org.dromara.hutool.core.cache.impl.FIFOCache;
+import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.text.StrUtil;
+
+import java.util.List;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.DAY_7_MS;
 
@@ -30,6 +33,10 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
 
     public static String buildVideoCacheKey(String mediaSourceId, String ua) {
         return StrUtil.format(VIDEO_UA_CACHE_KEY, mediaSourceId, ua);
+    }
+
+    public static List<String> buildVideoCacheKeyList(String mediaSourceId, String ua) {
+        return ListUtil.of(buildVideoCacheKey(mediaSourceId,ua), buildVideoCacheKey(mediaSourceId));
     }
 
     public static String buildPicCacheKey(String itemId, EmbyPicType picType) {

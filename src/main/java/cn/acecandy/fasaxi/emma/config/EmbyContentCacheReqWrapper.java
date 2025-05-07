@@ -1,8 +1,10 @@
 package cn.acecandy.fasaxi.emma.config;
 
+import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import lombok.Getter;
+import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.http.HttpUtil;
@@ -11,6 +13,7 @@ import org.dromara.hutool.http.server.servlet.ServletUtil;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -33,6 +36,8 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     private String paramUri;
     @Getter
     private String mediaSourceId;
+    @Getter
+    private String userId;
     @Getter
     private final Map<String, Object> cachedParam = new TreeMap<>();
 
@@ -84,6 +89,11 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
             if (cachedParam.containsKey("includeitemtypes")) {
                 cachedParam.put("includeitemtypes", StrUtil.replaceIgnoreCase(
                         cachedParam.get("includeitemtypes").toString(), ",BoxSet", ""));
+            }
+            List<String> itemUrlGroup = ReUtil.isSimilarItemUrl(uri);
+            if (CollUtil.isNotEmpty(itemUrlGroup)) {
+                userId = CollUtil.getFirst(itemUrlGroup);
+                mediaSourceId = CollUtil.getLast(itemUrlGroup);
             }
             if (cachedParam.containsKey("mediasourceid")) {
                 mediaSourceId = StrUtil.removePrefixIgnoreCase(

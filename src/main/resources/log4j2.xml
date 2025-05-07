@@ -40,6 +40,9 @@
     </Appenders>
 
     <Loggers>
+        <Logger name="io.lettuce.core.protocol" level="WARN" additivity="false">
+            <AppenderRef ref="AccessFile"/>
+        </Logger>
         <!-- 特定方法所在类的日志记录器 -->
         <Logger name="cn.acecandy.fasaxi.emma.config.AccessLog" level="INFO" additivity="false">
             <AppenderRef ref="AccessFile"/>

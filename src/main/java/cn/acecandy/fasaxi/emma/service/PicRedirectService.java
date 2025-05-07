@@ -77,37 +77,60 @@ public class PicRedirectService {
         }
 
         String maxWidth = MapUtil.getStr(request.getCachedParam(), "maxwidth");
-        String uri = redisClient.getStr(CacheUtil.buildPicCacheKey(itemId, picType));
-        if (StrUtil.isNotBlank(uri)) {
-            String url = getCdnPicUrl(uri, tmdbConfig, maxWidth);
-            response.setStatus(CODE_308);
-            response.setHeader("Location", url);
-            log.info("{}-图片重定向(缓存):[{}-{}] => {}", picType, itemId, maxWidth, url);
+        if (getByCacheOrDb(response, picType, itemId, maxWidth)) {
             return;
         }
 
+        // 获取或创建对应的锁
+        Lock lock = LockUtil.lockPic(itemId, picType);
+        if (LockUtil.isLock1s(lock)) {
+            response.setStatus(CODE_204);
+            return;
+        }
+        try {
+            if (getByCacheOrDb(response, picType, itemId, maxWidth)) {
+                return;
+            }
+            exec302Pic(request, response, itemId, picType, maxWidth);
+        } finally {
+            LockUtil.unlockPic(lock, itemId, picType);
+        }
+    }
+
+    private boolean getByCacheOrDb(HttpServletResponse response, EmbyPicType picType,
+                                   String itemId, String maxWidth) {
+        if (getByCache(response, picType, itemId, maxWidth)) {
+            return true;
+        }
+        return getByDb(response, picType, itemId, maxWidth);
+    }
+
+    private boolean getByDb(HttpServletResponse response, EmbyPicType picType,
+                            String itemId, String maxWidth) {
         EmbyItemPic itemPic = embyItemPicDao.findByItemId(NumberUtil.parseInt(itemId));
-        uri = getPic302Uri(itemPic, picType);
+        String uri = getPic302Uri(itemPic, picType);
         if (StrUtil.isNotBlank(uri)) {
             String url = getCdnPicUrl(uri, tmdbConfig, maxWidth);
             response.setStatus(CODE_308);
             response.setHeader("Location", url);
             log.info("{}-图片重定向(DB):[{}-{}] => {}", picType, itemId, maxWidth, url);
             asyncWriteItemPicRedis(itemId, uri, picType);
-            return;
+            return true;
         }
+        return false;
+    }
 
-        // 获取或创建对应的锁
-        Lock lock = LockUtil.lockPic(itemId, picType);
-        if (LockUtil.isLock(lock)) {
-            response.setStatus(CODE_204);
-            return;
+    private boolean getByCache(HttpServletResponse response, EmbyPicType picType,
+                               String itemId, String maxWidth) {
+        String uri = redisClient.getStr(CacheUtil.buildPicCacheKey(itemId, picType));
+        if (StrUtil.isNotBlank(uri)) {
+            String url = getCdnPicUrl(uri, tmdbConfig, maxWidth);
+            response.setStatus(CODE_308);
+            response.setHeader("Location", url);
+            log.info("{}-图片重定向(缓存):[{}-{}] => {}", picType, itemId, maxWidth, url);
+            return true;
         }
-        try {
-            exec302Pic(request, response, itemId, picType, maxWidth);
-        } finally {
-            LockUtil.unlockPic(lock, itemId, picType);
-        }
+        return false;
     }
 
     /**

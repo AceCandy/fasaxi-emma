@@ -5,11 +5,13 @@ import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
+import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItemsInfoOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
 import cn.acecandy.fasaxi.emma.utils.CompressUtil;
+import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
@@ -28,6 +30,7 @@ import org.dromara.hutool.http.client.body.ResponseBody;
 import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.dromara.hutool.http.meta.Method;
 import org.dromara.hutool.json.JSONUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.Charset;
@@ -50,6 +53,8 @@ public class EmbyProxy {
 
     @Resource
     private EmbyConfig embyConfig;
+    @Autowired
+    private RedisClient redisClient;
 
     /**
      * 获取项目信息
@@ -118,8 +123,8 @@ public class EmbyProxy {
             if (!res.isOk()) {
                 throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
             }
-            log.warn("");
-        } catch (Exception e) {
+            log.warn("刷新tmdb数据: {}", itemId);
+        } catch (Throwable e) {
             if (StrUtil.contains(ExceptionUtil.getSimpleMessage(e), "Cannot invoke " +
                     "\"org.apache.hc.core5.http.HttpEntity.getContent()\" because \"this.entity\" is null")) {
             } else {
@@ -193,13 +198,25 @@ public class EmbyProxy {
      * @param bodyStr 身体str
      */
     private void refreshItem(EmbyContentCacheReqWrapper request, String bodyStr) {
-        if (!ReUtil.isItemUrl(request.getRequestURI())) {
+        if (CollUtil.isEmpty(ReUtil.isItemUrl(request.getRequestURI().toLowerCase()))) {
             return;
         }
-        EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
-        if (StrUtil.isBlank(item.getImageTags().getPrimary())) {
-            ThreadUtil.execAsync(() -> refresh(item.getItemId()));
-        }
+        ThreadUtil.execAsync(() -> {
+            EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
+            if (StrUtil.isBlank(item.getProviderIds().get("Tmdb"))
+                    || StrUtil.isNotBlank(item.getImageTags().getPrimary())) {
+                return;
+            }
+            String lockKey = LockUtil.buildRefreshLock(item.getItemId());
+            if (redisClient.get(lockKey) != null) {
+                return;
+            }
+            try {
+                refresh(item.getItemId());
+            } finally {
+                redisClient.set(lockKey, "1", 6 * 60 * 60);
+            }
+        });
     }
 
     public static void main(String[] args) {

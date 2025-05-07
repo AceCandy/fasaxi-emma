@@ -5,6 +5,7 @@ import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
+import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
@@ -54,28 +55,18 @@ public class VideoRedirectService {
         }
 
         String ua = request.getUa();
-        String cacheKey = ua + "|" + mediaSourceId;
-        String cacheUrl = redisClient.getStrFindOne(ua + "|" + mediaSourceId, mediaSourceId);
-        if (StrUtil.isNotBlank(cacheUrl)) {
-            cacheUrl = getPtUrl(cacheUrl);
-            response.setStatus(HttpServletResponse.SC_FOUND);
-            response.setHeader("Location", cacheUrl);
-            log.warn("重定向(缓存):[{}] => {}", cacheKey, cacheUrl);
+        if (getByCache(response, mediaSourceId, ua)) {
             return;
         }
+
         // 获取或创建对应的锁
         Lock lock = LockUtil.lockVideo(mediaSourceId);
-        if (LockUtil.isLock(lock)) {
+        if (LockUtil.isLock1s(lock)) {
             response.setStatus(CODE_204);
             return;
         }
         try {
-            cacheUrl = redisClient.getStrFindOne(ua + "|" + mediaSourceId, mediaSourceId);
-            if (StrUtil.isNotBlank(cacheUrl)) {
-                cacheUrl = getPtUrl(cacheUrl);
-                response.setStatus(HttpServletResponse.SC_FOUND);
-                response.setHeader("Location", cacheUrl);
-                log.warn("重定向(缓存):[{}] => {}", cacheKey, cacheUrl);
+            if (getByCache(response, mediaSourceId, ua)) {
                 return;
             }
 
@@ -83,6 +74,18 @@ public class VideoRedirectService {
         } finally {
             LockUtil.unlockVideo(lock, mediaSourceId);
         }
+    }
+
+    private boolean getByCache(HttpServletResponse response, String mediaSourceId, String ua) {
+        String cacheUrl = redisClient.getStrFindOne(CacheUtil.buildVideoCacheKeyList(mediaSourceId, ua));
+        if (StrUtil.isNotBlank(cacheUrl)) {
+            cacheUrl = getPtUrl(cacheUrl);
+            response.setStatus(HttpServletResponse.SC_FOUND);
+            response.setHeader("Location", cacheUrl);
+            log.warn("重定向(缓存):[{}|{}] => {}", mediaSourceId, ua, cacheUrl);
+            return true;
+        }
+        return false;
     }
 
     private String getPtUrl(String cacheUrl) {

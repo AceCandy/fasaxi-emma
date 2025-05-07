@@ -8,6 +8,7 @@ import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
 
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -29,8 +30,18 @@ public final class LockUtil extends org.dromara.hutool.core.thread.lock.LockUtil
      */
     @SneakyThrows
     public static boolean isLock(Lock lock) {
-        // return !lock.tryLock(3, TimeUnit.SECONDS);
         return !lock.tryLock();
+    }
+
+    /**
+     * 是否锁定 等待1秒
+     *
+     * @param lock 锁
+     * @return boolean
+     */
+    @SneakyThrows
+    public static boolean isLock1s(Lock lock) {
+        return !lock.tryLock(1, TimeUnit.SECONDS);
     }
 
     // 视频重定向------------------------------------------------------------------------------------------
@@ -91,4 +102,13 @@ public final class LockUtil extends org.dromara.hutool.core.thread.lock.LockUtil
         }
         ORIGIN_LOCK_MAP.remove(buildPicLock(mediaSourceId, picType));
     }
+
+    // tmdb信息更新-------------------------------------------------------------------------------------------
+
+    private static final String LOCK_REFRESH_KEY = "lock:refresh:{}";
+
+    public static String buildRefreshLock(String itemId) {
+        return StrUtil.format(LOCK_REFRESH_KEY, itemId);
+    }
+
 }

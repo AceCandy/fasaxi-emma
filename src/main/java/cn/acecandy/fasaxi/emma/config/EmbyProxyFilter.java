@@ -5,6 +5,7 @@ import cn.acecandy.fasaxi.emma.service.OriginReqService;
 import cn.acecandy.fasaxi.emma.service.PicRedirectService;
 import cn.acecandy.fasaxi.emma.service.VideoRedirectService;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
+import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.AsyncContext;
 import jakarta.servlet.Filter;
@@ -48,7 +49,6 @@ import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.非图片;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getContentType;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getPicType;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.needClose;
-import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.needVideoRedirect;
 
 /**
  * 转发所有emby请求
@@ -110,10 +110,13 @@ public class EmbyProxyFilter implements Filter {
             EmbyPicType picType = getPicType(req);
             if (!非图片.equals(picType)) {
                 picRedirectService.processPic(reqWrapper, res, picType);
-            } else if (needVideoRedirect(req)) {
-                videoRedirectService.processVideo(reqWrapper, res);
             } else {
-                originReqService.forwardOriReq(reqWrapper, res);
+                String mediaSourceId = ReUtil.isVideoUrl(req.getRequestURI());
+                if (StrUtil.isNotBlank(mediaSourceId)) {
+                    videoRedirectService.processVideo(reqWrapper, res);
+                } else {
+                    originReqService.forwardOriReq(reqWrapper, res);
+                }
             }
         } catch (Exception e) {
             log.warn("转发请求失败[{}]: {}", req.getMethod(), reqWrapper.getRequestURI(), e);

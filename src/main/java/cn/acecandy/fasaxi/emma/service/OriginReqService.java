@@ -61,7 +61,14 @@ public class OriginReqService {
     public void forwardOriReq(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
         StopWatch stopWatch = StopWatch.of("原始请求");
         if (!StrUtil.equalsIgnoreCase(request.getMethod(), HTTP_GET)) {
-            execOriginReq(request, response, stopWatch);
+            try {
+                execOriginReq(request, response, stopWatch);
+            } finally {
+                if (StrUtil.isNotBlank(request.getUserId()) && StrUtil.isNotBlank(request.getMediaSourceId())) {
+                    redisClient.del(StrUtil.format("/emby/Users/{}/Items/{}?{}",
+                            request.getUserId(), request.getMediaSourceId()));
+                }
+            }
             return;
         }
 
@@ -74,7 +81,7 @@ public class OriginReqService {
 
         // 获取或创建对应的锁
         Lock lock = LockUtil.lockOrigin(request);
-        if (LockUtil.isLock(lock)) {
+        if (LockUtil.isLock1s(lock)) {
             response.setStatus(CODE_204);
             return;
         }

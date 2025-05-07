@@ -4,6 +4,7 @@ import lombok.Data;
 import org.dromara.hutool.core.annotation.Alias;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * emby item信息输出类
@@ -128,4 +129,11 @@ public class EmbyItem {
      */
     @Alias("Bitrate")
     private Long bitrate;
+
+    /**
+     * 外部第三方id
+     * 当前有 Tmdb、Tvdb、Imdb、bilibili
+     */
+    @Alias("ProviderIds")
+    private Map<String,String> providerIds;
 }

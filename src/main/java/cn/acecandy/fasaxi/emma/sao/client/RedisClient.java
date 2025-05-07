@@ -6,6 +6,7 @@ import org.dromara.hutool.core.array.ArrayUtil;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.core.thread.ThreadUtil;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -91,12 +92,12 @@ public class RedisClient {
      * @param keys 关键
      * @return {@link String }
      */
-    public String getStrFindOne(String... keys) {
+    public String getStrFindOne(List<String> keys) {
         if (ArrayUtil.isEmpty(keys)) {
             return null;
         }
         try {
-            List<String> validKeys = CollUtil.removeBlank(ListUtil.of(keys));
+            List<String> validKeys = CollUtil.removeBlank(keys);
             List<Object> value = CollUtil.removeNull(redisTemplate.opsForValue().multiGet(validKeys));
             if (CollUtil.isEmpty(value)) {
                 return null;
@@ -139,6 +140,8 @@ public class RedisClient {
         if (ArrayUtil.isEmpty(key)) {
             return;
         }
-        redisTemplate.delete(ListUtil.of(key));
+        ThreadUtil.execAsync(() -> {
+            redisTemplate.delete(ListUtil.of(key));
+        });
     }
 }
