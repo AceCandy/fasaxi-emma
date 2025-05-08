@@ -127,6 +127,7 @@ public class EmbyProxy {
         } catch (Throwable e) {
             if (StrUtil.contains(ExceptionUtil.getSimpleMessage(e), "Cannot invoke " +
                     "\"org.apache.hc.core5.http.HttpEntity.getContent()\" because \"this.entity\" is null")) {
+                log.warn("刷新tmdb数据: {}", itemId);
             } else {
                 log.warn("getRemoteImage 网络请求异常: ", e);
             }
