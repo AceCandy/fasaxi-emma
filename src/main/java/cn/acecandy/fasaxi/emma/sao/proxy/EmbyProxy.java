@@ -203,7 +203,7 @@ public class EmbyProxy {
         }
         ThreadUtil.execAsync(() -> {
             EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
-            if (!StrUtil.containsAll(item.getUniqueKey(),"tmdb","tt")
+            if (!StrUtil.containsAny(item.getUniqueKey(),"tmdb","tt")
                     || StrUtil.isNotBlank(item.getImageTags().getPrimary())) {
                 return;
             }
