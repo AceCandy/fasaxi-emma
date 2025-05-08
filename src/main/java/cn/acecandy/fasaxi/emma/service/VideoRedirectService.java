@@ -144,6 +144,7 @@ public class VideoRedirectService {
                 redisClient.set(CacheUtil.buildVideoCacheKey(mediaSourceId, request.getUa()), realUrl, exTime);
             }
 
+            realUrl = getPtUrl(realUrl);
             response.setStatus(HttpServletResponse.SC_FOUND);
             response.setHeader("Location", realUrl);
             log.info("▲ 请求重定向->[{}-{}] {} 【{}】", response.getStatus(),
