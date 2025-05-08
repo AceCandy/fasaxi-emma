@@ -33,6 +33,12 @@ public class EmbyItem {
     private String path;
 
     /**
+     * 唯一key tmdb会在上面标识
+     */
+    @Alias("PresentationUniqueKey")
+    private String uniqueKey;
+
+    /**
      * 文件名
      */
     @Alias("FileName")

@@ -66,8 +66,7 @@ public class OriginReqService {
                 execOriginReq(request, response, stopWatch);
             } finally {
                 if (StrUtil.isNotBlank(request.getUserId()) && StrUtil.isNotBlank(request.getMediaSourceId())) {
-                    redisClient.delByPrefix(StrUtil.format("/emby/Users/{}/Items/{}",
-                            request.getUserId(), request.getMediaSourceId()));
+                    redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheKey(request));
                 }
             }
             return;

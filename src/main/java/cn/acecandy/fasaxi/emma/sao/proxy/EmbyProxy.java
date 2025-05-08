@@ -203,7 +203,7 @@ public class EmbyProxy {
         }
         ThreadUtil.execAsync(() -> {
             EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
-            if (StrUtil.isBlank(item.getProviderIds().get("Tmdb"))
+            if (!StrUtil.contains(item.getUniqueKey(),"tmdb")
                     || StrUtil.isNotBlank(item.getImageTags().getPrimary())) {
                 return;
             }
@@ -214,7 +214,7 @@ public class EmbyProxy {
             try {
                 refresh(item.getItemId());
             } finally {
-                redisClient.set(lockKey, "1", 6 * 60 * 60);
+                redisClient.set(lockKey, "1", 2 * 60 * 60);
             }
         });
     }

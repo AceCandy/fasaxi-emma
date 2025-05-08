@@ -29,11 +29,16 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     private static final String VIDEO_UA_CACHE_KEY = "cache:video:{}|{}";
     private static final String PIC_CACHE_KEY = "cache:pic:{}|{}";
     private static final String ORIGIN_CACHE_KEY = "cache:req:{}|{}";
+    private static final String ORIGIN_CACHE_REFRESH_KEY1 = "cache:req:/emby/Users/{}/Items/{}";
 
 
     public static String buildOriginCacheKey(EmbyContentCacheReqWrapper req) {
         return StrUtil.format(ORIGIN_CACHE_KEY, req.getRequestURI(),
                 DigestUtil.md5Hex16(JSONUtil.toJsonStr(req.getCachedParam())));
+    }
+
+    public static String buildOriginRefreshCacheKey(EmbyContentCacheReqWrapper req) {
+        return StrUtil.format(ORIGIN_CACHE_REFRESH_KEY1, req.getUserId(), req.getMediaSourceId());
     }
 
     public static String buildVideoCacheKey(String mediaSourceId) {
