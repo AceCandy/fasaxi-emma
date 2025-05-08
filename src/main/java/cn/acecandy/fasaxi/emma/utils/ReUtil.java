@@ -3,7 +3,6 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
-import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.regex.PatternPool;
 
 import java.util.List;
@@ -32,14 +31,14 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
             "^/emby/users/([a-z0-9]+)/items/([0-9]+)$", Pattern.DOTALL);
 
     private static final Pattern REGEX_VIDEO = PatternPool.get(
-            "^/emby/videos/([0-9]+)/original\\.[^/]+$", Pattern.DOTALL);
+            "^/emby/(videos|items)/(\\d+)/(?:original\\.[^/]+|download)$", Pattern.DOTALL);
 
     public static String isVideoUrl(String url) {
         List<String> groups = getAllGroups(REGEX_VIDEO, url.toLowerCase());
         if (groups == null || groups.size() < 2) {
             return null;
         }
-        return CollUtil.get(groups, 1);
+        return CollUtil.get(groups, 2);
     }
 
     public static List<String> isSimilarItemUrl(String url) {
@@ -60,7 +59,7 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
 
     public static void main(String[] args) {
         String url = "/emby/Users/656fcefa283149708880b416786e5fde/Items/213123".toLowerCase();
-        Console.log(url);
+        /*Console.log(url);
         System.out.println(isSimilarItemUrl(url));
         System.out.println(isItemUrl(url));
         url = "/emby/Users/656fcefa283149708880b416786e5fde/Items/213123/delete".toLowerCase();
@@ -71,9 +70,6 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
         System.out.println(isItemUrl(url));
         url = "/emby/Users/656fcefa283149708880b416786e5fde".toLowerCase();
         System.out.println(isSimilarItemUrl(url));
-        System.out.println(isItemUrl(url));
-
-        url = "/emby/videos/1366253/original.mp4";
-        Console.log(isVideoUrl(url));
+        System.out.println(isItemUrl(url));*/
     }
 }

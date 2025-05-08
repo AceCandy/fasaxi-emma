@@ -5,12 +5,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.array.ArrayUtil;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
+import org.dromara.hutool.core.collection.set.SetUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.thread.ThreadUtil;
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -142,6 +146,27 @@ public class RedisClient {
         }
         ThreadUtil.execAsync(() -> {
             redisTemplate.delete(ListUtil.of(key));
+        });
+    }
+
+    public void delByPrefix(String prefix) {
+        if (StrUtil.isBlank(prefix)) {
+            return;
+        }
+        ThreadUtil.execAsync(() -> {
+            Set<String> keysToDelete = SetUtil.of();
+            try (Cursor<String> cursor = redisTemplate.scan(ScanOptions.scanOptions()
+                    .match(prefix + "*").count(100).build())) {
+                while (cursor.hasNext()) {
+                    String key = cursor.next();
+                    keysToDelete.add(key);
+                }
+            }
+            if (CollUtil.isEmpty(keysToDelete)) {
+                return;
+            }
+            // 统一序列化方式后删除
+            redisTemplate.unlink(keysToDelete);
         });
     }
 }

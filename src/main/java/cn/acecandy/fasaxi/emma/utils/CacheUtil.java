@@ -2,9 +2,12 @@ package cn.acecandy.fasaxi.emma.utils;
 
 
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
+import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import org.dromara.hutool.core.cache.impl.FIFOCache;
 import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.crypto.digest.DigestUtil;
+import org.dromara.hutool.json.JSONUtil;
 
 import java.util.List;
 
@@ -25,7 +28,13 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     private static final String VIDEO_CACHE_KEY = "cache:video:{}";
     private static final String VIDEO_UA_CACHE_KEY = "cache:video:{}|{}";
     private static final String PIC_CACHE_KEY = "cache:pic:{}|{}";
+    private static final String ORIGIN_CACHE_KEY = "cache:req:{}|{}";
 
+
+    public static String buildOriginCacheKey(EmbyContentCacheReqWrapper req) {
+        return StrUtil.format(ORIGIN_CACHE_KEY, req.getRequestURI(),
+                DigestUtil.md5Hex16(JSONUtil.toJsonStr(req.getCachedParam())));
+    }
 
     public static String buildVideoCacheKey(String mediaSourceId) {
         return StrUtil.format(VIDEO_CACHE_KEY, mediaSourceId);
@@ -36,7 +45,7 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     }
 
     public static List<String> buildVideoCacheKeyList(String mediaSourceId, String ua) {
-        return ListUtil.of(buildVideoCacheKey(mediaSourceId,ua), buildVideoCacheKey(mediaSourceId));
+        return ListUtil.of(buildVideoCacheKey(mediaSourceId, ua), buildVideoCacheKey(mediaSourceId));
     }
 
     public static String buildPicCacheKey(String itemId, EmbyPicType picType) {

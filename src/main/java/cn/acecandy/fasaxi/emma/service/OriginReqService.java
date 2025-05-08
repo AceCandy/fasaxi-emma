@@ -5,6 +5,7 @@ import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
+import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import jakarta.annotation.Resource;
@@ -65,14 +66,14 @@ public class OriginReqService {
                 execOriginReq(request, response, stopWatch);
             } finally {
                 if (StrUtil.isNotBlank(request.getUserId()) && StrUtil.isNotBlank(request.getMediaSourceId())) {
-                    redisClient.del(StrUtil.format("/emby/Users/{}/Items/{}?{}",
+                    redisClient.delByPrefix(StrUtil.format("/emby/Users/{}/Items/{}",
                             request.getUserId(), request.getMediaSourceId()));
                 }
             }
             return;
         }
 
-        String cacheKey = staticCacheKey(request);
+        String cacheKey = CacheUtil.buildOriginCacheKey(request);
         EmbyCachedResp cached = redisClient.getBean(cacheKey);
         if (cached != null) {
             writeCacheResponse(response, cached);
@@ -94,7 +95,7 @@ public class OriginReqService {
 
     private void execOriginReq(EmbyContentCacheReqWrapper request, HttpServletResponse response,
                                StopWatch stopWatch) throws Throwable {
-        String cacheKey = staticCacheKey(request);
+        String cacheKey = CacheUtil.buildOriginCacheKey(request);
         EmbyCachedResp cached = redisClient.getBean(cacheKey);
         if (cached != null) {
             writeCacheResponse(response, cached);
@@ -156,16 +157,6 @@ public class OriginReqService {
     }
 
     /**
-     * 静态资源缓存key
-     *
-     * @param req 请求入参
-     * @return {@link String }
-     */
-    private String staticCacheKey(EmbyContentCacheReqWrapper req) {
-        return StrUtil.format("{}?{}", req.getRequestURI(), req.getCachedParam());
-    }
-
-    /**
      * 返回响应(满足条件会缓存)
      *
      * @param request 请求
@@ -211,11 +202,11 @@ public class OriginReqService {
             if (!cached.getStatusCode().equals(CODE_200)) {
                 return;
             }
-            int exTime = 5;
+            int exTime = 10;
             if (isCacheStaticReq(request)) {
                 exTime = 2 * 24 * 60 * 60;
             }
-            redisClient.setBean(staticCacheKey(request), cached, exTime);
+            redisClient.setBean(CacheUtil.buildOriginCacheKey(request), cached, exTime);
         });
     }
 }
