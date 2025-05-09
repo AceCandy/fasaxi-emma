@@ -6,6 +6,7 @@ import cn.acecandy.fasaxi.emma.service.PicRedirectService;
 import cn.acecandy.fasaxi.emma.service.VideoRedirectService;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
+import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.AsyncContext;
 import jakarta.servlet.Filter;
@@ -26,7 +27,6 @@ import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.math.NumberUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
-import org.dromara.hutool.core.thread.ThreadUtil;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -122,7 +122,8 @@ public class EmbyProxyFilter implements Filter {
             log.warn("转发请求失败[{}]: {}", req.getMethod(), reqWrapper.getRequestURI(), e);
             originReqService.forwardOriReq(reqWrapper, res);
         } finally {
-            accessLog.log(req, res, start);
+            accessLog.log(reqWrapper.getMethod(), reqWrapper.getRequestURI(),
+                    req.getQueryString(), res.getStatus(), start);
         }
     }
 
@@ -243,7 +244,7 @@ public class EmbyProxyFilter implements Filter {
 
                 return true;
             } else {
-                ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
+                ThreadUtil.execVirtual(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
                 response.setStatus(HttpServletResponse.SC_FOUND);
                 response.setHeader("Location", embyInfo.getRealUrl());
                 return false;
@@ -279,7 +280,7 @@ public class EmbyProxyFilter implements Filter {
 
                 return true;
             } else {
-                ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
+                ThreadUtil.execVirtual(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
                 response.setStatus(HttpServletResponse.SC_FOUND);
                 response.setHeader("Location", embyInfo.getRealUrl());
                 return false;
@@ -307,7 +308,7 @@ public class EmbyProxyFilter implements Filter {
                 mixFileCache(embyInfo, response, headers);
                 return true;
             } else {
-                ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
+                ThreadUtil.execVirtual(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
                 response.setStatus(HttpServletResponse.SC_FOUND);
                 response.setHeader("Location", embyInfo.getRealUrl());
                 return true;
@@ -382,7 +383,7 @@ public class EmbyProxyFilter implements Filter {
                         return true;
                     }
                 } else {
-                    ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
+                    ThreadUtil.execVirtual(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
                     response.setStatus(HttpServletResponse.SC_FOUND);
                     response.setHeader("Location", embyInfo.getRealUrl());
                 }
@@ -408,7 +409,7 @@ public class EmbyProxyFilter implements Filter {
                     response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
                     mixFileCache(embyInfo, response, request.getCachedHeader());
                 } else {
-                    ThreadUtil.execAsync(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
+                    ThreadUtil.execVirtual(() -> fileCacheUtil.writeCacheFile(embyInfo, request.getCachedHeader()));
                     response.setStatus(HttpServletResponse.SC_FOUND);
                     response.setHeader("Location", embyInfo.getRealUrl());
                 }

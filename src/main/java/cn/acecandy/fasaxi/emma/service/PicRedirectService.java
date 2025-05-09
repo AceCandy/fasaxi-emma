@@ -11,6 +11,7 @@ import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
+import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
@@ -18,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.math.NumberUtil;
 import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.thread.ThreadUtil;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.locks.Lock;
@@ -165,7 +165,7 @@ public class PicRedirectService {
      * @param picType 图片类型
      */
     private void asyncWriteItemPic(Integer itemId, String url, EmbyPicType picType) {
-        ThreadUtil.execAsync(() -> {
+        ThreadUtil.execVirtual(() -> {
             EmbyItemPic picDto = switch (picType) {
                 case 封面 -> EmbyItemPic.builder().itemId(itemId).posterPath(url).build();
                 case 背景图 -> EmbyItemPic.builder().itemId(itemId).backdropPath(url).build();
@@ -185,7 +185,7 @@ public class PicRedirectService {
      * @param picType 图片类型
      */
     private void asyncWriteItemPicRedis(String itemId, String url, EmbyPicType picType) {
-        ThreadUtil.execAsync(() -> {
+        ThreadUtil.execVirtual(() -> {
             redisClient.set(CacheUtil.buildPicCacheKey(itemId, picType), url, 2 * 24 * 60 * 60);
         });
     }

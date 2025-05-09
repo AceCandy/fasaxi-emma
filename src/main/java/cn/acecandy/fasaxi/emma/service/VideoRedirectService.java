@@ -8,16 +8,28 @@ import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import jakarta.annotation.Resource;
+import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.date.DateUtil;
+import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.net.url.UrlQueryUtil;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.http.client.Request;
+import org.dromara.hutool.http.client.Response;
+import org.dromara.hutool.http.client.engine.ClientEngine;
+import org.dromara.hutool.http.meta.Method;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.nio.charset.Charset;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
@@ -38,6 +50,9 @@ public class VideoRedirectService {
     private OriginReqService originReqService;
 
     @Resource
+    private ClientEngine httpClient;
+
+    @Resource
     private RedisClient redisClient;
 
     @Resource
@@ -51,6 +66,10 @@ public class VideoRedirectService {
         String mediaSourceId = request.getMediaSourceId();
         if (StrUtil.isBlank(mediaSourceId)) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+        if (1 + 1 == 2) {
+            originalVideoStream(request, response);
             return;
         }
 
@@ -153,6 +172,82 @@ public class VideoRedirectService {
             return;
         } else {
             // TODO 这里是不需要302的本地路径
+            originalVideoStream(request, response);
+        }
+    }
+
+    private void originalVideoStream(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
+        Request originalRequest = Request.of(embyConfig.getHost() + request.getParamUri())
+                .method(Method.valueOf(request.getMethod()))
+                .body(request.getCachedBody()).header(request.getCachedHeader());
+        if(StrUtil.isBlank(request.getRange()) || StrUtil.equalsIgnoreCase(request.getRange(),"bytes=0-")) {
+            originalRequest.header("range", "bytes=0-"+5242879);
+        } else if(StrUtil.equalsIgnoreCase(request.getRange(),"bytes=32768-")) {
+            originalRequest.header("range", "bytes=32768-"+(5242879+32768));
+        } else if(StrUtil.equalsIgnoreCase(request.getRange(),"bytes=392069120-")) {
+            originalRequest.header("range", "bytes=392069120-"+(5242879+392069120));
+        } else {
+            originalRequest.header("range", "byte=791183360-");
+        }
+        try (Response res = httpClient.send(originalRequest)) {
+            response.setStatus(res.getStatus());
+            res.headers().forEach((name, values) ->
+                    response.setHeader(name, String.join(",", values)));
+            Console.log(res.headers());
+            response.setHeader("Accept-Ranges", "bytes");
+
+
+            // 使用虚拟线程池（非阻塞模式）
+            try (
+                    ServletOutputStream out = response.getOutputStream();
+                    InputStream bodyStream = res.bodyStream(); // 确保原始流关闭
+                    ReadableByteChannel inChannel = Channels.newChannel(bodyStream);
+                    WritableByteChannel outChannel = Channels.newChannel(out)
+            ) {
+                // 使用直接缓冲区提升性能（适用于大文件）
+                ByteBuffer buffer = ByteBuffer.allocateDirect(8192);
+                while (inChannel.read(buffer) != -1) {
+                    buffer.flip();
+                    while (buffer.hasRemaining()) {
+                        outChannel.write(buffer);
+                    }
+                    buffer.clear();
+
+                    // 响应客户端中断（关键！）
+                    if (Thread.currentThread().isInterrupted()) {
+                        throw new InterruptedException("Streaming interrupted");
+                    }
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); // 恢复中断状态
+                throw new RuntimeException("Video streaming interrupted", e);
+            }
+        } catch (IOException e) {
+            if (!response.isCommitted()) {
+                try {
+                    response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                } catch (IOException ex) {
+                    throw new RuntimeException(ex);
+                }
+            }
+        } catch (Exception e) {
+            Thread.currentThread().interrupt(); // 恢复中断状态
+            throw new RuntimeException("Thread interrupted", e);
+        }
+    }
+
+    private void handleStreamError(Throwable ex, HttpServletResponse response) {
+        if (!response.isCommitted()) {
+            try {
+                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            } catch (IOException e) {
+                // 记录日志但不再抛出
+            }
+        } else {
+            // 记录流传输中断日志
+        }
+        if (ex instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
         }
     }
 }

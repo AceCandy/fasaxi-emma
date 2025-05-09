@@ -16,7 +16,6 @@ import org.dromara.hutool.core.array.ArrayUtil;
 import org.dromara.hutool.core.date.StopWatch;
 import org.dromara.hutool.core.exception.ExceptionUtil;
 import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.thread.ThreadUtil;
 import org.dromara.hutool.http.client.Request;
 import org.dromara.hutool.http.client.Response;
 import org.dromara.hutool.http.client.engine.ClientEngine;
@@ -131,12 +130,13 @@ public class OriginReqService {
      * @param cached   高速缓存
      * @throws Throwable 可抛出
      */
-    private void httpClient5WarningCatch(EmbyContentCacheReqWrapper request, HttpServletResponse response,
+    private void httpClient5WarningCatch(EmbyContentCacheReqWrapper request,
+                                         HttpServletResponse response,
                                          Throwable e, EmbyCachedResp cached) throws Throwable {
         if (StrUtil.contains(ExceptionUtil.getSimpleMessage(e), "Cannot invoke " +
                 "\"org.apache.hc.core5.http.HttpEntity.getContent()\" because \"this.entity\" is null")) {
             cached.setStatusCode(CODE_204);
-            writeCacheResponse(request, response, cached);
+            writeCacheResponse(response, cached);
         } else {
             throw e;
         }
@@ -148,7 +148,7 @@ public class OriginReqService {
      * @param request 要求
      * @return {@link Response }
      */
-    private Response sendOriginReq(EmbyContentCacheReqWrapper request) {
+    public Response sendOriginReq(EmbyContentCacheReqWrapper request) {
         Request originalRequest = Request.of(embyConfig.getHost() + request.getParamUri())
                 .method(Method.valueOf(request.getMethod()))
                 .body(request.getCachedBody()).header(request.getCachedHeader());
@@ -191,21 +191,19 @@ public class OriginReqService {
      * @param cached  缓存返回
      */
     private void asyncWriteOriginReq(EmbyContentCacheReqWrapper request, EmbyCachedResp cached) {
-        ThreadUtil.execAsync(() -> {
-            if (null == request) {
-                return;
-            }
-            if (!StrUtil.equalsIgnoreCase(request.getMethod(), HTTP_GET)) {
-                return;
-            }
-            if (!cached.getStatusCode().equals(CODE_200)) {
-                return;
-            }
-            int exTime = 10;
-            if (isCacheStaticReq(request)) {
-                exTime = 2 * 24 * 60 * 60;
-            }
-            redisClient.setBean(CacheUtil.buildOriginCacheKey(request), cached, exTime);
-        });
+        if (null == request) {
+            return;
+        }
+        if (!StrUtil.equalsIgnoreCase(request.getMethod(), HTTP_GET)) {
+            return;
+        }
+        if (!cached.getStatusCode().equals(CODE_200)) {
+            return;
+        }
+        int exTime = 10;
+        if (isCacheStaticReq(request)) {
+            exTime = 2 * 24 * 60 * 60;
+        }
+        redisClient.setBean(CacheUtil.buildOriginCacheKey(request), cached, exTime);
     }
 }

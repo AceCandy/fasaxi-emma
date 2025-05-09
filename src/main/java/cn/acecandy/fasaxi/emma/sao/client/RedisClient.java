@@ -1,5 +1,6 @@
 package cn.acecandy.fasaxi.emma.sao.client;
 
+import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.array.ArrayUtil;
@@ -7,7 +8,6 @@ import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.collection.set.SetUtil;
 import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.thread.ThreadUtil;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ScanOptions;
@@ -144,7 +144,7 @@ public class RedisClient {
         if (ArrayUtil.isEmpty(key)) {
             return;
         }
-        ThreadUtil.execAsync(() -> {
+        ThreadUtil.execVirtual(() -> {
             redisTemplate.delete(ListUtil.of(key));
         });
     }
@@ -153,7 +153,7 @@ public class RedisClient {
         if (StrUtil.isBlank(prefix)) {
             return;
         }
-        ThreadUtil.execAsync(() -> {
+        ThreadUtil.execVirtual(() -> {
             Set<String> keysToDelete = SetUtil.of();
             try (Cursor<String> cursor = redisTemplate.scan(ScanOptions.scanOptions()
                     .match(prefix + "*").count(100).build())) {

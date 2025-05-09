@@ -19,6 +19,12 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
     }
 
     /**
+     * 匹配标题中的标点符号进行分割
+     */
+    public static final Pattern REGEX_SPILT_TITLE = PatternPool.get(
+            "[,.，。；;'\"“”‘’：:【】]", Pattern.DOTALL);
+
+    /**
      * 匹配类似 /emby/Users/656fcefa283149708880b416786e5fde/Items/1417552/Delete
      */
     private static final Pattern REGEX_SIMILAR_ITEM = PatternPool.get(
@@ -30,8 +36,11 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
     private static final Pattern REGEX_ITEM = PatternPool.get(
             "^/emby/users/([a-z0-9]+)/items/([0-9]+)$", Pattern.DOTALL);
 
+    private static final Pattern REGEX_ITEMS = PatternPool.get(
+            "^/emby/users/([a-z0-9]+)/items$", Pattern.DOTALL);
+
     private static final Pattern REGEX_VIDEO = PatternPool.get(
-            "^/emby/(videos|items)/(\\d+)/(?:original\\.[^/]+|download)$", Pattern.DOTALL);
+            "^/emby/(videos|items)/(\\d+)/(?:original\\.[^/]+|download|stream.*)$", Pattern.DOTALL);
 
     public static String isVideoUrl(String url) {
         List<String> groups = getAllGroups(REGEX_VIDEO, url.toLowerCase());
@@ -55,6 +64,10 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
             return null;
         }
         return ListUtil.of(CollUtil.get(groups, 1), CollUtil.get(groups, 2));
+    }
+
+    public static boolean isItemsUrl(String url) {
+        return isMatch(REGEX_ITEMS, url.toLowerCase());
     }
 
     public static void main(String[] args) {

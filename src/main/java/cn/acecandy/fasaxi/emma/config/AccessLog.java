@@ -1,11 +1,9 @@
 package cn.acecandy.fasaxi.emma.config;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.thread.ThreadUtil;
 import org.springframework.stereotype.Component;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
@@ -22,21 +20,18 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_400;
 @Component
 public class AccessLog {
 
-    public void log(HttpServletRequest req, HttpServletResponse res, long start) {
-        ThreadUtil.execAsync(() -> {
-            ThreadUtil.execAsync(() -> {
-                int statusCode = res.getStatus();
-                long elapsedTime = DateUtil.current() - start;
-                String logMessage = StrUtil.format("[{}-{}:{}ms] {}", statusCode,
-                        req.getMethod(), elapsedTime, req.getRequestURI(), req.getQueryString());
-                if (statusCode >= CODE_200 && statusCode < CODE_300) {
-                    log.info(logMessage);
-                } else if (statusCode >= CODE_300 && statusCode < CODE_400) {
-                    log.warn(logMessage);
-                } else {
-                    log.error(logMessage);
-                }
-            });
+    public void log(String method, String uri, String queryStr, int status, long start) {
+        ThreadUtil.execVirtual(() -> {
+            long elapsedTime = DateUtil.current() - start;
+            String logMessage = StrUtil.format("[{}-{}:{}ms] {}", status,
+                    method, elapsedTime, uri, queryStr);
+            if (status >= CODE_200 && status < CODE_300) {
+                log.info(logMessage);
+            } else if (status >= CODE_300 && status < CODE_400) {
+                log.warn(logMessage);
+            } else {
+                log.error(logMessage);
+            }
         });
     }
 }

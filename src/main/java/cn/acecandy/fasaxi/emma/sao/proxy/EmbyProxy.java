@@ -13,6 +13,8 @@ import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
 import cn.acecandy.fasaxi.emma.utils.CompressUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
+import cn.acecandy.fasaxi.emma.utils.SortUtil;
+import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +24,6 @@ import org.dromara.hutool.core.exception.ExceptionUtil;
 import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.thread.ThreadUtil;
 import org.dromara.hutool.http.HttpUtil;
 import org.dromara.hutool.http.client.Request;
 import org.dromara.hutool.http.client.Response;
@@ -34,6 +35,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.Charset;
+import java.util.List;
 import java.util.Map;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_302;
@@ -173,16 +175,13 @@ public class EmbyProxy {
             String content = "";
             if (StrUtil.equalsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "br")) {
                 String bodyStr = new String(CompressUtil.decode(body.getBytes()));
-                refreshItem(request, bodyStr);
-                content = StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
+                content = changeRespBody(request, bodyStr);
             } else if (StrUtil.containsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "gzip")) {
                 String bodyStr = new String(ZipUtil.unGzip(body.getBytes()));
-                refreshItem(request, bodyStr);
-                content = StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
+                content = changeRespBody(request, bodyStr);
             } else {
                 String bodyStr = body.getString();
-                refreshItem(request, bodyStr);
-                content = StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
+                content = changeRespBody(request, bodyStr);
             }
             embyCachedResp.setContent(content.getBytes());
         } else {
@@ -191,6 +190,33 @@ public class EmbyProxy {
         return embyCachedResp;
     }
 
+    private String changeRespBody(EmbyContentCacheReqWrapper request, String bodyStr) {
+        refreshItem(request, bodyStr);
+        bodyStr = searchItem(request, bodyStr);
+        return StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
+    }
+
+
+    /**
+     * 返回结果个性化排序
+     *
+     * @param request 要求
+     * @param bodyStr 身体str
+     */
+    private String searchItem(EmbyContentCacheReqWrapper request, String bodyStr) {
+        if (!ReUtil.isItemsUrl(request.getRequestURI().toLowerCase()) ||
+                !request.getCachedParam().containsKey("searchterm")) {
+            return bodyStr;
+        }
+        EmbyItemsInfoOut itemInfo = JSONUtil.toBean(bodyStr, EmbyItemsInfoOut.class);
+        if (CollUtil.isEmpty(itemInfo.getItems())) {
+            return bodyStr;
+        }
+        List<EmbyItem> items = SortUtil.searchSortItem(itemInfo.getItems(),
+                request.getCachedParam().get("searchterm").toString());
+        itemInfo.setItems(items);
+        return JSONUtil.toJsonStr(itemInfo);
+    }
 
     /**
      * 刷新项目
@@ -202,9 +228,9 @@ public class EmbyProxy {
         if (CollUtil.isEmpty(ReUtil.isItemUrl(request.getRequestURI().toLowerCase()))) {
             return;
         }
-        ThreadUtil.execAsync(() -> {
+        ThreadUtil.execVirtual(() -> {
             EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
-            if (!StrUtil.containsAny(item.getUniqueKey(),"tmdb","tt","zh-CN-cf")
+            if (!StrUtil.containsAny(item.getUniqueKey(), "tmdb", "tt", "zh-CN-cf")
                     || StrUtil.isNotBlank(item.getImageTags().getPrimary())) {
                 return;
             }
