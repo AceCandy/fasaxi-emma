@@ -20,6 +20,7 @@ public interface CacheConstant {
     Integer CODE_404 = 404;
     Integer CODE_416 = 416;
     Integer CODE_429 = 429;
+    Integer CODE_599 = 599;
 
     // http请求方法
 

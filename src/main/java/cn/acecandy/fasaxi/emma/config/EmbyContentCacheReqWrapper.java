@@ -7,6 +7,7 @@ import lombok.Getter;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.core.text.split.SplitUtil;
 import org.dromara.hutool.http.HttpUtil;
 import org.dromara.hutool.http.server.servlet.ServletUtil;
 
@@ -16,6 +17,8 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+
+import static org.dromara.hutool.core.text.StrPool.COMMA;
 
 /**
  * emby请求体缓存包装器
@@ -38,6 +41,8 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     private String mediaSourceId;
     @Getter
     private String userId;
+    @Getter
+    private String ip;
     @Getter
     private final Map<String, Object> cachedParam = new TreeMap<>();
 
@@ -67,6 +72,12 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
                 }
             }
         }
+        String xffHeader = request.getHeader("X-Forwarded-For");
+        if (StrUtil.isNotBlank(xffHeader)) {
+            ip = CollUtil.getFirst(SplitUtil.splitTrim(xffHeader, COMMA));
+        } else {
+            ip = request.getRemoteAddr();
+        }
         cachedHeader.putAll(headerMap);
     }
 
@@ -74,7 +85,7 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         String uri = request.getRequestURI().toLowerCase();
         if (StrUtil.containsAnyIgnoreCase(uri, "/images/primary")) {
             cachedParam.put("tag", request.getParameter("tag"));
-            cachedParam.put("maxwidth", "500");
+            cachedParam.put("maxwidth", "400");
             // cachedParam.put("quality", "90");
         } else if (StrUtil.containsAnyIgnoreCase(uri, "/images/logo")) {
             cachedParam.put("tag", request.getParameter("tag"));

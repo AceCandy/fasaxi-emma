@@ -6,13 +6,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.lang.Console;
+import org.dromara.hutool.core.math.NumberUtil;
+import org.dromara.hutool.core.regex.RegexPool;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
 import org.dromara.hutool.json.JSONUtil;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static cn.acecandy.fasaxi.emma.utils.ReUtil.REGEX_SPILT_TITLE;
 
@@ -32,6 +37,32 @@ public final class SortUtil {
     private static final String[] REMOVE_SYMBOL = {",", ".", "，", "。", "；",
             ";", "'", "\"", "“", "”", "‘", "’", "：", ":", "【", "】"};
 
+    private enum SearchMatchGroup {
+        // 搜索匹配分组
+        全匹配,
+        剔除符号全匹配,
+        分割后全匹配,
+        普通包含,
+        普通包含_带书名号,
+        其它;
+
+        /**
+         * 分组判断逻辑
+         */
+        public static SearchMatchGroup classify(EmbyItem item, String searchLower,
+                                                String noSymbolName, List<String> splitName) {
+            String nameLower = item.getName().toLowerCase();
+
+            if (StrUtil.equals(nameLower, searchLower)) return 全匹配;
+            if (StrUtil.equals(noSymbolName, searchLower)) return 剔除符号全匹配;
+            if (CollUtil.contains(splitName, searchLower)) return 分割后全匹配;
+            if (nameLower.contains(searchLower)) {
+                return hasBookBrackets(nameLower) ? 普通包含_带书名号 : 普通包含;
+            }
+            return 其它;
+        }
+    }
+
     /**
      * 搜索排序
      *
@@ -40,7 +71,49 @@ public final class SortUtil {
      * @return {@link List }<{@link EmbyItem }>
      */
     public static List<EmbyItem> searchSortItem(List<EmbyItem> items, String search) {
-        // 全匹配
+        // 预处理
+        final String searchLower = search.toLowerCase();
+        items.forEach(item -> item.setProductionYear(NumberUtil.nullToZero(item.getProductionYear())));
+
+        // 使用EnumMap分组
+        EnumMap<SearchMatchGroup, List<EmbyItem>> groups = new EnumMap<>(SearchMatchGroup.class);
+        Arrays.stream(SearchMatchGroup.values()).forEach(g -> groups.put(g, ListUtil.of()));
+
+        // 单次遍历分组
+        items.forEach(item -> {
+            String nameLower = item.getName().toLowerCase();
+            String noSymbolName = StrUtil.removeAll(nameLower, REMOVE_SYMBOL);
+            List<String> splitName = SplitUtil.splitByRegex(nameLower, REGEX_SPILT_TITLE, 0, true, true);
+
+            groups.get(SearchMatchGroup.classify(item, searchLower, noSymbolName, splitName)).add(item);
+        });
+
+        // 构建统一比较器 年份降序->数字降序->关键字位置
+        Comparator<EmbyItem> comparator = Comparator
+                .comparingInt((EmbyItem e) -> -e.getProductionYear())
+                .thenComparing(e -> -extractFirstNumber(e.getName()))
+                .thenComparing(e -> -StrUtil.lastIndexOfIgnoreCase(e.getName(), search));
+
+        // 分组排序（OTHERS保持原序）
+        groups.forEach((group, list) -> {
+            if (group == SearchMatchGroup.其它) {
+                return;
+            }
+            CollUtil.sort(list, comparator);
+        });
+
+        // 合并结果流处理
+        return groups.entrySet().stream()
+                .sorted(Comparator.comparingInt(e -> e.getKey().ordinal()))
+                .flatMap(entry -> entry.getValue().stream())
+                .peek(item -> {
+                    if (item.getProductionYear() == 0) {
+                        item.setProductionYear(null);
+                    }
+                })
+                .collect(Collectors.toList());
+
+        /*// 全匹配
         List<EmbyItem> exactMatch = ListUtil.of();
         // 全匹配(剔除符号)
         List<EmbyItem> noSymbolExactMatch = ListUtil.of();
@@ -52,6 +125,9 @@ public final class SortUtil {
         List<EmbyItem> containsWithBracket = ListUtil.of();
         // 其他元素
         List<EmbyItem> others = ListUtil.of();
+
+        String searchLower = search.toLowerCase();
+        items.forEach(item -> item.setProductionYear(ObjUtil.defaultIfNull(item.getProductionYear(), 0)));
 
         // 第一遍遍历：分组处理
         for (EmbyItem item : items) {
@@ -80,9 +156,23 @@ public final class SortUtil {
         // 定义包含组的排序规则（关键字位置 + 年份降序）
         Comparator<EmbyItem> containsComparator = Comparator
                 .comparingInt((EmbyItem b) -> StrUtil.lastIndexOfIgnoreCase(b.getName(), search))
-                .thenComparingInt(EmbyItem::getProductionYear).reversed();
+                .thenComparingInt(EmbyItem::getProductionYear).reversed()
+                .thenComparing((item1, item2) -> {
+                    Integer num1 = NumberUtil.parseInt(CollUtil.getFirst(
+                            ReUtil.findAllGroup0(RegexPool.NUMBERS, item1.getName())), 0);
+                    Integer num2 = NumberUtil.parseInt(CollUtil.getFirst(
+                            ReUtil.findAllGroup0(RegexPool.NUMBERS, item2.getName())), 0);
+                    return num2.compareTo(num1);
+                });
 
-        Comparator<EmbyItem> matchComparator = Comparator.comparingInt(EmbyItem::getProductionYear).reversed();
+        Comparator<EmbyItem> matchComparator = Comparator.comparingInt(EmbyItem::getProductionYear).reversed()
+                .thenComparing((item1, item2) -> {
+                    Integer num1 = NumberUtil.parseInt(CollUtil.getFirst(
+                            ReUtil.findAllGroup0(RegexPool.NUMBERS, item1.getName())), 0);
+                    Integer num2 = NumberUtil.parseInt(CollUtil.getFirst(
+                            ReUtil.findAllGroup0(RegexPool.NUMBERS, item2.getName())), 0);
+                    return num2.compareTo(num1);
+                });
 
         // 分组排序
         exactMatch.sort(matchComparator);
@@ -100,7 +190,26 @@ public final class SortUtil {
         result.addAll(containsWithBracket);
         result.addAll(others);
 
-        return result;
+        result.replaceAll(item -> {
+            if (0 == item.getProductionYear()) {
+                item.setProductionYear(null);
+            }
+            return item;
+        });
+
+        return result;*/
+    }
+
+    /**
+     * 提取第一个数字
+     *
+     * @param name 名称
+     * @return int
+     */
+    private static int extractFirstNumber(String name) {
+        return Optional.ofNullable(ReUtil.findAllGroup0(RegexPool.NUMBERS, name))
+                .map(CollUtil::getFirst).map(NumberUtil::parseInt)
+                .orElse(0);
     }
 
     /**

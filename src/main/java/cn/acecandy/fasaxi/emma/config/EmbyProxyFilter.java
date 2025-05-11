@@ -96,14 +96,15 @@ public class EmbyProxyFilter implements Filter {
         }*/
 
         EmbyContentCacheReqWrapper reqWrapper = new EmbyContentCacheReqWrapper(req);
-        if (!StrUtil.containsAny(reqWrapper.getUa(), "Infuse-Library", "EmbyTheater", "Tsukimi",
-                "Yamby", "Hills", "AfuseKt",
-                "SenPlayer", "VidHub", "Filebar", "iemc", "iPlay", "Forward")) {
-            res.setStatus(CODE_416);
-            return;
-        }
         try {
             if (needClose(req)) {
+                res.setStatus(CODE_416);
+                return;
+            }
+            if (!StrUtil.containsAny(reqWrapper.getUa(), "okhttp",
+                    "Yamby", "Hills", "AfuseKt",
+                    "SenPlayer", "VidHub", "Forward")) {
+                log.error("非法UA已被禁止: {}", reqWrapper.getUa());
                 res.setStatus(CODE_416);
                 return;
             }
@@ -119,10 +120,10 @@ public class EmbyProxyFilter implements Filter {
                 }
             }
         } catch (Exception e) {
-            log.warn("转发请求失败[{}]: {}", req.getMethod(), reqWrapper.getRequestURI(), e);
+            log.warn("转发请求失败[{}]: {}?{}", req.getMethod(), reqWrapper.getRequestURI(), reqWrapper.getQueryString(), e);
             originReqService.forwardOriReq(reqWrapper, res);
         } finally {
-            accessLog.log(reqWrapper.getMethod(), reqWrapper.getRequestURI(),
+            accessLog.log(reqWrapper.getMethod(), reqWrapper.getRequestURI(), reqWrapper.getIp(),
                     req.getQueryString(), res.getStatus(), start);
         }
     }

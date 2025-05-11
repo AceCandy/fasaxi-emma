@@ -16,6 +16,12 @@ import java.util.Map;
 public class EmbyItem {
 
     /**
+     * 服务器id
+     */
+    @Alias("ServerId")
+    private String serverId;
+
+    /**
      * 标题
      */
     @Alias("Name")
@@ -50,6 +56,12 @@ public class EmbyItem {
      */
     @Alias("Type")
     private String type;
+
+    /**
+     * 用户信息
+     */
+    @Alias("UserData")
+    private Map<String, Object> userData;
 
     /**
      * 对应的父id
@@ -93,6 +105,19 @@ public class EmbyItem {
      */
     @Alias("MediaType")
     private String mediaType;
+
+    /**
+     * 是否文件夹
+     */
+    @Alias("IsFolder")
+    private Boolean isFolder;
+
+    /**
+     * 图像标记
+     * 有图片就会有值
+     */
+    @Alias("PrimaryImageAspectRatio")
+    private Double primaryImageAspectRatio;
 
     /**
      * 图像标记

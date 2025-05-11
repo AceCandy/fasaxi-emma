@@ -26,6 +26,7 @@ import java.util.concurrent.locks.Lock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_599;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_GET;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheStaticReq;
 
@@ -138,6 +139,7 @@ public class OriginReqService {
             cached.setStatusCode(CODE_204);
             writeCacheResponse(response, cached);
         } else {
+            cached.setStatusCode(CODE_599);
             throw e;
         }
     }
@@ -152,6 +154,7 @@ public class OriginReqService {
         Request originalRequest = Request.of(embyConfig.getHost() + request.getParamUri())
                 .method(Method.valueOf(request.getMethod()))
                 .body(request.getCachedBody()).header(request.getCachedHeader());
+        // Console.log(originalRequest);
         return httpClient.send(originalRequest);
     }
 
