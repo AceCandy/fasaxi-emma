@@ -2,6 +2,8 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
+import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
+import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import jakarta.annotation.Resource;
 import lombok.Builder;
@@ -13,6 +15,7 @@ import org.dromara.hutool.core.io.IoUtil;
 import org.dromara.hutool.core.io.file.FileNameUtil;
 import org.dromara.hutool.core.io.file.FileUtil;
 import org.dromara.hutool.core.io.file.PathUtil;
+import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
@@ -21,10 +24,14 @@ import org.dromara.hutool.http.client.Request;
 import org.dromara.hutool.http.client.Response;
 import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.dromara.hutool.http.meta.HttpStatus;
+import org.dromara.hutool.http.meta.Method;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.io.InputStream;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -36,6 +43,8 @@ import java.util.stream.Stream;
 
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电影;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧;
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.WRITE;
 
 
 /**
@@ -90,6 +99,11 @@ public class FileCacheUtil {
                     PathUtil.subPath(path, path.getNameCount() - 2, path.getNameCount()));
         }
         return SecureUtil.md5(newFilePath.toString());
+    }
+
+    public static Path getCachePath(String itemId, String mediaType, String filePath) {
+        return PathUtil.of(cache_path, mediaType, itemId,
+                SecureUtil.md5(PathUtil.getLastPathEle(Paths.get(filePath)).toString()));
     }
 
     public enum CacheStatus {
@@ -236,6 +250,120 @@ public class FileCacheUtil {
         } finally {
             lock.unlock();
         }
+    }
+
+    /**
+     * 写入文件缓存
+     *
+     * @param request   要求
+     * @param totalSize 总尺寸
+     * @return boolean
+     */
+    @SneakyThrows
+    public boolean writeFile(EmbyContentCacheReqWrapper request, EmbyItem embyItem,
+                             Map<String, String> headerMap) {
+        EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
+        String filePath = embyItem.getPath();
+        String itemId = request.getMediaSourceId();
+        String mediaType = embyItem.getMediaType();
+        String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();
+        mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
+
+        Path writePath = getCachePath(itemId, mediaType, filePath);
+
+        Long start = range.start();
+        Long end = range.end();
+        String cacheFileName = "cacheFile_" + start + "_" + end;
+        Path cacheFilePath = Paths.get(feConfig.getCachePath(), writePath.toString(), cacheFileName);
+        Path parentPath = PathUtil.mkParentDirs(cacheFilePath);
+
+        if (PathUtil.exists(cacheFilePath, false)) {
+            log.info("缓存文件已存在: {}", cacheFilePath);
+            return false;
+        }
+        log.info("写入本地缓存文件->{}", cacheFilePath);
+
+        Request originalRequest = Request.of(mediaPath).method(Method.GET).header(headerMap);
+        try (Response res = httpClient.send(originalRequest);
+             FileChannel fileChannel = FileChannel.open(cacheFilePath, CREATE, WRITE)) {
+            ReadableByteChannel remoteChannel = Channels.newChannel(res.body().getStream());
+            fileChannel.transferFrom(remoteChannel, 0, Long.MAX_VALUE);
+        } catch (Exception e) {
+            log.error("写入缓存文件失败: {}", cacheFilePath, e);
+            PathUtil.del(cacheFilePath);
+        }
+
+        return true;
+        /*Long itemId = fileInfo.getItemId();
+        String path = fileInfo.getPath();
+        long fileSize = fileInfo.getSize();
+        long cacheSize = fileInfo.getCacheFileSize();
+        String itemType = fileInfo.getItemType();
+
+        String pathMd5 = getPathMd5(path, itemType);
+        String subDir = StrUtil.subPre(pathMd5, 2);
+        String dir = pathMd5;
+
+        Long startPoint = fileInfo.getStartByte();
+        Long endPoint = fileInfo.getEndByte();
+        if (null == endPoint) {
+            endPoint = Math.min(fileSize, startPoint + cacheSize) - 1;
+        }
+        String realUrl = embyProxy.fetch302Path(path, reqHeader);
+
+        String cacheFileName = "cacheFile_" + startPoint + "_" + endPoint;
+        Path cacheFilePath = Paths.get(feConfig.getCachePath(), subDir, dir, cacheFileName);
+        Path parentPath = PathUtil.mkParentDirs(cacheFilePath);
+
+        String cacheWriteTagPath = cacheFilePath + ".tag";
+        FileUtil.touch(cacheWriteTagPath);
+
+        ReentrantLock lock = getLock(subDir, dir);
+        try {
+            lock.lock();
+
+            List<File> loopFile = PathUtil.loopFiles(parentPath, -1, null);
+            long finalStartPoint = startPoint;
+            long finalEndPoint = endPoint;
+            loopFile.forEach(file -> {
+                String fileName = FileNameUtil.getName(file);
+                if (!StrUtil.startWith(fileName, "cacheFile_") || StrUtil.endWith(fileName, ".tag")) {
+                    return;
+                }
+                List<String> parts = SplitUtil.split(fileName, "_");
+                long fileStart = Long.parseLong(parts.get(1));
+                long fileEnd = Long.parseLong(parts.get(2));
+                if (finalStartPoint >= fileStart && finalEndPoint <= fileEnd) {
+                    PathUtil.del(cacheFilePath);
+                } else if (finalStartPoint <= fileStart && finalEndPoint >= fileEnd) {
+                    FileUtil.del(file);
+                }
+            });
+            if (reqHeader == null) {
+                reqHeader = MapUtil.newHashMap();
+            } else {
+                reqHeader = new HashMap<>(reqHeader);
+            }
+            reqHeader.put("host", SplitUtil.split(realUrl, "/").get(2));
+            reqHeader.put("range", StrUtil.format("bytes={}-{}", startPoint, endPoint));
+
+            try (Response res = httpClient.send(Request.of(realUrl).header(reqHeader)).sync()) {
+                if (res.getStatus() != HttpStatus.HTTP_PARTIAL) {
+                    throw new BaseException("请求返回code不为206");
+                }
+                FileUtil.writeFromStream(res.body().getStream(), cacheFilePath.toFile());
+                log.info("写入缓存文件成功[{}]: {}", itemId, cacheFilePath);
+                FileUtil.del(cacheWriteTagPath);
+                return true;
+            }
+        } catch (Exception e) {
+            log.error("写入缓存失败[{}]: {}", itemId, cacheFilePath, e);
+            PathUtil.del(cacheFilePath);
+            FileUtil.del(cacheWriteTagPath);
+            throw e;
+        } finally {
+            lock.unlock();
+        }*/
     }
 
     /**
@@ -425,5 +553,9 @@ public class FileCacheUtil {
             return true;
         }
         return false;
+    }
+
+    public static void main(String[] args) {
+        Console.log(getCachePath("12345", 电影.getValue(), "/vol2/1000/dockerThirdConf/bili-sync-rs/docker-compose.yml"));
     }
 }

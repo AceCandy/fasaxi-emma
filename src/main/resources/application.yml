@@ -53,6 +53,7 @@ knife4j:
       group: 对外API
 
 emby:
+  common-ua: "AceCandy/1.0"
   item-info-url: /Items
   remote-images-url: /Items/{}/RemoteImages
   refresh-url: /emby/Items/{}/Refresh

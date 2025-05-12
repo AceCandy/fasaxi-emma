@@ -28,6 +28,10 @@ public class EmbyConfig {
      */
     private String apiKey;
     /**
+     * 通用ua
+     */
+    private String commonUa;
+    /**
      * 媒体信息url
      */
     private String itemInfoUrl;

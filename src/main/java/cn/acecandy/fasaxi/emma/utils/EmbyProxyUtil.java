@@ -6,9 +6,17 @@ import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.config.TmdbConfig;
 import cn.acecandy.fasaxi.emma.dao.entity.EmbyItemPic;
 import jakarta.servlet.http.HttpServletRequest;
+import org.dromara.hutool.core.collection.CollUtil;
+import org.dromara.hutool.core.math.NumberUtil;
+import org.dromara.hutool.core.net.url.UrlDecoder;
+import org.dromara.hutool.core.net.url.UrlUtil;
 import org.dromara.hutool.core.regex.ReUtil;
 import org.dromara.hutool.core.regex.RegexPool;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.core.text.split.SplitUtil;
+
+import java.nio.charset.Charset;
+import java.util.List;
 
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.Logo;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.封面;
@@ -172,4 +180,55 @@ public final class EmbyProxyUtil {
         return statusCode >= 200 && statusCode < 300;
     }
 
+    /**
+     * 构建香港url
+     *
+     * @param mediaPath 媒体路径
+     * @return {@link String }
+     */
+    public static String getPtUrlOnHk(String mediaPath) {
+        if (StrUtil.isBlank(mediaPath)) {
+            return "";
+        }
+        mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath, Charset.defaultCharset()));
+        mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt/Emby1/",
+                "http://8.210.221.216:5244/p/bt/Emby1/");
+        mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt/Emby/",
+                "http://8.210.221.216:5244/p/pt/Emby/");
+        return mediaPath;
+    }
+
+    public static Range parseRangeHeader(String range, Long totalSize) {
+        long chunk = 10 * 1024 * 1024;
+        if (null == totalSize || NumberUtil.isZero(totalSize)) {
+            totalSize = Long.MAX_VALUE;
+        }
+        if (StrUtil.isBlank(range) || !StrUtil.startWith(range, "bytes=")) {
+            return new Range(0, Math.min(chunk, totalSize) - 1, totalSize);
+        }
+        range = StrUtil.removePrefixIgnoreCase(range, "bytes=");
+        List<String> parts = SplitUtil.split(range, "-");
+        long start = NumberUtil.parseLong(CollUtil.getFirst(parts));
+        if(start > totalSize - 1){
+            return null;
+        }
+        if (start + chunk > totalSize - 1) {
+            start = totalSize - chunk;
+        }
+        // Long end = NumberUtil.parseLong(CollUtil.getLast(parts));
+        return new Range(start, Math.min(chunk + start, totalSize - 1), totalSize);
+    }
+
+    /**
+     * 请求头 range范围
+     *
+     * @author AceCandy
+     * @since 2025/05/12
+     */
+    public record Range(long start, long end, long size) {
+        // 写一个方法输出bytes=start-end的字符串
+        public String toHeader() {
+            return StrUtil.format("bytes={}-{}", start, end);
+        }
+    }
 }

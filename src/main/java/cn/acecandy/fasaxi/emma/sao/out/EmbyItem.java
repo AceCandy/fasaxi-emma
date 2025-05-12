@@ -133,6 +133,12 @@ public class EmbyItem {
     private List<String> backdropImageTags;
 
     /**
+     * 章节
+     */
+    @Alias("Chapters")
+    private List<EmbyChapters> chapters;
+
+    /**
      * 容器类型 mkv、mp4
      */
     @Alias("Container")
