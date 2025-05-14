@@ -3,6 +3,8 @@ package cn.acecandy.fasaxi.emma.config;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.List;
+
 /**
  * tmdb配置类
  *
@@ -34,5 +36,5 @@ public class TmdbConfig {
     /**
      * 图片cdn静态url
      */
-    private String imageCdnUrl;
+    private List<String> imageCdnUrl;
 }

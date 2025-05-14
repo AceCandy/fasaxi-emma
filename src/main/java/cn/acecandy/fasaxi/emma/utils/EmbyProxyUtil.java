@@ -103,7 +103,9 @@ public final class EmbyProxyUtil {
         if (StrUtil.isBlank(maxWidth)) {
             maxWidth = "400";
         }
-        return StrUtil.format(tmdbConfig.getImageCdnUrl(), maxWidth) + path;
+        int index = 0;
+        // int index = (path.hashCode() & Integer.MAX_VALUE) % 2;
+        return StrUtil.format(CollUtil.get(tmdbConfig.getImageCdnUrl(), index), maxWidth) + path;
     }
 
     /**
@@ -209,7 +211,7 @@ public final class EmbyProxyUtil {
         range = StrUtil.removePrefixIgnoreCase(range, "bytes=");
         List<String> parts = SplitUtil.split(range, "-");
         long start = NumberUtil.parseLong(CollUtil.getFirst(parts));
-        if(start > totalSize - 1){
+        if (start > totalSize - 1) {
             return null;
         }
         if (start + chunk > totalSize - 1) {

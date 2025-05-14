@@ -57,3 +57,12 @@ emby:
   item-info-url: /Items
   remote-images-url: /Items/{}/RemoteImages
   refresh-url: /emby/Items/{}/Refresh
+
+tmdb:
+  host: http://api.tmdb.org
+  api-key: 950257e1e6e1b7e0daf665312d82e922
+  image-info-url: /3/tv/1399/images
+  image-static-url: https://image.tmdb.org/t/p/original
+  image-cdn-url:
+    - http://static-mdb.v.geilijiasu.com/t/p/w{}
+#    - http://pic.worldline.space/t/p/w{}
