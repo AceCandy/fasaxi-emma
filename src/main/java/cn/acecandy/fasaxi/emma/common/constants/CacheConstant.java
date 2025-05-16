@@ -12,6 +12,7 @@ public interface CacheConstant {
 
     Integer CODE_200 = 200;
     Integer CODE_204 = 204;
+    Integer CODE_206 = 206;
     Integer CODE_300 = 300;
     Integer CODE_302 = 302;
     Integer CODE_307 = 307;
@@ -20,6 +21,7 @@ public interface CacheConstant {
     Integer CODE_404 = 404;
     Integer CODE_416 = 416;
     Integer CODE_429 = 429;
+    Integer CODE_500 = 500;
     Integer CODE_599 = 599;
 
     // http请求方法

@@ -32,9 +32,13 @@ public class EmbyConfig {
      */
     private String commonUa;
     /**
-     * 媒体信息url
+     * 项目信息url
      */
     private String itemInfoUrl;
+    /**
+     * 媒体信息url
+     */
+    private String playbackUrl;
     /**
      * 获取远程图片url
      */

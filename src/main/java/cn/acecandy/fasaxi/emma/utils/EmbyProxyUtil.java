@@ -15,6 +15,7 @@ import org.dromara.hutool.core.regex.RegexPool;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
 
+import java.io.File;
 import java.nio.charset.Charset;
 import java.util.List;
 
@@ -214,11 +215,12 @@ public final class EmbyProxyUtil {
         if (start > totalSize - 1) {
             return null;
         }
+        /*long end = Math.min(chunk + start, totalSize - 1);
         if (start + chunk > totalSize - 1) {
-            start = totalSize - chunk;
-        }
+            // start = totalSize - chunk;
+        }*/
         // Long end = NumberUtil.parseLong(CollUtil.getLast(parts));
-        return new Range(start, Math.min(chunk + start, totalSize - 1), totalSize);
+        return new Range(start, Math.min(chunk + start, totalSize) - 1, totalSize);
     }
 
     /**
@@ -231,6 +233,26 @@ public final class EmbyProxyUtil {
         // 写一个方法输出bytes=start-end的字符串
         public String toHeader() {
             return StrUtil.format("bytes={}-{}", start, end);
+        }// 写一个方法输出bytes=start-end的字符串
+
+        public String toRespHeader() {
+            return StrUtil.format("bytes {}-{}/{}", start, end, size);
+        }
+
+        public long len() {
+            return end - start + 1;
+        }
+    }
+
+    /**
+     * 请求头 range范围
+     *
+     * @author AceCandy
+     * @since 2025/05/12
+     */
+    public record CacheFile(long start, long end, File file) {
+        public long len() {
+            return end - start;
         }
     }
 }

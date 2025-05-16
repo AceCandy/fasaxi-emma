@@ -18,6 +18,7 @@ public class EmbyMediaSource {
     private String mediaResourceId;
     /**
      * 真实路径
+     * 比如strm文件中是url
      */
     @Alias("Path")
     private String path;
@@ -26,6 +27,12 @@ public class EmbyMediaSource {
      */
     @Alias("Name")
     private String name;
+    /**
+     * 容器
+     * 为strm时应该是未获取到媒体信息 获取到后会是对应真实的媒体类型比如mp4/mkv等等
+     */
+    @Alias("Container")
+    private String container;
     /**
      * 是远程
      */

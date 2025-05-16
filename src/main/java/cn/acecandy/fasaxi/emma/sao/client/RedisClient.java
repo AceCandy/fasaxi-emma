@@ -149,19 +149,23 @@ public class RedisClient {
         });
     }
 
-    public void delByPrefix(String prefix) {
-        if (StrUtil.isBlank(prefix)) {
+    /**
+     * 通过前缀批量删除
+     *
+     * @param prefixes 前缀
+     */
+    public void delByPrefix(List<String> prefixes) {
+        if (CollUtil.isEmpty(prefixes)) {
             return;
         }
         ThreadUtil.execVirtual(() -> {
             Set<String> keysToDelete = SetUtil.of();
-            try (Cursor<String> cursor = redisTemplate.scan(ScanOptions.scanOptions()
-                    .match(prefix + "*").count(100).build())) {
-                while (cursor.hasNext()) {
-                    String key = cursor.next();
-                    keysToDelete.add(key);
+            prefixes.forEach(prefix -> {
+                try (Cursor<String> cursor = redisTemplate.scan(ScanOptions.scanOptions()
+                        .match(prefix + "*").count(100).build())) {
+                    cursor.forEachRemaining(keysToDelete::add);
                 }
-            }
+            });
             if (CollUtil.isEmpty(keysToDelete)) {
                 return;
             }

@@ -30,6 +30,7 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     private static final String PIC_CACHE_KEY = "cache:pic:{}|{}";
     private static final String ORIGIN_CACHE_KEY = "cache:req:{}|{}";
     private static final String ORIGIN_CACHE_REFRESH_KEY1 = "cache:req:/emby/Users/{}/Items/{}";
+    private static final String ORIGIN_CACHE_REFRESH_KEY2 = "cache:req:/emby/Shows/{}";
 
 
     public static String buildOriginCacheKey(EmbyContentCacheReqWrapper req) {
@@ -37,8 +38,10 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
                 DigestUtil.md5Hex16(JSONUtil.toJsonStr(req.getCachedParam())));
     }
 
-    public static String buildOriginRefreshCacheKey(EmbyContentCacheReqWrapper req) {
-        return StrUtil.format(ORIGIN_CACHE_REFRESH_KEY1, req.getUserId(), req.getMediaSourceId());
+    public static List<String> buildOriginRefreshCacheKey(EmbyContentCacheReqWrapper req) {
+        return ListUtil.of(StrUtil.format(ORIGIN_CACHE_REFRESH_KEY1, req.getUserId(), req.getMediaSourceId()),
+                // TODO 暂时懒得改 这里有问题 需要清除的是比如剧集上一级的季对应的itemId
+                StrUtil.format(ORIGIN_CACHE_REFRESH_KEY2, req.getMediaSourceId()));
     }
 
     public static String buildVideoCacheKey(String mediaSourceId) {

@@ -8,6 +8,8 @@ import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItemsInfoOut;
+import cn.acecandy.fasaxi.emma.sao.out.EmbyMediaSource;
+import cn.acecandy.fasaxi.emma.sao.out.EmbyPlaybackOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
 import cn.acecandy.fasaxi.emma.utils.CompressUtil;
@@ -31,7 +33,6 @@ import org.dromara.hutool.http.client.body.ResponseBody;
 import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.dromara.hutool.http.meta.Method;
 import org.dromara.hutool.json.JSONUtil;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.Charset;
@@ -55,8 +56,62 @@ public class EmbyProxy {
 
     @Resource
     private EmbyConfig embyConfig;
-    @Autowired
+
+    @Resource
     private RedisClient redisClient;
+
+    /**
+     * 获取媒体信息
+     * <p>
+     * 如果媒体信息不存在时会自动获取媒体信息
+     *
+     * @param mediaSourceId 媒体源id
+     * @return {@link TmdbImageInfoOut }
+     */
+    public EmbyMediaSource getPlayback(String mediaSourceId) {
+        String url = embyConfig.getHost() + StrUtil.format(embyConfig.getPlaybackUrl(), mediaSourceId);
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET)
+                .form(MapUtil.<String, Object>builder("api_key", embyConfig.getApiKey()).map()))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+            return CollUtil.getFirst(JSONUtil.toBean(resBody, EmbyPlaybackOut.class).getMediaSources());
+        } catch (Exception e) {
+            log.warn("getPlayback 网络请求异常: ", e);
+        }
+        return null;
+    }
+
+    /**
+     * 刷新媒体信息
+     * <p>
+     * 媒体信息有 但是有问题的话需要进行强制刷新
+     *
+     * @param mediaSourceId 媒体源id
+     * @return {@link TmdbImageInfoOut }
+     */
+    public EmbyMediaSource refreshPlayback(String mediaSourceId) {
+        String url = embyConfig.getHost() + StrUtil.format(embyConfig.getPlaybackUrl(), mediaSourceId);
+        try (Response res = httpClient.send(Request.of(url).method(Method.POST)
+                .form(MapUtil.<String, Object>builder("api_key", embyConfig.getApiKey())
+                        .put("AutoOpenLiveStream", true).put("IsPlayback", true).map()))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+            return CollUtil.getFirst(JSONUtil.toBean(resBody, EmbyPlaybackOut.class).getMediaSources());
+        } catch (Exception e) {
+            log.warn("refreshPlayback 网络请求异常: ", e);
+        }
+        return null;
+    }
 
     /**
      * 获取项目信息
@@ -156,6 +211,13 @@ public class EmbyProxy {
         return null;
     }
 
+    /**
+     * 原始出参转换为 项目出参
+     *
+     * @param res     事件
+     * @param request 要求
+     * @return {@link EmbyCachedResp }
+     */
     @SneakyThrows
     public EmbyCachedResp transferResp(Response res, EmbyContentCacheReqWrapper request) {
         EmbyCachedResp embyCachedResp = new EmbyCachedResp();

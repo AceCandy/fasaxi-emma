@@ -151,18 +151,21 @@ public class EmbyItem {
 
     /**
      * 时长
+     * 没有获取到媒体信息时该值为null
      */
     @Alias("RunTimeTicks")
     private Long runTimeTicks;
 
     /**
      * 文件大小
+     * 没有获取到媒体信息时该值为0
      */
     @Alias("Size")
     private Long size;
 
     /**
      * 比特率
+     * 没有获取到媒体信息时该值为null
      */
     @Alias("Bitrate")
     private Long bitrate;
@@ -172,5 +175,5 @@ public class EmbyItem {
      * 当前有 Tmdb、Tvdb、Imdb、bilibili
      */
     @Alias("ProviderIds")
-    private Map<String,String> providerIds;
+    private Map<String, String> providerIds;
 }

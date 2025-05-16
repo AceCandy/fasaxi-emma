@@ -22,7 +22,7 @@ public class HutoolConfig {
     @Bean
     public ClientEngine httpClient() {
         return ClientEngineFactory.createEngine(ApacheHttpClientConfig.of()
-                .setMaxTotal(200).setMaxPerRoute(20).setTimeout(15_000));
+                .setMaxTotal(200).setMaxPerRoute(20).setConnectionTimeout(10_000).setReadTimeout(60_000));
     }
 
     /**

@@ -188,7 +188,8 @@ public class VideoRedirectService {
         }
     }
 
-    private void originalVideoStream(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
+    private void originalVideoStream(EmbyContentCacheReqWrapper request,
+                                     HttpServletResponse response) {
         String mediaSourceId = request.getMediaSourceId();
         EmbyItem embyItem = embyProxy.getItemInfo(mediaSourceId);
         if (null == embyItem) {
@@ -196,12 +197,15 @@ public class VideoRedirectService {
             return;
         }
         EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
-        if(null == range){
+        if (null == range) {
             response.setHeader("Content-Range", "bytes */" + embyItem.getSize());
             response.setStatus(CODE_416);
             return;
         }
-        String rangeHeader  = range.toHeader();
+        if (fileCacheUtil.readFile(response, embyItem, range)) {
+            return;
+        }
+        String rangeHeader = range.toHeader();
         String ua = embyConfig.getCommonUa();
         Map<String, String> headerMap = MapUtil.<String, String>builder()
                 .put("User-Agent", ua).put("range", rangeHeader).build();
@@ -212,13 +216,13 @@ public class VideoRedirectService {
         if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
             mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath, Charset.defaultCharset()));
             if (StrUtil.containsAny(mediaPath, "pt/Emby", "bt/Emby")) {
-                mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
+                // mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
             } else {
                 mediaPath = get302RealUrl(mediaSourceId, ua, mediaPath, headerMap);
             }
             log.warn("原始range:{} total:{}", request.getRange(), embyItem.getSize());
             log.warn("视频拉取(远程):[{}-({})] => {}", mediaSourceId, rangeHeader, mediaPath);
-            originalRequest = Request.of(mediaPath).method(Method.GET).header(headerMap);
+            originalRequest = Request.of(mediaPath).method(Method.GET).header(headerMap).setMaxRedirects(1);
         } else {
             originalRequest = Request.of(embyConfig.getHost() + request.getParamUri())
                     .method(Method.valueOf(request.getMethod()))
