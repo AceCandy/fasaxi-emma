@@ -194,10 +194,13 @@ public final class EmbyProxyUtil {
             return "";
         }
         mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath, Charset.defaultCharset()));
-        mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt/Emby1/",
-                "http://8.210.221.216:5244/p/bt/Emby1/");
-        mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt/Emby/",
-                "http://8.210.221.216:5244/p/pt/Emby/");
+        mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt/",
+                "http://alist.netcup-1o.worldline.space/p/pt/");
+
+        // mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt",
+        // "http://8.210.221.216:5244/p/bt/Emby1/");
+        // mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt/Emby/",
+        // "http://8.210.221.216:5244/p/pt/Emby/");
         return mediaPath;
     }
 

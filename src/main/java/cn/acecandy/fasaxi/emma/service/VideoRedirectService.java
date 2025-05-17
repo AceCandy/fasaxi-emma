@@ -11,6 +11,7 @@ import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.IpUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
+import cn.acecandy.fasaxi.emma.utils.VideoUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,6 +19,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.date.DateUtil;
+import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.net.url.UrlDecoder;
 import org.dromara.hutool.core.net.url.UrlQueryUtil;
@@ -55,7 +57,7 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_416;
 public class VideoRedirectService {
 
     @Resource
-    private OriginReqService originReqService;
+    private VideoUtil videoUtil;
 
     @Resource
     private ClientEngine httpClient;
@@ -79,9 +81,34 @@ public class VideoRedirectService {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
-        if (IpUtil.isInnerIp(request.getIp())) {
-            originalVideoStream(request, response);
-            return;
+        if (IpUtil.isInnerIp(request.getIp()) || StrUtil.equalsIgnoreCase(
+                MapUtil.getStr(request.getCachedParam(), "api_key"), "953a6f6d552940868653245ca9f4a5c1")) {
+            EmbyItem embyItem = embyProxy.getItemInfo(mediaSourceId);
+            if (null == embyItem) {
+                response.setStatus(CODE_404);
+                return;
+            }
+            EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
+            if (null == range) {
+                response.setHeader("Content-Range", "bytes */" + embyItem.getSize());
+                response.setStatus(CODE_416);
+                return;
+            }
+            if (fileCacheUtil.readFile(request, response, embyItem, range)) {
+                return;
+            }
+            ThreadUtil.execVirtual(() -> {
+                Lock lock = LockUtil.lockVideoCache(embyItem.getItemId());
+                if (LockUtil.isLock(lock)) {
+                    return;
+                }
+                try {
+                    fileCacheUtil.writeFile(embyItem);
+                    fileCacheUtil.writeMoovFile(embyItem);
+                } finally {
+                    LockUtil.unlockVideoCache(lock, embyItem.getItemId());
+                }
+            });
         }
 
         String ua = request.getUa();
@@ -99,7 +126,6 @@ public class VideoRedirectService {
             if (getByCache(response, mediaSourceId, ua)) {
                 return;
             }
-
             exec302(request, response, mediaSourceId);
         } finally {
             LockUtil.unlockVideo(lock, mediaSourceId);
@@ -153,18 +179,12 @@ public class VideoRedirectService {
         String mediaPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
         Map<String, String> header302 = MapUtil.<String, String>builder()
                 .put("User-Agent", request.getUa()).put("range", request.getRange()).build();
-        // fileCacheUtil.cacheNextEpisode(embyInfo, header302);
         if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
             String realUrl = embyProxy.fetch302Path(mediaPath, header302);
             if (StrUtil.isBlank(realUrl)) {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 return;
             }
-            /*if (findRangeCache(request, response, embyInfo)) {
-                response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
-                return;
-            }*/
-
             int exTime = 2 * 24 * 60 * 60;
             if (StrUtil.startWithIgnoreCase(realUrl, embyConfig.getOriginPt())) {
                 redisClient.set(CacheUtil.buildVideoCacheKey(mediaSourceId), realUrl, exTime);
@@ -177,8 +197,6 @@ public class VideoRedirectService {
             realUrl = getPtUrl(realUrl);
             response.setStatus(HttpServletResponse.SC_FOUND);
             response.setHeader("Location", realUrl);
-            // log.info("▲ 请求重定向->[{}-{}] {} 【{}】", response.getStatus(),
-            //         request.getMethod(), request.getRequestURI(), request.getCachedHeader());
             log.warn("视频重定向({}):[{}] => {}", DateUtil.formatDateTime(DateUtil.date(DateUtil.currentSeconds() + exTime)),
                     mediaPath, realUrl);
             return;
@@ -202,15 +220,16 @@ public class VideoRedirectService {
             response.setStatus(CODE_416);
             return;
         }
-        if (fileCacheUtil.readFile(response, embyItem, range)) {
+        if (fileCacheUtil.readFile(request, response, embyItem, range)) {
             return;
         }
+        // range = new EmbyProxyUtil.Range(range.start(), embyItem.getSize() - 1, embyItem.getSize());
         String rangeHeader = range.toHeader();
         String ua = embyConfig.getCommonUa();
         Map<String, String> headerMap = MapUtil.<String, String>builder()
                 .put("User-Agent", ua).put("range", rangeHeader).build();
 
-        ThreadUtil.execVirtual(() -> fileCacheUtil.writeFile(request, embyItem, headerMap));
+        // ThreadUtil.execVirtual(() -> fileCacheUtil.writeFile(request, embyItem, headerMap));
         String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();
         Request originalRequest = null;
         if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
@@ -241,8 +260,10 @@ public class VideoRedirectService {
                 // 使用直接缓冲区提升性能（适用于大文件）
                 ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 128);
                 while (inChannel.read(buffer) != -1) {
+                    Console.log("开始");
                     buffer.flip();
                     while (buffer.hasRemaining()) {
+                        Console.log("开始。。。");
                         outChannel.write(buffer);
                     }
                     buffer.clear();

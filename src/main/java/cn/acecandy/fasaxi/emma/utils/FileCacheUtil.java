@@ -14,7 +14,6 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.connector.ClientAbortException;
 import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.io.IoUtil;
 import org.dromara.hutool.core.io.file.FileNameUtil;
 import org.dromara.hutool.core.io.file.FileUtil;
 import org.dromara.hutool.core.io.file.PathUtil;
@@ -33,7 +32,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
@@ -46,7 +44,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Stream;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_206;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_500;
@@ -78,8 +75,9 @@ public class FileCacheUtil {
     @Resource
     private EmbyConfig embyConfig;
 
-    private static final String cache_path = "cache";
     private static final Map<String, ReentrantLock> FILE_CACHE_LOCK = MapUtil.newSafeConcurrentHashMap();
+    @Resource
+    private VideoUtil videoUtil;
     // private static final OkHttpClient client = new OkHttpClient();
 
     private static ReentrantLock getLock(String subdirname, String dirname) {
@@ -111,7 +109,7 @@ public class FileCacheUtil {
     }
 
     public static Path getCachePath(String itemId, String mediaType, String filePath) {
-        return PathUtil.of(cache_path, mediaType, itemId,
+        return PathUtil.of(mediaType, itemId,
                 SecureUtil.md5(PathUtil.getLastPathEle(Paths.get(filePath)).toString()));
     }
 
@@ -121,11 +119,11 @@ public class FileCacheUtil {
      * @param embyItem emby项目
      * @return {@link Path }
      */
-    public static Path getCachePath(EmbyItem embyItem) {
+    public Path getCacheDir(EmbyItem embyItem) {
         String filePath = embyItem.getPath();
         String itemId = embyItem.getItemId();
         String mediaType = embyItem.getMediaType();
-        return PathUtil.of(cache_path, mediaType, itemId,
+        return PathUtil.of(embyConfig.getCachePath(), mediaType, itemId,
                 SecureUtil.md5(PathUtil.getLastPathEle(Paths.get(filePath)).toString()));
     }
 
@@ -136,9 +134,22 @@ public class FileCacheUtil {
      * @return {@link Path }左边是根目录  右边是具体路径
      */
     public Pair<Path, Path> getCacheFullPath(EmbyItem embyItem, EmbyProxyUtil.Range range) {
-        Path writePath = getCachePath(embyItem);
+        Path writePath = getCacheDir(embyItem);
         String cacheFileName = StrUtil.format("cacheFile_{}_{}", range.start(), range.end());
-        return Pair.of(Paths.get(embyConfig.getCachePath(), writePath.toString()),
+        return Pair.of(Paths.get(writePath.toString()),
+                Paths.get(writePath.toString(), cacheFileName));
+    }
+
+    /**
+     * 获取缓存完整路径
+     *
+     * @param embyItem emby项目
+     * @return {@link Path }左边是根目录  右边是具体路径
+     */
+    public Pair<Path, Path> getMoovFullPath(EmbyItem embyItem, EmbyProxyUtil.Range range) {
+        Path writePath = getCacheDir(embyItem);
+        String cacheFileName = StrUtil.format("moov_{}_{}", range.start(), range.end());
+        return Pair.of(Paths.get(writePath.toString()),
                 Paths.get(embyConfig.getCachePath(), writePath.toString(), cacheFileName));
     }
 
@@ -291,18 +302,20 @@ public class FileCacheUtil {
     /**
      * 写入文件缓存
      *
-     * @param request   要求
-     * @param embyItem  emby项目
-     * @param headerMap 请求头
+     * @param embyItem emby项目
      * @return boolean
      */
     @SneakyThrows
-    public boolean writeFile(EmbyContentCacheReqWrapper request, EmbyItem embyItem,
-                             Map<String, String> headerMap) {
-        EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
-        if (null == range) {
+    public boolean writeFile(EmbyItem embyItem
+    ) {
+        Map<String, String> headerMap = null;
+        // EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
+        Long size = embyItem.getSize();
+        if (null == size || size == 0) {
             return false;
         }
+        Long cacheSize = size / (embyItem.getRunTimeTicks() / 10000 / 60 / 1000);
+        EmbyProxyUtil.Range range = new EmbyProxyUtil.Range(0, cacheSize, embyItem.getSize());
         Pair<Path, Path> cacheFilePair = getCacheFullPath(embyItem, range);
         PathUtil.mkdir(cacheFilePair.getLeft());
         Path cacheFilePath = cacheFilePair.getRight();
@@ -310,19 +323,80 @@ public class FileCacheUtil {
             log.info("缓存文件已存在: {}", cacheFilePath);
             return false;
         }
-        log.info("写入本地缓存文件->{}", cacheFilePath);
-
+        log.info("准备写入本地缓存文件->{}", cacheFilePath);
+        File tmpTag = FileUtil.touch(cacheFilePair.getRight().toString() + ".tag");
         String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();
-        // mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
-        Request originalRequest = Request.of(mediaPath).method(Method.GET).header(headerMap).setMaxRedirects(1);
+        mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
+        Request originalRequest = Request.of(mediaPath).method(Method.GET).header("range", range.toHeader()).setMaxRedirects(1);
         try (Response res = httpClient.send(originalRequest);
-             FileChannel fileChannel = FileChannel.open(cacheFilePath, CREATE, WRITE)) {
+             FileChannel fileChannel = FileChannel.open(tmpTag.toPath(), CREATE, WRITE)) {
             fileChannel.position(range.start());
             ReadableByteChannel remoteChannel = Channels.newChannel(res.body().getStream());
             fileChannel.transferFrom(remoteChannel, 0, range.len());
+            FileUtil.move(tmpTag, cacheFilePath.toFile(), true);
+            log.warn("写入本地缓存文件完成->{}", cacheFilePath);
         } catch (Exception e) {
             log.error("写入缓存文件失败: {}", cacheFilePath, e);
+            FileUtil.del(tmpTag);
             PathUtil.del(cacheFilePath);
+        }
+        return true;
+    }
+
+    @SneakyThrows
+    public boolean writeMoovFile(EmbyItem embyItem) {
+
+        if (!StrUtil.equalsAnyIgnoreCase(embyItem.getContainer(), "mp4", "mov", "3gp")) {
+            return false;
+        }
+        Path writePath = getCacheDir(embyItem);
+        if (FileUtil.listFileNames(writePath.toString()).stream()
+                .anyMatch(name -> StrUtil.startWith(name, "moov"))) {
+            log.info("moov文件已存在: {}", writePath);
+            return false;
+        }
+        String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();
+        mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
+        VideoUtil.MoovPos moovPos = videoUtil.analyzeMp4(mediaPath, embyItem.getSize());
+        if (null == moovPos) {
+            return false;
+        }
+        moovPos.setStart(moovPos.getStart() - 16 * 1024);
+        moovPos.setSize(moovPos.getSize() + 16 * 1024);
+        Long moovEnd = moovPos.getStart() + moovPos.getSize() - 1;
+
+        boolean cacheContainMoov = FileUtil.loopFiles(writePath.toFile()).stream().filter(file -> {
+            String fileName = FileNameUtil.getName(file);
+            return StrUtil.startWithAny(fileName, "cacheFile_") && !StrUtil.endWith(fileName, ".tag");
+        }).map(file -> {
+            String[] parts = file.getName().split("_");
+            long cacheStart = Long.parseLong(parts[1]);
+            long cacheEnd = Long.parseLong(parts[2]);
+            return new EmbyProxyUtil.CacheFile(cacheStart, cacheEnd, file);
+        }).anyMatch(cf -> cf.start() <= moovPos.getStart() && cf.end() >= moovEnd);
+        if (cacheContainMoov) {
+            log.info("moov文件已存在cache子集中: {}", writePath);
+            return false;
+        }
+
+
+        log.info("找到moov位置，准备写入: {}", moovPos);
+        File tmpTag = FileUtil.touch(writePath.toFile(), "moov.tag");
+
+        Request originalRequest = Request.of(mediaPath).method(Method.GET)
+                .header("range", moovPos.toHead()).setMaxRedirects(1);
+        try (Response res = httpClient.send(originalRequest);
+             FileChannel fileChannel = FileChannel.open(tmpTag.toPath(), CREATE, WRITE)) {
+            fileChannel.position(moovPos.getStart());
+            ReadableByteChannel remoteChannel = Channels.newChannel(res.body().getStream());
+            fileChannel.transferFrom(remoteChannel, 0, moovPos.getSize());
+            String moovName = StrUtil.format("moov_{}_{}",
+                    moovPos.getStart(), moovEnd);
+            tmpTag = FileUtil.rename(tmpTag, moovName, true);
+            log.warn("写入本地moov文件完成->{}", moovName);
+        } catch (Exception e) {
+            log.error("写入moov文件失败: {}", FileNameUtil.getName(tmpTag), e);
+            FileUtil.del(tmpTag);
         }
         return true;
     }
@@ -335,7 +409,8 @@ public class FileCacheUtil {
      * @return boolean
      */
     @SneakyThrows
-    public boolean readFile(HttpServletResponse response, EmbyItem embyItem, EmbyProxyUtil.Range range) {
+    public boolean readFile(EmbyContentCacheReqWrapper request, HttpServletResponse response,
+                            EmbyItem embyItem, EmbyProxyUtil.Range range) {
         if (null == range) {
             return false;
         }
@@ -347,6 +422,10 @@ public class FileCacheUtil {
         // 2. 遍历所有缓存文件，匹配符合条件的范围
         long start = range.start();
         EmbyProxyUtil.CacheFile cacheFile = FileUtil.loopFiles(cacheDir.toFile()).stream()
+                .filter(file -> {
+                    String fileName = FileNameUtil.getName(file);
+                    return StrUtil.startWithAny(fileName, "cacheFile_", "moov_") && !StrUtil.endWith(fileName, ".tag");
+                })
                 .map(file -> {
                     String[] parts = file.getName().split("_");
                     long cacheStart = Long.parseLong(parts[1]);
@@ -370,6 +449,7 @@ public class FileCacheUtil {
         try (FileChannel inChannel = FileChannel.open(cacheFile.file().toPath(), StandardOpenOption.READ);
              ServletOutputStream out = response.getOutputStream()) {
 
+            // FileChannel inChannel = FileChannel.open(cacheFile.file().toPath(), StandardOpenOption.READ);
             // 设置响应头（示例）
             response.setContentType(EmbyProxyUtil.getContentType(embyItem.getContainer()));
             response.setHeader("Content-Range",
@@ -387,6 +467,44 @@ public class FileCacheUtil {
                 log.warn("传输不完整，offset:{}, 预期:{}, 实际:{}", offset, actualLen, transferred);
                 return false;
             }
+
+
+            /*AsyncContext asyncContext = request.startAsync();
+            asyncContext.setTimeout(30000);
+
+            ServletOutputStream out = response.getOutputStream();
+            WritableByteChannel outChannel = Channels.newChannel(out);
+
+            long chunkSize = 8 * 1024 * 1024;
+            AtomicLong remaining = new AtomicLong(actualLen);
+            AtomicLong offset = new AtomicLong(actualStart - cacheFile.start());
+            AtomicLong totalTransferred = new AtomicLong();
+
+            Thread.startVirtualThread(() -> {
+                try {
+                    while (remaining.get() > 0) {
+                        long currentChunk = Math.min(chunkSize, remaining.get());
+                        long transferred = inChannel.transferTo(offset.get(), currentChunk, outChannel);
+                        if (transferred <= 0) {
+                            throw new IOException("传输中断，剩余字节: " + remaining.get());
+                        }
+                        offset.addAndGet(transferred);
+                        remaining.addAndGet(-transferred);
+                        totalTransferred.addAndGet(transferred);
+
+                        if (out.isReady()) {
+                            Thread.onSpinWait();
+                        }
+                    }
+
+                    log.info("缓存文件传输完成: {} ({} bytes)", fileName, totalTransferred.get());
+                    asyncContext.complete();
+                } catch (IOException e) {
+                    log.error("传输过程中发生错误", e);
+                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    asyncContext.complete();
+                }
+            });*/
             return true;
         } catch (ClientAbortException e) {
             log.info("客户端主动中断下载: {}", cacheFile.file().getName());
@@ -398,67 +516,6 @@ public class FileCacheUtil {
         }
     }
 
-    /**
-     * 读取缓存文件
-     *
-     * @param fileInfo 请求信息
-     * @return {@link Stream }<{@link byte[] }>
-     */
-    public Stream<byte[]> readCacheFile(FileInfo fileInfo) {
-        String path = fileInfo.getPath();
-
-        String pathMd5 = getPathMd5(path, fileInfo.getItemType());
-        String subDir = StrUtil.subPre(pathMd5, 2);
-        String dir = pathMd5;
-
-        Path fileDir = Paths.get(embyConfig.getCachePath(), subDir, dir);
-        for (File file : PathUtil.loopFiles(fileDir, -1, null)) {
-            String fileName = FileNameUtil.getName(file);
-            if (!StrUtil.startWith(fileName, "cacheFile_") || StrUtil.endWith(fileName, ".tag")) {
-                continue;
-            }
-            List<String> parts = SplitUtil.split(fileName, "_");
-            long fileStart = Long.parseLong(parts.get(1));
-            long fileEnd = Long.parseLong(parts.get(2));
-            if (fileStart <= fileInfo.getStartByte() && fileInfo.getStartByte() <= fileEnd) {
-                Long adjustedEnd = null;
-                if (fileInfo.getCacheStatus() == CacheStatus.HIT) {
-                    adjustedEnd = fileInfo.getEndByte() - fileInfo.getStartByte();
-                }
-                log.info("读取缓存文件: {}", file.getAbsolutePath());
-                return new FileRangeReader(FileUtil.getAbsolutePath(file),
-                        fileInfo.getStartByte(), adjustedEnd, 1024 * 1024).stream();
-            }
-        }
-        return Stream.empty();
-    }
-
-    public InputStream readCacheFileInput(FileInfo fileInfo) {
-        String path = fileInfo.getPath();
-
-        String pathMd5 = getPathMd5(path, fileInfo.getItemType());
-        String subDir = StrUtil.subPre(pathMd5, 2);
-        String dir = pathMd5;
-
-        Path fileDir = PathUtil.of(embyConfig.getCachePath(), subDir, dir);
-        for (File file : PathUtil.loopFiles(fileDir, -1, null)) {
-            String fileName = FileNameUtil.getName(file);
-            if (!StrUtil.startWith(fileName, "cacheFile_") || StrUtil.endWith(fileName, ".tag")) {
-                continue;
-            }
-            List<String> parts = SplitUtil.split(fileName, "_");
-            long fileStart = Long.parseLong(parts.get(1));
-            long fileEnd = Long.parseLong(parts.get(2));
-            if (fileStart <= fileInfo.getStartByte() && fileInfo.getStartByte() <= fileEnd) {
-                Long adjustedEnd = null;
-                if (fileInfo.getCacheStatus() == CacheStatus.HIT) {
-                    adjustedEnd = fileInfo.getEndByte() - fileInfo.getStartByte();
-                }
-                return IoUtil.toStream(file);
-            }
-        }
-        return null;
-    }
 
     /**
      * 检查缓存文件是否存在
@@ -538,53 +595,6 @@ public class FileCacheUtil {
         } else {
             return writeCacheFile(nextFileInfo, header);
         }
-    }
-
-    /**
-     * 验证缓存文件是否符合 Emby 文件大小，筛选出错误缓存文件
-     * <p>
-     * 实现方式仅为验证文件大小，不验证文件内容
-     *
-     * @param fileInfo       文件简介
-     * @param cacheFileRange 缓存文件范围
-     * @return boolean
-     */
-    public static boolean verifyCacheFile(FileInfo fileInfo, List<Long> cacheFileRange) {
-        long start = CollUtil.getFirst(cacheFileRange);
-        long end = CollUtil.getLast(cacheFileRange);
-
-        // 开头缓存文件
-        boolean isStartCache = start == 0 && end == fileInfo.cacheFileSize - 1;
-        boolean isEndCache = end == fileInfo.size - 1;
-        return isStartCache || isEndCache;
-    }
-
-    /**
-     * 根据webhook信息删除缓存文件，及缓存文件夹
-     *
-     * @param fileInfo 文件简介
-     * @return boolean
-     */
-    public boolean cleanCache(FileInfo fileInfo) {
-        String path = fileInfo.getPath();
-        String pathMd5 = getPathMd5(path, fileInfo.getItemType());
-        String subDir = StrUtil.subPre(pathMd5, 2);
-        String dir = pathMd5;
-
-        File cacheDir = FileUtil.file(embyConfig.getCachePath(), subDir, dir);
-        ReentrantLock lock = getLock(subDir, dir);
-
-        if (FileUtil.isEmpty(cacheDir) || !FileUtil.isDirectory(cacheDir)) {
-            return false;
-        }
-
-        FileUtil.loopFiles(cacheDir).stream().filter(f ->
-                StrUtil.startWith(FileNameUtil.getName(f), "cacheFile_")).forEach(FileUtil::del);
-        if (CollUtil.isEmpty(FileUtil.loopFiles(cacheDir))) {
-            FileUtil.del(cacheDir);
-            return true;
-        }
-        return false;
     }
 
     public static void main(String[] args) {

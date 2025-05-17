@@ -47,7 +47,9 @@ public final class LockUtil extends org.dromara.hutool.core.thread.lock.LockUtil
     // 视频重定向------------------------------------------------------------------------------------------
 
     private static final String LOCK_VIDEO_KEY = "lock:video:{}";
+    private static final String LOCK_VIDEO_CACHE_KEY = "lock:video-cache:{}";
     private static final Map<String, Lock> VIDEO_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    private static final Map<String, Lock> VIDEO_LOCK_CACHE_MAP = MapUtil.newSafeConcurrentHashMap();
 
     private static String buildVideoLock(String mediaSourceId) {
         return StrUtil.format(LOCK_VIDEO_KEY, mediaSourceId);
@@ -62,6 +64,21 @@ public final class LockUtil extends org.dromara.hutool.core.thread.lock.LockUtil
             lock.unlock();
         }
         VIDEO_LOCK_MAP.remove(buildVideoLock(mediaSourceId));
+    }
+
+    public static String buildVideoCacheLock(String itemId) {
+        return StrUtil.format(LOCK_VIDEO_CACHE_KEY, itemId);
+    }
+
+    public static Lock lockVideoCache(String itemId) {
+        return VIDEO_LOCK_CACHE_MAP.computeIfAbsent(buildVideoCacheLock(itemId), k -> new ReentrantLock());
+    }
+
+    public static void unlockVideoCache(Lock lock, String itemId) {
+        if (null != lock) {
+            lock.unlock();
+        }
+        VIDEO_LOCK_CACHE_MAP.remove(buildVideoCacheLock(itemId));
     }
 
     // 原始请求------------------------------------------------------------------------------------------
@@ -105,10 +122,15 @@ public final class LockUtil extends org.dromara.hutool.core.thread.lock.LockUtil
 
     // tmdb信息更新-------------------------------------------------------------------------------------------
 
-    private static final String LOCK_REFRESH_KEY = "lock:refresh:{}";
+    private static final String LOCK_REFRESH_TMDB_KEY = "lock:refresh-tmdb:{}";
+    private static final String LOCK_REFRESH_MEDIA_KEY = "lock:refresh-media:{}";
 
-    public static String buildRefreshLock(String itemId) {
-        return StrUtil.format(LOCK_REFRESH_KEY, itemId);
+    public static String buildRefreshTmdbLock(String itemId) {
+        return StrUtil.format(LOCK_REFRESH_TMDB_KEY, itemId);
+    }
+
+    public static String buildRefreshMediaLock(String itemId) {
+        return StrUtil.format(LOCK_REFRESH_MEDIA_KEY, itemId);
     }
 
 }

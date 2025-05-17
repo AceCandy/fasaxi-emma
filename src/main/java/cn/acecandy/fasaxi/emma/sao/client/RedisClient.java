@@ -51,6 +51,15 @@ public class RedisClient {
         }
     }
 
+    public boolean setnx(String key, Object value, Integer time) {
+        try {
+            return redisTemplate.opsForValue().setIfAbsent(key, value, time, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("redis set方法异常:", e);
+            return false;
+        }
+    }
+
     public Object get(String key) {
         return StrUtil.isBlank(key) ? null : redisTemplate.opsForValue().get(key);
     }

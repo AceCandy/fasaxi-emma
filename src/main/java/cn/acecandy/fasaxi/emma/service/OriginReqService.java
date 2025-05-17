@@ -7,11 +7,13 @@ import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
+import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.connector.ClientAbortException;
 import org.dromara.hutool.core.array.ArrayUtil;
 import org.dromara.hutool.core.date.StopWatch;
 import org.dromara.hutool.core.exception.ExceptionUtil;
@@ -51,6 +53,9 @@ public class OriginReqService {
 
     @Resource
     private EmbyProxy embyProxy;
+
+    @Resource
+    private FileCacheUtil fileCacheUtil;
 
     /**
      * 转发原始请求
@@ -183,7 +188,11 @@ public class OriginReqService {
         res.setStatus(cached.getStatusCode());
         cached.getHeaders().forEach(res::setHeader);
         if (ArrayUtil.isNotEmpty(cached.getContent())) {
-            res.getOutputStream().write(cached.getContent());
+            try {
+                res.getOutputStream().write(cached.getContent());
+            } catch (ClientAbortException e) {
+                // 客户端中止连接 不做处理
+            }
         }
     }
 

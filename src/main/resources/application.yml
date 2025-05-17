@@ -10,6 +10,14 @@ spring:
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
+  datasource:
+    hikari:
+      initialization-fail-timeout: 10000  # 启动时连接超时时间（毫秒）
+      minimum-idle: 10                    # 最小空闲连接数
+      maximum-pool-size: 10              # 最大连接数
+      connection-timeout: 30000          # 连接超时时间
+      validation-timeout: 5000           # 连接验证超时时间
+      idle-timeout: 600000               # 空闲连接超时时间
   threads:
     virtual:
       enabled: true
@@ -58,6 +66,7 @@ emby:
   playback-url: /Items/{}/PlaybackInfo
   remote-images-url: /Items/{}/RemoteImages
   refresh-url: /emby/Items/{}/Refresh
+  cache-path: tmp/cache
 
 tmdb:
   host: http://api.tmdb.org

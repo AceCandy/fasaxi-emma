@@ -296,7 +296,7 @@ public class EmbyProxy {
                     || StrUtil.isNotBlank(item.getImageTags().getPrimary())) {
                 return;
             }
-            String lockKey = LockUtil.buildRefreshLock(item.getItemId());
+            String lockKey = LockUtil.buildRefreshTmdbLock(item.getItemId());
             if (redisClient.get(lockKey) != null) {
                 return;
             }
@@ -304,6 +304,17 @@ public class EmbyProxy {
                 refresh(item.getItemId());
             } finally {
                 redisClient.set(lockKey, "1", 2 * 60 * 60);
+            }
+        });
+        ThreadUtil.execVirtual(() -> {
+            String lockKey = LockUtil.buildRefreshMediaLock(request.getMediaSourceId());
+            if (redisClient.setnx(lockKey, 1, 5 * 60)) {
+                return;
+            }
+            try {
+                getPlayback(request.getMediaSourceId());
+            } finally {
+                redisClient.del(lockKey);
             }
         });
     }

@@ -150,14 +150,14 @@ public class EmbyItem {
     private List<EmbyMediaSource> mediaSources;
 
     /**
-     * 时长
+     * 时长(单位为100纳秒 ) /10000/60/1000 为分钟数
      * 没有获取到媒体信息时该值为null
      */
     @Alias("RunTimeTicks")
     private Long runTimeTicks;
 
     /**
-     * 文件大小
+     * 文件大小（单位byte） /1024/1024 为MB
      * 没有获取到媒体信息时该值为0
      */
     @Alias("Size")
