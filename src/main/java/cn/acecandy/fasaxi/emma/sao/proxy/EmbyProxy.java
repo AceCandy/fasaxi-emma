@@ -308,7 +308,7 @@ public class EmbyProxy {
         });
         ThreadUtil.execVirtual(() -> {
             String lockKey = LockUtil.buildRefreshMediaLock(request.getMediaSourceId());
-            if (redisClient.setnx(lockKey, 1, 5 * 60)) {
+            if (!redisClient.setnx(lockKey, 1, 5 * 60)) {
                 return;
             }
             try {
