@@ -114,6 +114,33 @@ public class EmbyProxy {
     }
 
     /**
+     * 刷新媒体信息
+     * <p>
+     * 媒体信息有 但是有问题的话需要进行强制刷新
+     *
+     * @param mediaSourceId 媒体源id
+     * @return {@link TmdbImageInfoOut }
+     */
+    public List<EmbyItem> getEpisodes(String mediaSourceId, String seasonId) {
+        String url = embyConfig.getHost() + StrUtil.format(embyConfig.getEpisodesUrl(), mediaSourceId);
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET)
+                .form(MapUtil.<String, Object>builder("api_key", embyConfig.getApiKey())
+                        .put("fields", "Path,MediaSources,ProviderIds").put("seasonid", seasonId).map()))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+            return JSONUtil.toBean(resBody, EmbyItemsInfoOut.class).getItems();
+        } catch (Exception e) {
+            log.warn("getEpisodes 网络请求异常: ", e);
+        }
+        return null;
+    }
+
+    /**
      * 获取项目信息
      *
      * @param mediaSourceId 媒体源id
@@ -307,6 +334,10 @@ public class EmbyProxy {
             }
         });
         ThreadUtil.execVirtual(() -> {
+            EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
+            if (item.getIsFolder()) {
+                return;
+            }
             String lockKey = LockUtil.buildRefreshMediaLock(request.getMediaSourceId());
             if (!redisClient.setnx(lockKey, 1, 5 * 60)) {
                 return;

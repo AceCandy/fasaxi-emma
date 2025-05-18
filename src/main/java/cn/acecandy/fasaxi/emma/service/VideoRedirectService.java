@@ -81,30 +81,33 @@ public class VideoRedirectService {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
+        EmbyItem embyItem = embyProxy.getItemInfo(mediaSourceId);
         if (IpUtil.isInnerIp(request.getIp()) || StrUtil.equalsIgnoreCase(
-                MapUtil.getStr(request.getCachedParam(), "api_key"), "953a6f6d552940868653245ca9f4a5c1")) {
-            EmbyItem embyItem = embyProxy.getItemInfo(mediaSourceId);
+                mediaSourceId, "1366257")) {
             if (null == embyItem) {
                 response.setStatus(CODE_404);
                 return;
             }
+
             EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
             if (null == range) {
                 response.setHeader("Content-Range", "bytes */" + embyItem.getSize());
                 response.setStatus(CODE_416);
                 return;
             }
-            if (fileCacheUtil.readFile(request, response, embyItem, range)) {
+            if (fileCacheUtil.readFile(response, embyItem, range)) {
                 return;
             }
+        }
+        if (StrUtil.containsIgnoreCase(embyItem.getPath(), "micu")) {
             ThreadUtil.execVirtual(() -> {
                 Lock lock = LockUtil.lockVideoCache(embyItem.getItemId());
                 if (LockUtil.isLock(lock)) {
                     return;
                 }
                 try {
-                    fileCacheUtil.writeFile(embyItem);
-                    fileCacheUtil.writeMoovFile(embyItem);
+                    fileCacheUtil.writeCacheAndMoov(embyItem);
+                    fileCacheUtil.cacheNextEpisode(embyItem);
                 } finally {
                     LockUtil.unlockVideoCache(lock, embyItem.getItemId());
                 }
@@ -220,7 +223,7 @@ public class VideoRedirectService {
             response.setStatus(CODE_416);
             return;
         }
-        if (fileCacheUtil.readFile(request, response, embyItem, range)) {
+        if (fileCacheUtil.readFile(response, embyItem, range)) {
             return;
         }
         // range = new EmbyProxyUtil.Range(range.start(), embyItem.getSize() - 1, embyItem.getSize());

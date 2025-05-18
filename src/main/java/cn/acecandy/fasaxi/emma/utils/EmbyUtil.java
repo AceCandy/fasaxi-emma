@@ -11,7 +11,6 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.map.MapUtil;
-import org.dromara.hutool.core.math.NumberUtil;
 import org.dromara.hutool.core.net.url.UrlEncoder;
 import org.dromara.hutool.core.net.url.UrlUtil;
 import org.dromara.hutool.core.text.StrUtil;
@@ -160,41 +159,6 @@ public class EmbyUtil {
             }
         }
         return "";
-    }
-
-
-
-    @SneakyThrows
-    public FileCacheUtil.FileInfo getFileInfo(Long mediaSourceId) {
-        try (Response res = httpClient.send(Request.of(embyConfig.getHost() + "/Items").method(Method.GET)
-                .form(MapUtil.<String, Object>builder("Fields", "Path,MediaSources").put("Ids", mediaSourceId)
-                        .put("Limit", 1).put("api_key", EMBY_API_KEY).map()))) {
-            if (!res.isOk()) {
-                return null;
-            }
-            String resBody = res.bodyStr();
-            if (res.isOk() && JSONUtil.isTypeJSON(resBody)) {
-                JSONObject resJn = JSONUtil.parseObj(resBody);
-                JSONObject item = resJn.getJSONArray("Items").getJSONObject(0);
-                String mediaPath = item.getJSONArray("MediaSources").getJSONObject(0)
-                        .getStr("Path");
-                // 外网转为内网
-                mediaPath = StrUtil.replaceIgnoreCase(mediaPath,
-                        embyConfig.getAlistPublic(), embyConfig.getAlistInner());
-                Long minute = item.getLong("RunTimeTicks", 0L) / 10000 / 1000 / 60;
-                Long cacheFileSize = item.getLong("Size", 0L) / minute;
-                return FileCacheUtil.FileInfo.builder()
-                        .itemId(NumberUtil.parseLong(item.getStr("Id"))).path(mediaPath)
-                        .itemType(item.getStr("Type", "未知"))
-                        .seasonId(item.getLong("SeasonId"))
-                        .bitrate(item.getLong("Bitrate", 27962026L))
-                        .size(item.getLong("Size", 0L))
-                        .container(item.getStr("Container"))
-                        .cacheFileSize(cacheFileSize)
-                        .build();
-            }
-        }
-        return null;
     }
 
     public static String replacePath2Alist(String inputPath) {

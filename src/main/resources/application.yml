@@ -64,6 +64,7 @@ emby:
   common-ua: "AceCandy/1.0"
   item-info-url: /Items
   playback-url: /Items/{}/PlaybackInfo
+  episodes-url: /emby/Shows/{}/Episodes
   remote-images-url: /Items/{}/RemoteImages
   refresh-url: /emby/Items/{}/Refresh
   cache-path: tmp/cache

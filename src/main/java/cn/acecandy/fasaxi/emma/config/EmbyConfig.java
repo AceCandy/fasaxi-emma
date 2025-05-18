@@ -40,6 +40,10 @@ public class EmbyConfig {
      */
     private String playbackUrl;
     /**
+     * 剧集信息url
+     */
+    private String episodesUrl;
+    /**
      * 获取远程图片url
      */
     private String remoteImagesUrl;

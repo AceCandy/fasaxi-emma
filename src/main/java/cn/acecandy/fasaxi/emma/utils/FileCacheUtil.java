@@ -1,15 +1,11 @@
 package cn.acecandy.fasaxi.emma.utils;
 
-import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
-import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.Builder;
-import lombok.Data;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.connector.ClientAbortException;
@@ -21,12 +17,10 @@ import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.lang.tuple.Pair;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.text.split.SplitUtil;
 import org.dromara.hutool.crypto.SecureUtil;
 import org.dromara.hutool.http.client.Request;
 import org.dromara.hutool.http.client.Response;
 import org.dromara.hutool.http.client.engine.ClientEngine;
-import org.dromara.hutool.http.meta.HttpStatus;
 import org.dromara.hutool.http.meta.Method;
 import org.springframework.stereotype.Component;
 
@@ -39,10 +33,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_206;
@@ -70,43 +62,11 @@ public class FileCacheUtil {
     private EmbyProxy embyProxy;
 
     @Resource
-    private EmbyUtil embyUtil;
-
-    @Resource
     private EmbyConfig embyConfig;
 
     private static final Map<String, ReentrantLock> FILE_CACHE_LOCK = MapUtil.newSafeConcurrentHashMap();
     @Resource
     private VideoUtil videoUtil;
-    // private static final OkHttpClient client = new OkHttpClient();
-
-    private static ReentrantLock getLock(String subdirname, String dirname) {
-        String key = subdirname + "/" + dirname;
-        return FILE_CACHE_LOCK.computeIfAbsent(key, k -> new ReentrantLock());
-    }
-
-    /**
-     * 获取路径的md5值
-     * <p>
-     * 电视剧取后三层目录 电影取后两层
-     * md5前两位可用作缓存目录文件夹名
-     *
-     * @param filePath  文件路径
-     * @param mediaType 纸张类型
-     * @return {@link String }
-     */
-    public static String getPathMd5(String filePath, String mediaType) {
-        Path path = Paths.get(filePath);
-        StringBuilder newFilePath = new StringBuilder();
-        if (!电影.getValue().equals(mediaType)) {
-            newFilePath.append("series/").append(
-                    PathUtil.subPath(path, path.getNameCount() - 3, path.getNameCount()));
-        } else {
-            newFilePath.append("movie/").append(
-                    PathUtil.subPath(path, path.getNameCount() - 2, path.getNameCount()));
-        }
-        return SecureUtil.md5(newFilePath.toString());
-    }
 
     public static Path getCachePath(String itemId, String mediaType, String filePath) {
         return PathUtil.of(mediaType, itemId,
@@ -122,9 +82,14 @@ public class FileCacheUtil {
     public Path getCacheDir(EmbyItem embyItem) {
         String filePath = embyItem.getPath();
         String itemId = embyItem.getItemId();
-        String mediaType = embyItem.getMediaType();
-        return PathUtil.of(embyConfig.getCachePath(), mediaType, itemId,
-                SecureUtil.md5(PathUtil.getLastPathEle(Paths.get(filePath)).toString()));
+        String type = embyItem.getType();
+        String md5FileName = SecureUtil.md5(PathUtil.getLastPathEle(Paths.get(filePath)).toString());
+
+        if (电视剧.getValue().equals(type)) {
+            return PathUtil.of(embyConfig.getCachePath(), type,
+                    embyItem.getSeriesId(), embyItem.getSeasonId(), itemId, md5FileName);
+        }
+        return PathUtil.of(embyConfig.getCachePath(), type, itemId, md5FileName);
     }
 
     /**
@@ -153,152 +118,6 @@ public class FileCacheUtil {
                 Paths.get(embyConfig.getCachePath(), writePath.toString(), cacheFileName));
     }
 
-    public enum CacheStatus {
-        UNKNOWN, MISS, PARTIAL, HIT, HIT_TAIL
-    }
-
-    @Builder
-    @Data
-    static class RequestInfo {
-        private FileInfo fileInfo;
-        private CacheStatus cacheStatus;
-
-        private String rawUrl;
-        private String hostUrl;
-        private CompletableFuture<String> rawUrlTask;
-        private Map<String, String> headers;
-    }
-
-    @Data
-    @Builder
-    public static class FileInfo {
-        /**
-         * alist路径
-         */
-        private String path;
-        /**
-         * 真实URL
-         */
-        private String realUrl;
-        /**
-         * 类型 Movie/Episode
-         */
-        private String itemType;
-        /**
-         * 项目id
-         */
-        private Long itemId;
-        /**
-         * 季id
-         */
-        private Long seasonId;
-        private Long bitrate;
-        private Long size;
-        private String container;
-        private Long cacheFileSize;
-
-        /**
-         * 缓存参数
-         */
-        private Long startByte;
-        private Long endByte;
-        private CacheStatus cacheStatus;
-    }
-
-    /**
-     * 写入文件缓存
-     *
-     * @param fileInfo  请求信息
-     * @param reqHeader 请求入参头球
-     * @return boolean
-     */
-    @SneakyThrows
-    public boolean writeCacheFile(FileInfo fileInfo,
-                                  Map<String, String> reqHeader) {
-        log.info("写入本地缓存文件->");
-        Long itemId = fileInfo.getItemId();
-        String path = fileInfo.getPath();
-        long fileSize = fileInfo.getSize();
-        long cacheSize = fileInfo.getCacheFileSize();
-        String itemType = fileInfo.getItemType();
-
-        String pathMd5 = getPathMd5(path, itemType);
-        String subDir = StrUtil.subPre(pathMd5, 2);
-        String dir = pathMd5;
-
-        Long startPoint = fileInfo.getStartByte();
-        Long endPoint = fileInfo.getEndByte();
-        if (null == endPoint) {
-            endPoint = Math.min(fileSize, startPoint + cacheSize) - 1;
-        }
-        /*switch (fileInfo.getCacheStatus()) {
-            case PARTIAL, HIT -> {
-                startPoint = 0;
-                endPoint = cacheSize - 1;
-            }
-            case HIT_TAIL -> {
-                startPoint = fileInfo.getStartByte();
-                endPoint = fileSize - 1;
-            }
-            default -> throw new BaseException("未知的缓存状态");
-        }*/
-        String realUrl = embyProxy.fetch302Path(path, reqHeader);
-
-        String cacheFileName = "cacheFile_" + startPoint + "_" + endPoint;
-        Path cacheFilePath = Paths.get(embyConfig.getCachePath(), subDir, dir, cacheFileName);
-        Path parentPath = PathUtil.mkParentDirs(cacheFilePath);
-
-        String cacheWriteTagPath = cacheFilePath + ".tag";
-        FileUtil.touch(cacheWriteTagPath);
-
-        ReentrantLock lock = getLock(subDir, dir);
-        try {
-            lock.lock();
-
-            List<File> loopFile = PathUtil.loopFiles(parentPath, -1, null);
-            long finalStartPoint = startPoint;
-            long finalEndPoint = endPoint;
-            loopFile.forEach(file -> {
-                String fileName = FileNameUtil.getName(file);
-                if (!StrUtil.startWith(fileName, "cacheFile_") || StrUtil.endWith(fileName, ".tag")) {
-                    return;
-                }
-                List<String> parts = SplitUtil.split(fileName, "_");
-                long fileStart = Long.parseLong(parts.get(1));
-                long fileEnd = Long.parseLong(parts.get(2));
-                if (finalStartPoint >= fileStart && finalEndPoint <= fileEnd) {
-                    PathUtil.del(cacheFilePath);
-                } else if (finalStartPoint <= fileStart && finalEndPoint >= fileEnd) {
-                    FileUtil.del(file);
-                }
-            });
-            if (reqHeader == null) {
-                reqHeader = MapUtil.newHashMap();
-            } else {
-                reqHeader = new HashMap<>(reqHeader);
-            }
-            reqHeader.put("host", SplitUtil.split(realUrl, "/").get(2));
-            reqHeader.put("range", StrUtil.format("bytes={}-{}", startPoint, endPoint));
-
-            try (Response res = httpClient.send(Request.of(realUrl).header(reqHeader)).sync()) {
-                if (res.getStatus() != HttpStatus.HTTP_PARTIAL) {
-                    throw new BaseException("请求返回code不为206");
-                }
-                FileUtil.writeFromStream(res.body().getStream(), cacheFilePath.toFile());
-                log.info("写入缓存文件成功[{}]: {}", itemId, cacheFilePath);
-                FileUtil.del(cacheWriteTagPath);
-                return true;
-            }
-        } catch (Exception e) {
-            log.error("写入缓存失败[{}]: {}", itemId, cacheFilePath, e);
-            PathUtil.del(cacheFilePath);
-            FileUtil.del(cacheWriteTagPath);
-            throw e;
-        } finally {
-            lock.unlock();
-        }
-    }
-
     /**
      * 写入文件缓存
      *
@@ -306,15 +125,14 @@ public class FileCacheUtil {
      * @return boolean
      */
     @SneakyThrows
-    public boolean writeFile(EmbyItem embyItem
-    ) {
+    public boolean writeFile(EmbyItem embyItem) {
         Map<String, String> headerMap = null;
         // EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
         Long size = embyItem.getSize();
         if (null == size || size == 0) {
             return false;
         }
-        Long cacheSize = size / (embyItem.getRunTimeTicks() / 10000 / 60 / 1000);
+        Long cacheSize = Math.max(size / (embyItem.getRunTimeTicks() / 10000 / 60 / 1000), 1024 * 1024 * 10);
         EmbyProxyUtil.Range range = new EmbyProxyUtil.Range(0, cacheSize, embyItem.getSize());
         Pair<Path, Path> cacheFilePair = getCacheFullPath(embyItem, range);
         PathUtil.mkdir(cacheFilePair.getLeft());
@@ -409,7 +227,7 @@ public class FileCacheUtil {
      * @return boolean
      */
     @SneakyThrows
-    public boolean readFile(EmbyContentCacheReqWrapper request, HttpServletResponse response,
+    public boolean readFile(HttpServletResponse response,
                             EmbyItem embyItem, EmbyProxyUtil.Range range) {
         if (null == range) {
             return false;
@@ -516,85 +334,37 @@ public class FileCacheUtil {
         }
     }
 
-
-    /**
-     * 检查缓存文件是否存在
-     *
-     * @param fileInfo 请求信息
-     * @return boolean
-     */
-    public boolean checkCacheFile(FileInfo fileInfo) {
-        String path = fileInfo.getPath();
-
-        String pathMd5 = getPathMd5(path, fileInfo.getItemType());
-        String subDir = StrUtil.subPre(pathMd5, 2);
-        String dir = pathMd5;
-
-        Path fileDir = Paths.get(embyConfig.getCachePath(), subDir, dir);
-        if (FileUtil.isEmpty(fileDir.toFile())) {
-            return false;
-        }
-
-        // 检查是否有任何缓存文件正在写入
-        List<File> files = FileUtil.loopFiles(fileDir.toFile());
-        if (files.stream().map(FileNameUtil::getName)
-                .anyMatch(fileName -> StrUtil.endWith(fileName, ".tag"))) {
-            return false;
-        }
-
-        // 这时候已经没有tag结尾的文件了 查找与 startPoint 匹配的缓存文件，endPoint 为文件名的一部分
-        for (File file : files) {
-            String fileName = FileNameUtil.getName(file);
-            if (!StrUtil.startWith(fileName, "cacheFile_")) {
-                continue;
-            }
-            List<String> parts = SplitUtil.split(fileName, "_");
-            long fileStart = Long.parseLong(parts.get(1));
-            long fileEnd = Long.parseLong(parts.get(2));
-            if (fileStart <= fileInfo.getStartByte() && fileInfo.getStartByte() <= fileEnd) {
-                return true;
-            }
-            /*if (verifyCacheFile(fileInfo, CollUtil.newArrayList(fileStart, fileEnd))) {
-                if (fileStart <= fileInfo.getStartByte() && fileInfo.getStartByte() <= fileEnd) {
-                    return true;
-                }
-            } else {
-                FileUtil.del(file);
-                continue;
-            }*/
-        }
-        return false;
-    }
-
     /**
      * 缓存下一集
      * <p>
      * 如果是剧集则缓存下一集；如果是电影则跳过
      *
-     * @param fileInfo 请求信息
-     * @param header   请求头
-     * @return {@link CompletableFuture }<{@link Boolean }>
+     * @param embyItem emby项目
      */
-    public Boolean cacheNextEpisode(FileInfo fileInfo, Map<String, String> header) {
+    public void cacheNextEpisode(EmbyItem embyItem) {
         // 不是剧集就跳过
-        if (!StrUtil.equals(电视剧.getValue(), fileInfo.getItemType())) {
-            return false;
+        if (!StrUtil.equals(电视剧.getValue(), embyItem.getType())) {
+            return;
         }
+        List<EmbyItem> seasonItem = embyProxy.getEpisodes(embyItem.getItemId(), embyItem.getSeasonId());
+        int index = -1;
+        for (int i = 0; i < seasonItem.size(); i++) {
+            if (seasonItem.get(i).getSeasonId().equals(embyItem.getSeasonId())) {
+                index = i;
+                break;
+            }
+        }
+        if (index == -1 || index == seasonItem.size() - 1) {
+            // 没有找到符合条件或者已经最后一集了
+            return;
+        }
+        EmbyItem nextItem = seasonItem.get(index + 1);
+        writeCacheAndMoov(nextItem);
+    }
 
-        long nextId = fileInfo.getItemId() + 1;
-        FileInfo nextFileInfo = embyUtil.getFileInfo(nextId);
-        // 无下一集或者下一集不是同一季 不进行缓存
-        if (null == nextFileInfo || !nextFileInfo.getSeasonId().equals(fileInfo.getSeasonId())) {
-            return false;
-        }
-        nextFileInfo.setCacheStatus(CacheStatus.PARTIAL);
-        nextFileInfo.setStartByte(0L);
-        nextFileInfo.setEndByte(null);
-        if (checkCacheFile(nextFileInfo)) {
-            return false;
-        } else {
-            return writeCacheFile(nextFileInfo, header);
-        }
+    public void writeCacheAndMoov(EmbyItem embyItem) {
+        writeFile(embyItem);
+        writeMoovFile(embyItem);
     }
 
     public static void main(String[] args) {

@@ -106,6 +106,7 @@ public class EmbyItem {
     @Alias("MediaType")
     private String mediaType;
 
+
     /**
      * 是否文件夹
      */
