@@ -163,10 +163,6 @@ public class FileCacheUtil {
 
     @SneakyThrows
     public boolean writeMoovFile(EmbyItem embyItem) {
-
-        if (!StrUtil.equalsAnyIgnoreCase(embyItem.getContainer(), "mp4", "mov", "3gp")) {
-            return false;
-        }
         Path writePath = getCacheDir(embyItem);
         if (FileUtil.listFileNames(writePath.toString()).stream()
                 .anyMatch(name -> StrUtil.startWith(name, "moov"))) {
@@ -175,7 +171,11 @@ public class FileCacheUtil {
         }
         String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();
         mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
-        VideoUtil.MoovPos moovPos = videoUtil.analyzeMp4(mediaPath, embyItem.getSize());
+        VideoUtil.MoovPos moovPos = switch (embyItem.getContainer()) {
+            case "mp4", "mov", "3gp" -> videoUtil.analyzeMp4(mediaPath, embyItem.getSize());
+            default -> VideoUtil.MoovPos.builder().start(embyItem.getSize() - 512 * 1024)
+                    .size(512 * 1024).posDesc("虚拟").build();
+        };
         if (null == moovPos) {
             return false;
         }
@@ -208,7 +208,8 @@ public class FileCacheUtil {
             fileChannel.position(moovPos.getStart());
             ReadableByteChannel remoteChannel = Channels.newChannel(res.body().getStream());
             fileChannel.transferFrom(remoteChannel, 0, moovPos.getSize());
-            String moovName = StrUtil.format("moov_{}_{}",
+            String moovName = StrUtil.format("moov{}_{}_{}",
+                    StrUtil.equals(moovPos.getPosDesc(), "虚拟") ? "X" : "",
                     moovPos.getStart(), moovEnd);
             tmpTag = FileUtil.rename(tmpTag, moovName, true);
             log.warn("写入本地moov文件完成->{}", moovName);
@@ -242,7 +243,7 @@ public class FileCacheUtil {
         EmbyProxyUtil.CacheFile cacheFile = FileUtil.loopFiles(cacheDir.toFile()).stream()
                 .filter(file -> {
                     String fileName = FileNameUtil.getName(file);
-                    return StrUtil.startWithAny(fileName, "cacheFile_", "moov_") && !StrUtil.endWith(fileName, ".tag");
+                    return StrUtil.startWithAny(fileName, "cacheFile_", "moov") && !StrUtil.endWith(fileName, ".tag");
                 })
                 .map(file -> {
                     String[] parts = file.getName().split("_");
