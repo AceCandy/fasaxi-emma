@@ -138,7 +138,7 @@ public class FileCacheUtil {
         PathUtil.mkdir(cacheFilePair.getLeft());
         Path cacheFilePath = cacheFilePair.getRight();
         if (PathUtil.exists(cacheFilePath, false)) {
-            log.info("缓存文件已存在: {}", cacheFilePath);
+            log.debug("缓存文件已存在: {}", cacheFilePath);
             return false;
         }
         log.info("准备写入本地缓存文件->{}", cacheFilePath);
@@ -166,7 +166,7 @@ public class FileCacheUtil {
         Path writePath = getCacheDir(embyItem);
         if (FileUtil.listFileNames(writePath.toString()).stream()
                 .anyMatch(name -> StrUtil.startWith(name, "moov"))) {
-            log.info("moov文件已存在: {}", writePath);
+            log.debug("moov文件已存在: {}", writePath);
             return false;
         }
         String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();

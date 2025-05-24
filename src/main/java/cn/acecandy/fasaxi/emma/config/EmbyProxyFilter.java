@@ -22,9 +22,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.text.StrUtil;
-import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -48,9 +46,8 @@ import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.needClose;
  * @since 2025/4/15
  */
 @Slf4j
-@Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
-@WebFilter("/emby/*")
+@Order(2)
+@WebFilter("/*")
 public class EmbyProxyFilter implements Filter {
 
     @Resource

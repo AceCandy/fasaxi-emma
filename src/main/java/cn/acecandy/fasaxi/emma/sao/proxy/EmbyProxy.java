@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_302;
+import static org.dromara.hutool.core.text.StrPool.COMMA;
 
 /**
  * emby 代理服务
@@ -167,6 +168,32 @@ public class EmbyProxy {
     }
 
     /**
+     * 获取项目信息列表
+     *
+     * @param items items
+     * @return {@link TmdbImageInfoOut }
+     */
+    public EmbyItemsInfoOut getItemInfos(List<String> items) {
+        String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET)
+                .form(MapUtil.<String, Object>builder("Fields", "Path,MediaSources,ProviderIds")
+                        .put("Ids", StrUtil.join(COMMA,items))
+                        .put("api_key", embyConfig.getApiKey()).map()))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+            return JSONUtil.toBean(resBody, EmbyItemsInfoOut.class);
+        } catch (Exception e) {
+            log.warn("getItemInfo 网络请求异常: ", e);
+        }
+        return null;
+    }
+
+    /**
      * 获取远程图片
      *
      * @param itemId 媒体源id
@@ -256,7 +283,7 @@ public class EmbyProxy {
             if (k == null || StrUtil.equalsIgnoreCase(k, "content-length")) {
                 return;
             }
-            embyCachedResp.getHeaders().put(k, StrUtil.join(StrUtil.COMMA, v));
+            embyCachedResp.getHeaders().put(k, StrUtil.join(COMMA, v));
         });
         ResponseBody body = res.body().sync();
         if (StrUtil.equalsAnyIgnoreCase(request.getMethod(), "get") && StrUtil.containsIgnoreCase(

@@ -194,7 +194,7 @@ public final class EmbyProxyUtil {
             return "";
         }
         mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath, Charset.defaultCharset()));
-        mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt/",
+        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/",
                 "http://alist.netcup-1o.worldline.space/p/pt/");
 
         // mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt",

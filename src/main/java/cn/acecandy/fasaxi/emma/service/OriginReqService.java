@@ -116,7 +116,7 @@ public class OriginReqService {
         } finally {
             stopWatch.stop();
             if (EmbyProxyUtil.isHttpOk(cached.getStatusCode())) {
-                log.info("请求原始转发->[{}-{}:{}ms] {}", cached.getStatusCode(), request.getMethod(),
+                log.debug("请求原始转发->[{}-{}:{}ms] {}", cached.getStatusCode(), request.getMethod(),
                         stopWatch.getLastTaskTimeMillis(),
                         StrUtil.format("{}&api_key={}", request.getParamUri(), embyConfig.getApiKey()));
             } else {
@@ -145,6 +145,7 @@ public class OriginReqService {
             writeCacheResponse(response, cached);
         } else {
             cached.setStatusCode(CODE_599);
+            log.error("请求599[{}]: {}&api_key={}, e:{}", request.getMethod(), request.getParamUri(), embyConfig.getApiKey(), ExceptionUtil.stacktraceToString(e));
             throw e;
         }
     }

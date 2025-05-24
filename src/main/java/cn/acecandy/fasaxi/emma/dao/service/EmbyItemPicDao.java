@@ -3,6 +3,9 @@ package cn.acecandy.fasaxi.emma.dao.service;
 import cn.acecandy.fasaxi.emma.dao.entity.EmbyItemPic;
 import cn.acecandy.fasaxi.emma.dao.mapper.EmbyItemPicMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
@@ -29,6 +32,24 @@ public class EmbyItemPicDao {
             return false;
         }
         return embyItemPicMapper.insertOrUpdate(dto);
+    }
+
+    public IPage<EmbyItemPic> findAllByPage(Integer pageNum, Integer pageSize) {
+        if (pageNum == null || pageSize == null) {
+            return null;
+        }
+        Page<EmbyItemPic> page = new Page<>(pageNum, pageSize);
+
+        // 执行分页查询（这里可以添加查询条件，若无则传null）
+        QueryWrapper<EmbyItemPic> queryWrapper = new QueryWrapper<>();
+        return embyItemPicMapper.selectPage(page, queryWrapper);
+    }
+
+    public int delById(List<Integer> itemIds) {
+        if (CollUtil.isEmpty(itemIds)) {
+            return 0;
+        }
+        return embyItemPicMapper.deleteByIds(itemIds);
     }
 
     public List<EmbyItemPic> findByItemId(List<Integer> itemIds) {

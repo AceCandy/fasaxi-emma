@@ -298,7 +298,7 @@ public class VideoRedirectService {
                                  String mediaPath, Map<String, String> headerMap) {
         String cacheUrl = redisClient.getStr(CacheUtil.buildVideoCacheKey(mediaSourceId, ua));
         if (StrUtil.isBlank(cacheUrl)) {
-            mediaPath = StrUtil.replace(mediaPath, embyConfig.getAlistPublic(), embyConfig.getAlistInner());
+            // mediaPath = StrUtil.replace(mediaPath, embyConfig.getAlistPublic(), embyConfig.getAlistInner());
             mediaPath = embyProxy.fetch302Path(mediaPath, headerMap);
             if (StrUtil.isNotBlank(mediaPath)) {
                 int exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(

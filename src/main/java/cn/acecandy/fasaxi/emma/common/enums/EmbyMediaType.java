@@ -16,6 +16,7 @@ public enum EmbyMediaType {
     电影("Movie", "movie"),
     电视剧("Episode", "tv"),
     电视剧_季("Season", ""),
+    文件夹("Folder", ""),
     ;
 
     private final String value;

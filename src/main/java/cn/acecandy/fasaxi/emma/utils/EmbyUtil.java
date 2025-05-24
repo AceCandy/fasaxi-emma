@@ -154,8 +154,9 @@ public class EmbyUtil {
                         .getJSONArray("MediaSources").getJSONObject(0)
                         .getStr("Path");
                 // 外网转为内网
-                return StrUtil.replaceIgnoreCase(mediaPath,
-                        embyConfig.getAlistPublic(), embyConfig.getAlistInner());
+                return mediaPath;
+                // return StrUtil.replaceIgnoreCase(mediaPath,
+                //         embyConfig.getAlistPublic(), embyConfig.getAlistInner());
             }
         }
         return "";

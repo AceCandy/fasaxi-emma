@@ -127,7 +127,7 @@ public class PicRedirectService {
             String url = getCdnPicUrl(uri, tmdbConfig, maxWidth);
             response.setStatus(CODE_308);
             response.setHeader("Location", url);
-            log.info("{}-图片重定向(缓存):[{}-{}] => {}", picType, itemId, maxWidth, url);
+            log.debug("{}-图片重定向(缓存):[{}-{}] => {}", picType, itemId, maxWidth, url);
             return true;
         }
         return false;

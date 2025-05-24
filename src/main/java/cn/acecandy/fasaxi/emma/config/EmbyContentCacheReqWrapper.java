@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import lombok.Getter;
 import org.dromara.hutool.core.collection.CollUtil;
+import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
@@ -13,7 +14,6 @@ import org.dromara.hutool.http.server.servlet.ServletUtil;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -59,19 +59,19 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
 
     private void cacheHeader(HttpServletRequest request) throws IOException {
         Map<String, String> headerMap = MapUtil.newHashMap();
-        Enumeration<String> headerNames = request.getHeaderNames();
-        while (headerNames.hasMoreElements()) {
-            String headerName = headerNames.nextElement();
-            if (!StrUtil.equalsAnyIgnoreCase(headerName, "Host", "Content-Length", "Referer", "Transfer-Encoding")) {
-                String headerValue = request.getHeader(headerName);
-                headerMap.put(headerName, headerValue);
-                if (StrUtil.equalsIgnoreCase(headerName, "User-Agent")) {
-                    this.ua = headerValue;
-                } else if (StrUtil.equalsIgnoreCase(headerName, "Range")) {
-                    this.range = headerValue;
-                }
+        List<String> headerNameList = ListUtil.of(request.getHeaderNames());
+        headerNameList.forEach(headerName -> {
+            if (StrUtil.equalsAnyIgnoreCase(headerName, "Host", "Content-Length", "Referer", "Transfer-Encoding", "Content-Type")) {
+                return;
             }
-        }
+            String headerValue = request.getHeader(headerName);
+            headerMap.put(headerName, headerValue);
+            if (StrUtil.equalsIgnoreCase(headerName, "User-Agent")) {
+                this.ua = headerValue;
+            } else if (StrUtil.equalsIgnoreCase(headerName, "Range")) {
+                this.range = headerValue;
+            }
+        });
         String xffHeader = request.getHeader("X-Forwarded-For");
         if (StrUtil.isNotBlank(xffHeader)) {
             ip = CollUtil.getFirst(SplitUtil.splitTrim(xffHeader, COMMA));
