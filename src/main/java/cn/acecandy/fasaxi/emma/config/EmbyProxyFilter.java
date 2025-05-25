@@ -89,7 +89,7 @@ public class EmbyProxyFilter implements Filter {
                 res.setStatus(CODE_416);
                 return;
             }
-            if (!StrUtil.containsAny(reqWrapper.getUa(), "okhttp",
+            if (!StrUtil.containsAny(reqWrapper.getUa(), "okhttp", "EmbyTheater", "libmpv",
                     "Yamby", "Hills", "AfuseKt",
                     "SenPlayer", "VidHub", "Forward")) {
                 log.error("非法UA已被禁止: {}", reqWrapper.getUa());
