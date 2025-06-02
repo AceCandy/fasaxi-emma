@@ -8,6 +8,7 @@ import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
+import cn.acecandy.fasaxi.emma.utils.IpUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.acecandy.fasaxi.emma.utils.VideoUtil;
@@ -81,22 +82,22 @@ public class VideoRedirectService {
             return;
         }
         EmbyItem embyItem = embyProxy.getItemInfo(mediaSourceId);
-        // if (IpUtil.isInnerIp(request.getIp())) {
-        if (null == embyItem) {
-            response.setStatus(CODE_404);
-            return;
-        }
+        if (IpUtil.isInnerIp(request.getIp())) {
+            if (null == embyItem) {
+                response.setStatus(CODE_404);
+                return;
+            }
 
-        EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
-        if (null == range) {
-            response.setHeader("Content-Range", "bytes */" + embyItem.getSize());
-            response.setStatus(CODE_416);
-            return;
+            EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
+            if (null == range) {
+                response.setHeader("Content-Range", "bytes */" + embyItem.getSize());
+                response.setStatus(CODE_416);
+                return;
+            }
+            if (fileCacheUtil.readFile(response, embyItem, range)) {
+                return;
+            }
         }
-        if (fileCacheUtil.readFile(response, embyItem, range)) {
-            return;
-        }
-        // }
         if (StrUtil.containsIgnoreCase(embyItem.getPath(), "micu")) {
             ThreadUtil.execVirtual(() -> {
                 Lock lock = LockUtil.lockVideoCache(embyItem.getItemId());
@@ -150,9 +151,10 @@ public class VideoRedirectService {
             return cacheUrl;
         }
         int minute = DateUtil.thisMinute();
-        if (minute == 0) {
+        /*if (minute == 0) {
             // 使用原始路径
-        } else if (minute % 10 == 0) {
+        } else */
+        if (minute % 10 == 0) {
             cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
                     embyConfig.getOriginPt(), embyConfig.getTransPt1());
         } else {

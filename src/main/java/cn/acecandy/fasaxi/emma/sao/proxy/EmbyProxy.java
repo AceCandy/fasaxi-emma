@@ -177,7 +177,7 @@ public class EmbyProxy {
         String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
         try (Response res = httpClient.send(Request.of(url).method(Method.GET)
                 .form(MapUtil.<String, Object>builder("Fields", "Path,MediaSources,ProviderIds")
-                        .put("Ids", StrUtil.join(COMMA,items))
+                        .put("Ids", StrUtil.join(COMMA, items))
                         .put("api_key", embyConfig.getApiKey()).map()))) {
             if (!res.isOk()) {
                 throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
@@ -285,6 +285,9 @@ public class EmbyProxy {
             }
             embyCachedResp.getHeaders().put(k, StrUtil.join(COMMA, v));
         });
+        if (res.getStatus() == 204) {
+            return embyCachedResp;
+        }
         ResponseBody body = res.body().sync();
         if (StrUtil.equalsAnyIgnoreCase(request.getMethod(), "get") && StrUtil.containsIgnoreCase(
                 embyCachedResp.getHeaders().get("Content-Type"), "application/json")) {
