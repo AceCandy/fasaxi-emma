@@ -39,6 +39,7 @@ import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
 
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_302;
 import static org.dromara.hutool.core.text.StrPool.COMMA;
 
@@ -285,7 +286,7 @@ public class EmbyProxy {
             }
             embyCachedResp.getHeaders().put(k, StrUtil.join(COMMA, v));
         });
-        if (res.getStatus() == 204) {
+        if (res.getStatus() == CODE_204) {
             return embyCachedResp;
         }
         ResponseBody body = res.body().sync();
