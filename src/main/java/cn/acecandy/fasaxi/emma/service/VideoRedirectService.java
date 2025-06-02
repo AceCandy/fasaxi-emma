@@ -19,7 +19,6 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.date.DateUtil;
-import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.net.url.UrlDecoder;
 import org.dromara.hutool.core.net.url.UrlQueryUtil;
@@ -263,10 +262,8 @@ public class VideoRedirectService {
                 // 使用直接缓冲区提升性能（适用于大文件）
                 ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 128);
                 while (inChannel.read(buffer) != -1) {
-                    Console.log("开始");
                     buffer.flip();
                     while (buffer.hasRemaining()) {
-                        Console.log("开始。。。");
                         outChannel.write(buffer);
                     }
                     buffer.clear();

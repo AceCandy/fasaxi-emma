@@ -71,8 +71,7 @@ public class EmbyProxyFilter implements Filter {
 
     @Override
     @SneakyThrows
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-            throws IOException, ServletException {
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         long start = DateUtil.current();
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse res = (HttpServletResponse) response;
@@ -104,23 +103,27 @@ public class EmbyProxyFilter implements Filter {
                 if (StrUtil.isNotBlank(mediaSourceId)) {
                     videoRedirectService.processVideo(reqWrapper, res);
                 } else {
-                    originReqService.forwardOriReq(reqWrapper, res);
+                    mediaSourceId = ReUtil.isAudioUrl(req.getRequestURI());
+                    if (StrUtil.isNotBlank(mediaSourceId)) {
+                        reqWrapper.setMediaSourceId(mediaSourceId);
+                        videoRedirectService.processVideo(reqWrapper, res);
+                    } else {
+                        originReqService.forwardOriReq(reqWrapper, res);
+                    }
                 }
             }
         } catch (Exception e) {
             log.warn("转发请求失败[{}]: {}?{}", req.getMethod(), reqWrapper.getRequestURI(), reqWrapper.getQueryString(), e);
             originReqService.forwardOriReq(reqWrapper, res);
         } finally {
-            accessLog.log(reqWrapper.getMethod(), reqWrapper.getRequestURI(), reqWrapper.getIp(),
-                    req.getQueryString(), res.getStatus(), start);
+            accessLog.log(reqWrapper.getMethod(), reqWrapper.getRequestURI(), reqWrapper.getIp(), req.getQueryString(), res.getStatus(), start);
         }
     }
 
     private boolean isWebSocketHandshake(HttpServletRequest request) {
         String connection = request.getHeader("Connection");
         String upgrade = request.getHeader("Upgrade");
-        return "Upgrade".equalsIgnoreCase(connection) &&
-                "websocket".equalsIgnoreCase(upgrade);
+        return "Upgrade".equalsIgnoreCase(connection) && "websocket".equalsIgnoreCase(upgrade);
     }
 
     // WebSocket请求转发实现

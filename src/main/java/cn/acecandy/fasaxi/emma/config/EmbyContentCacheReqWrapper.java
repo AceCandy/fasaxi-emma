@@ -4,6 +4,7 @@ import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import lombok.Getter;
+import lombok.Setter;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.map.MapUtil;
@@ -38,7 +39,8 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     @Getter
     private String paramUri;
     @Getter
-    private String mediaSourceId;
+    @Setter
+    public String mediaSourceId;
     @Getter
     private String userId;
     @Getter

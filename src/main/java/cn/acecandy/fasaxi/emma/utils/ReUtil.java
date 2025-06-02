@@ -42,12 +42,23 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
     private static final Pattern REGEX_VIDEO = PatternPool.get(
             "^/emby/(videos|items)/(\\d+)/(?:original\\.[^/]+|download|stream.*)$", Pattern.DOTALL);
 
+    private static final Pattern REGEX_AUDIO = PatternPool.get(
+            "^/audio/(\\d+)/(?:original\\.[^/]+|download|stream|stream.*)$", Pattern.DOTALL);
+
     public static String isVideoUrl(String url) {
         List<String> groups = getAllGroups(REGEX_VIDEO, url.toLowerCase());
-        if (groups == null || groups.size() < 2) {
+        if (CollUtil.isEmpty(groups) || groups.size() < 2) {
             return null;
         }
         return CollUtil.get(groups, 2);
+    }
+
+    public static String isAudioUrl(String url) {
+        List<String> groups = getAllGroups(REGEX_AUDIO, url.toLowerCase());
+        if (groups == null || groups.size() < 2) {
+            return null;
+        }
+        return CollUtil.get(groups, 1);
     }
 
     public static List<String> isSimilarItemUrl(String url) {

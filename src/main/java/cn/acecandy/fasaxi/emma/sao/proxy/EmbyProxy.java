@@ -289,7 +289,12 @@ public class EmbyProxy {
         if (res.getStatus() == CODE_204) {
             return embyCachedResp;
         }
-        ResponseBody body = res.body().sync();
+
+        ResponseBody body = res.body();
+        if (null == body) {
+            return embyCachedResp;
+        }
+
         if (StrUtil.equalsAnyIgnoreCase(request.getMethod(), "get") && StrUtil.containsIgnoreCase(
                 embyCachedResp.getHeaders().get("Content-Type"), "application/json")) {
             String content = "";
