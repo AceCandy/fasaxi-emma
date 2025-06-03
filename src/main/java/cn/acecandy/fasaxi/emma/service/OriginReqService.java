@@ -29,6 +29,7 @@ import java.util.concurrent.locks.Lock;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_599;
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_DELETE;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_GET;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheLongTimeReq;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheStaticReq;
@@ -71,7 +72,11 @@ public class OriginReqService {
             try {
                 execOriginReq(request, response, stopWatch);
             } finally {
-                redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheKey(request));
+                if (StrUtil.equalsIgnoreCase(request.getMethod(), HTTP_DELETE)) {
+                    redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheAllKey(request));
+                } else {
+                    redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheKey(request));
+                }
             }
             return;
         }
@@ -160,6 +165,7 @@ public class OriginReqService {
                 .method(Method.valueOf(request.getMethod()))
                 .body(request.getCachedBody()).header(request.getCachedHeader());
         // Console.log(originalRequest);
+        // 非get请求不等待返回
         return httpClient.send(originalRequest);
     }
 

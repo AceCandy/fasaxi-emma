@@ -155,6 +155,9 @@ public final class EmbyProxyUtil {
         if (StrUtil.containsAny(uri, "/images/primary", "/images/backdrop", "/images/logo")) {
             return true;
         }
+        if (StrUtil.containsIgnoreCase(uri, "/subtitles")) {
+            return false;
+        }
         return uri.matches(".*\\.(js|css|woff2|png|jpg|gif|ico|json|html)$");
     }
 

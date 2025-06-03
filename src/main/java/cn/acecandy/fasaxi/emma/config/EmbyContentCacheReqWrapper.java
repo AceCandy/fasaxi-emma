@@ -117,6 +117,9 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
                 mediaSourceId = StrUtil.removePrefixIgnoreCase(
                         cachedParam.get("mediasourceid").toString(), "mediasource_");
             }
+            if (cachedParam.containsKey("userid")) {
+                userId = MapUtil.getStr(cachedParam, "userid");
+            }
         }
         paramUri = HttpUtil.urlWithFormUrlEncoded(request.getRequestURI(), cachedParam, Charset.defaultCharset());
     }

@@ -181,5 +181,7 @@ public class RedisClient {
             // 统一序列化方式后删除
             redisTemplate.unlink(keysToDelete);
         });
+        // TODO 为了让操作同步这里先等待100毫秒，确保删除操作完成
+        ThreadUtil.safeSleep(100);
     }
 }

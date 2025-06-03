@@ -27,4 +27,5 @@ public interface CacheConstant {
     // http请求方法
 
     String HTTP_GET = "GET";
+    String HTTP_DELETE = "DELETE";
 }
