@@ -1,11 +1,16 @@
 package cn.acecandy.fasaxi.emma.config;
 
 import lombok.Data;
+import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.lang.Console;
+import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.regex.ReUtil;
+import org.dromara.hutool.core.text.StrUtil;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * @author tangningzhu
@@ -99,7 +104,21 @@ public class EmbyConfig {
     /**
      * 本地相关路径
      */
-    private Map<String, String> localPathMap;
+    private List<String> localPaths;
+
+    public Map<String, String> getLocalPathMap() {
+        if (CollUtil.isEmpty(localPaths)) {
+            return MapUtil.newHashMap();
+        }
+
+        return localPaths.stream().map(entry -> entry.split("::", 2))
+                .filter(parts -> parts.length == 2)
+                .collect(Collectors.toMap(
+                        parts -> StrUtil.trim(parts[0]),
+                        parts -> StrUtil.trim(parts[1]),
+                        (k1, k2) -> k2
+                ));
+    }
 
     public static void main(String[] args) {
         String s = "^/emby/Users/[a-zA-Z0-9]+/Items/[0-9]+$";
