@@ -19,8 +19,10 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.date.DateUtil;
+import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.net.url.UrlDecoder;
+import org.dromara.hutool.core.net.url.UrlEncoder;
 import org.dromara.hutool.core.net.url.UrlQueryUtil;
 import org.dromara.hutool.core.net.url.UrlUtil;
 import org.dromara.hutool.core.text.StrPool;
@@ -38,6 +40,7 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.Charset;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 
@@ -179,33 +182,78 @@ public class VideoRedirectService {
             return;
         }
         String mediaPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
-        Map<String, String> header302 = MapUtil.<String, String>builder()
-                .put("User-Agent", request.getUa()).put("range", request.getRange()).build();
+        int exTime = 2 * 24 * 60 * 60;
+        String realUrl = mediaPath;
         if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
-            String realUrl = embyProxy.fetch302Path(mediaPath, header302);
-            if (StrUtil.isBlank(realUrl)) {
-                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            // 1. 处理pt/Emby的特殊情况 直接替换为168路径
+            if (StrUtil.containsIgnoreCase(mediaPath, "pt/Emby")) {
+                for (String strmPath : embyConfig.getStrmPaths()) {
+                    realUrl = StrUtil.replaceIgnoreCase(mediaPath, strmPath, embyConfig.getOriginPt());
+                }
+                realUrl = UrlEncoder.encodeQuery(realUrl);
+                // HtmlUtil
+                // realut
+            } else {
+                // 2. head获取处理其他网盘直链远程路径
+                Map<String, String> header302 = MapUtil.<String, String>builder()
+                        .put("User-Agent", request.getUa()).put("Range", request.getRange()).build();
+                realUrl = embyProxy.fetch302Path(mediaPath, header302);
+                if (StrUtil.isBlank(realUrl)) {
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    return;
+                }
+                // 3. 动态计算过期时间
+                if (!StrUtil.startWithIgnoreCase(realUrl, embyConfig.getOriginPt())) {
+                    exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(realUrl, Charset.defaultCharset()),
+                            "t") - DateUtil.currentSeconds() - 5 * 60);
+                }
+            }
+            // 4. 统一缓存和重定向逻辑
+            String cacheKey = StrUtil.containsAnyIgnoreCase(mediaPath, "pt/Emby")
+                    ? CacheUtil.buildVideoCacheKey(mediaSourceId)
+                    : CacheUtil.buildVideoCacheKey(mediaSourceId, request.getUa());
+            redisClient.set(cacheKey, realUrl, exTime);
+            realUrl = getPtUrl(realUrl);
+            doRedirect(response, realUrl, exTime, mediaPath);
+
+            return;
+        }
+        // 5. 需要302的本地路径
+        Map<String, String> pathMap = embyConfig.getLocalPathMap();
+        String[] localPaths = pathMap.keySet().toArray(new String[0]);
+        if (StrUtil.startWithAnyIgnoreCase(mediaPath, localPaths)) {
+            // 6. 找到最长匹配前缀的路径映射，避免部分匹配导致的错误替换
+            String bestMatchKey = pathMap.keySet().stream()
+                    .filter(prefix -> StrUtil.startWithIgnoreCase(mediaPath, prefix))
+                    .max(Comparator.comparingInt(String::length))
+                    .orElse(null);
+
+            if (bestMatchKey != null) {
+                exTime = 30 * 60;
+                realUrl = StrUtil.replaceIgnoreCase(mediaPath, bestMatchKey, pathMap.get(bestMatchKey));
+                realUrl = UrlEncoder.encodeQuery(realUrl);
+                doRedirect(response, realUrl, exTime, mediaPath);
+                redisClient.set(CacheUtil.buildVideoCacheKey(mediaSourceId), realUrl, exTime);
                 return;
             }
-            int exTime = 2 * 24 * 60 * 60;
-            if (StrUtil.startWithIgnoreCase(realUrl, embyConfig.getOriginPt())) {
-                redisClient.set(CacheUtil.buildVideoCacheKey(mediaSourceId), realUrl, exTime);
-            } else {
-                exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(realUrl, Charset.defaultCharset()),
-                        "t") - DateUtil.currentSeconds() - 5 * 60);
-                redisClient.set(CacheUtil.buildVideoCacheKey(mediaSourceId, request.getUa()), realUrl, exTime);
-            }
-
-            realUrl = getPtUrl(realUrl);
-            response.setStatus(HttpServletResponse.SC_FOUND);
-            response.setHeader("Location", realUrl);
-            log.warn("视频重定向({}):[{}] => {}", DateUtil.formatDateTime(DateUtil.date(DateUtil.currentSeconds() + exTime)),
-                    mediaPath, realUrl);
-            return;
-        } else {
-            // TODO 这里是不需要302的本地路径
-            originalVideoStream(request, response);
         }
+        // 不需要302的本地路径
+        originalVideoStream(request, response);
+    }
+
+    /**
+     * 进行重定向
+     *
+     * @param response  响应
+     * @param realUrl   真实URL
+     * @param exTime    前时间
+     * @param mediaPath 媒体路径
+     */
+    private void doRedirect(HttpServletResponse response, String realUrl, int exTime,
+                            String mediaPath) {
+        response.setStatus(HttpServletResponse.SC_FOUND);
+        response.setHeader("Location", realUrl);
+        log.warn("视频重定向({}): [{}] => {}", DateUtil.date(DateUtil.currentSeconds() + exTime), mediaPath, realUrl);
     }
 
     private void originalVideoStream(EmbyContentCacheReqWrapper request,
@@ -306,5 +354,9 @@ public class VideoRedirectService {
             mediaPath = cacheUrl;
         }
         return mediaPath;
+    }
+
+    public static void main(String[] args) {
+        Console.log(UrlEncoder.encodeQuery("http://192.168.1.205:5244/d/pt/Emby1/动画电影/万王之王 (2025)/万王之王 (2025) - 1080p - REDMT.mkv"));
     }
 }
