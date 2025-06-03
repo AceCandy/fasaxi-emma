@@ -1,5 +1,6 @@
 package cn.acecandy.fasaxi.emma.sao.proxy;
 
+import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
@@ -355,6 +356,10 @@ public class EmbyProxy {
         }
         ThreadUtil.execVirtual(() -> {
             EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
+            if (item.getIsFolder() || !StrUtil.equalsAnyIgnoreCase(item.getType(), EmbyMediaType.电影.getValue(),
+                    EmbyMediaType.电视剧.getValue())) {
+                return;
+            }
             if (!StrUtil.containsAny(item.getUniqueKey(), "tmdb", "tt", "zh-CN-cf")
                     || StrUtil.isNotBlank(item.getImageTags().getPrimary())) {
                 return;
@@ -371,7 +376,8 @@ public class EmbyProxy {
         });
         ThreadUtil.execVirtual(() -> {
             EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
-            if (item.getIsFolder()) {
+            if (item.getIsFolder() || !StrUtil.equalsAnyIgnoreCase(item.getType(), EmbyMediaType.电影.getValue(),
+                    EmbyMediaType.电视剧.getValue())) {
                 return;
             }
             String lockKey = LockUtil.buildRefreshMediaLock(request.getMediaSourceId());
