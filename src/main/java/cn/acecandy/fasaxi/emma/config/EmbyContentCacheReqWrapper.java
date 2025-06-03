@@ -108,6 +108,11 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
                 userId = CollUtil.getFirst(itemUrlGroup);
                 mediaSourceId = CollUtil.getLast(itemUrlGroup);
             }
+            String itemId = ReUtil.isPlaylistUrl(request.getRequestURI());
+            if (StrUtil.isBlank(mediaSourceId) && StrUtil.isNotBlank(itemId)) {
+                mediaSourceId = itemId;
+            }
+
             if (cachedParam.containsKey("mediasourceid")) {
                 mediaSourceId = StrUtil.removePrefixIgnoreCase(
                         cachedParam.get("mediasourceid").toString(), "mediasource_");

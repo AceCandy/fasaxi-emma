@@ -31,6 +31,7 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     private static final String ORIGIN_CACHE_KEY = "cache:req:{}|{}";
     private static final String ORIGIN_CACHE_REFRESH_KEY1 = "cache:req:/emby/Users/{}/Items/{}";
     private static final String ORIGIN_CACHE_REFRESH_KEY2 = "cache:req:/emby/Shows/{}";
+    private static final String ORIGIN_CACHE_REFRESH_KEY3 = "cache:req:/Users/{}/Items";
 
 
     public static String buildOriginCacheKey(EmbyContentCacheReqWrapper req) {
@@ -39,9 +40,15 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     }
 
     public static List<String> buildOriginRefreshCacheKey(EmbyContentCacheReqWrapper req) {
-        return ListUtil.of(StrUtil.format(ORIGIN_CACHE_REFRESH_KEY1, req.getUserId(), req.getMediaSourceId()),
-                // TODO 暂时懒得改 这里有问题 需要清除的是比如剧集上一级的季对应的itemId
-                StrUtil.format(ORIGIN_CACHE_REFRESH_KEY2, req.getMediaSourceId()));
+        List<String> cacheKeys = ListUtil.of();
+        if (StrUtil.isNotBlank(req.getUserId()) && StrUtil.isNotBlank(req.getMediaSourceId())) {
+            cacheKeys.add(StrUtil.format(ORIGIN_CACHE_REFRESH_KEY1, req.getUserId(), req.getMediaSourceId()));
+        }
+        if (StrUtil.isNotBlank(req.getMediaSourceId())) {
+            cacheKeys.add(StrUtil.format(ORIGIN_CACHE_REFRESH_KEY2, req.getMediaSourceId()));
+            cacheKeys.add(StrUtil.format(ORIGIN_CACHE_REFRESH_KEY3, req.getMediaSourceId()));
+        }
+        return cacheKeys;
     }
 
     public static String buildVideoCacheKey(String mediaSourceId) {

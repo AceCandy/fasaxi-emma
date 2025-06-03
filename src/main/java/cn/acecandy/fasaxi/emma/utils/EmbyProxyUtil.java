@@ -3,6 +3,7 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
+import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.config.TmdbConfig;
 import cn.acecandy.fasaxi.emma.dao.entity.EmbyItemPic;
 import jakarta.servlet.http.HttpServletRequest;
@@ -155,6 +156,22 @@ public final class EmbyProxyUtil {
             return true;
         }
         return uri.matches(".*\\.(js|css|woff2|png|jpg|gif|ico|json|html)$");
+    }
+
+    /**
+     * 需要缓存的请求
+     *
+     * @param req 请求入参
+     * @return boolean
+     */
+    public static boolean isCacheLongTimeReq(EmbyContentCacheReqWrapper req) {
+        String uri = req.getRequestURI().toLowerCase();
+        if (StrUtil.containsAll(uri, "/users/", "/items")) {
+            if (req.getCachedParam().containsKey("parentid")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

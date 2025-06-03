@@ -30,6 +30,7 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_599;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_GET;
+import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheLongTimeReq;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheStaticReq;
 
 /**
@@ -70,9 +71,7 @@ public class OriginReqService {
             try {
                 execOriginReq(request, response, stopWatch);
             } finally {
-                if (StrUtil.isNotBlank(request.getUserId()) && StrUtil.isNotBlank(request.getMediaSourceId())) {
-                    redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheKey(request));
-                }
+                redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheKey(request));
             }
             return;
         }
@@ -203,7 +202,8 @@ public class OriginReqService {
      * @param request 请求
      * @param cached  缓存返回
      */
-    private void asyncWriteOriginReq(EmbyContentCacheReqWrapper request, EmbyCachedResp cached) {
+    private void asyncWriteOriginReq(EmbyContentCacheReqWrapper request,
+                                     EmbyCachedResp cached) {
         if (null == request) {
             return;
         }
@@ -214,7 +214,7 @@ public class OriginReqService {
             return;
         }
         int exTime = 10;
-        if (isCacheStaticReq(request)) {
+        if (isCacheStaticReq(request) || isCacheLongTimeReq(request)) {
             exTime = 2 * 24 * 60 * 60;
         }
         redisClient.setBean(CacheUtil.buildOriginCacheKey(request), cached, exTime);
