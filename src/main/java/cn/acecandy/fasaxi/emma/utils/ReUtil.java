@@ -5,6 +5,7 @@ import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.regex.PatternPool;
+import org.dromara.hutool.core.text.StrUtil;
 
 import java.util.List;
 import java.util.regex.Pattern;
@@ -24,6 +25,18 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
      */
     public static final Pattern REGEX_SPILT_TITLE = PatternPool.get(
             "[,.，。；;'\"“”‘’：:【】]", Pattern.DOTALL);
+
+    /**
+     * 匹配标题中的标点符号进行分割
+     */
+    public static final Pattern REGEX_DOUBAN_HTML_ID = PatternPool.get(
+            "subject_id:\\s*'([0-9]+)'", Pattern.DOTALL);
+
+    /**
+     * 匹配标题中的标点符号进行分割
+     */
+    public static final Pattern REGEX_DOUBAN_JSON_ID = PatternPool.get(
+            "movie\\\\/subject\\\\/(\\d+)", Pattern.DOTALL);
 
     /**
      * 匹配类似 /emby/Users/656fcefa283149708880b416786e5fde/Items/1417552/Delete
@@ -51,6 +64,22 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
 
     private static final Pattern REGEX_AUDIO = PatternPool.get(
             "(/emby)?/audio/(\\d+)/(?:original\\.[^/]+|download|stream|stream.*)$", Pattern.DOTALL);
+
+    public static String findDouBanIdByHtml(String html) {
+        html = StrUtil.trim(html);
+        if (StrUtil.isBlank(html)) {
+            return null;
+        }
+        return ReUtil.getGroup1(REGEX_DOUBAN_HTML_ID, html);
+    }
+
+    public static String findDouBanIdByJson(String json) {
+        json = StrUtil.trim(json);
+        if (StrUtil.isBlank(json)) {
+            return null;
+        }
+        return ReUtil.getGroup1(REGEX_DOUBAN_JSON_ID, json);
+    }
 
     public static String isPlaybackUrl(String url) {
         List<String> groups = getAllGroups(REGEX_PLAYBACK, url.toLowerCase());

@@ -8,7 +8,7 @@ import lombok.Data;
 import java.util.Date;
 
 /**
- * tmdb信息实体
+ * emby项目图片实体类
  *
  * @author AceCandy
  * @since 2025/5/3
