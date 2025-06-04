@@ -102,16 +102,8 @@ public class VideoRedirectService {
         }
         if (StrUtil.containsIgnoreCase(embyItem.getPath(), "micu")) {
             ThreadUtil.execVirtual(() -> {
-                Lock lock = LockUtil.lockVideoCache(embyItem.getItemId());
-                if (LockUtil.isLock(lock)) {
-                    return;
-                }
-                try {
-                    fileCacheUtil.writeCacheAndMoov(embyItem);
-                    fileCacheUtil.cacheNextEpisode(embyItem);
-                } finally {
-                    LockUtil.unlockVideoCache(lock, embyItem.getItemId());
-                }
+                fileCacheUtil.writeCacheAndMoov(embyItem);
+                fileCacheUtil.cacheNextEpisode(embyItem);
             });
         }
 
@@ -253,7 +245,8 @@ public class VideoRedirectService {
                             String mediaPath) {
         response.setStatus(HttpServletResponse.SC_FOUND);
         response.setHeader("Location", realUrl);
-        log.warn("视频重定向({}): [{}] => {}", DateUtil.date(DateUtil.currentSeconds() + exTime), mediaPath, realUrl);
+        log.warn("视频重定向({}): [{}] => {}",
+                DateUtil.date((DateUtil.currentSeconds() + exTime) * 1000), mediaPath, realUrl);
     }
 
     private void originalVideoStream(EmbyContentCacheReqWrapper request,

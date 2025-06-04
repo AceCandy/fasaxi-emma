@@ -35,6 +35,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_206;
@@ -364,8 +365,16 @@ public class FileCacheUtil {
     }
 
     public void writeCacheAndMoov(EmbyItem embyItem) {
-        writeFile(embyItem);
-        writeMoovFile(embyItem);
+        Lock lock = LockUtil.lockVideoCache(embyItem.getItemId());
+        if (LockUtil.isLock(lock)) {
+            return;
+        }
+        try {
+            writeFile(embyItem);
+            writeMoovFile(embyItem);
+        } finally {
+            LockUtil.unlockVideoCache(lock, embyItem.getItemId());
+        }
     }
 
     public static void main(String[] args) {

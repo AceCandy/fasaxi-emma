@@ -18,7 +18,7 @@
         <!-- 请求日志输出到单独文件 -->
         <RollingFile name="AccessFile" fileName="${LOG_DIR}/access.log"
                      filePattern="${LOG_DIR}/$${date:yyyy-MM}/access-%d{yyyy-MM-dd}-%i.log.gz">
-            <PatternLayout pattern="%d{MM-dd mm:ss.SSS} %highlight{%-5level} %msg%n"/>
+            <PatternLayout pattern="%d{MM-dd HH:mm:ss.SSS} %highlight{%-5level} %msg%n"/>
             <Policies>
                 <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
                 <SizeBasedTriggeringPolicy size="${MAX_FILE_SIZE}"/>
