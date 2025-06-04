@@ -169,7 +169,10 @@ public final class EmbyProxyUtil {
      */
     public static boolean isCacheLongTimeReq(EmbyContentCacheReqWrapper req) {
         String uri = req.getRequestURI().toLowerCase();
-        if (StrUtil.containsAll(uri, "/users/", "/items")) {
+        if (StrUtil.containsAll(uri, "/users/")) {
+            if (!StrUtil.endWith(uri, "/items")) {
+                return false;
+            }
             if (null != req.getCachedParam().get("parentid")) {
                 return true;
             }
