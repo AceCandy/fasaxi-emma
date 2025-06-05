@@ -5,7 +5,10 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.json.JSONUtil;
 import org.springframework.stereotype.Component;
+
+import java.util.Map;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_300;
@@ -24,10 +27,13 @@ public class AccessLog {
     @Resource
     private EmbyConfig embyConfig;
 
-    public void log(String method, String uri, String ip, String queryStr, int status, long start) {
+    public void log(String method, String uri, String ip, String queryStr,
+                    Map<String, String> cachedHeader,
+                    String apiKey, int status, long start) {
         ThreadUtil.execVirtual(() -> {
-            String logMessage = StrUtil.format("[{}][{}-{}:{}ms] {}?{}&api_key={}", ip, method, status,
-                    DateUtil.current() - start, uri, queryStr, embyConfig.getApiKey());
+            String logMessage = StrUtil.format("[{}][{}-{}:{}ms] {}?{}&api_key={} [{}]",
+                    ip, method, status, DateUtil.current() - start, uri, queryStr,
+                    StrUtil.isBlank(apiKey) ? embyConfig.getApiKey() : apiKey, JSONUtil.toJsonStr(cachedHeader));
             if (status >= CODE_200 && status < CODE_300) {
                 log.info(logMessage);
             } else if (status >= CODE_300 && status < CODE_400) {

@@ -8,6 +8,8 @@ import cn.acecandy.fasaxi.emma.config.TmdbConfig;
 import cn.acecandy.fasaxi.emma.dao.entity.EmbyItemPic;
 import jakarta.servlet.http.HttpServletRequest;
 import org.dromara.hutool.core.collection.CollUtil;
+import org.dromara.hutool.core.collection.ListUtil;
+import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.math.NumberUtil;
 import org.dromara.hutool.core.net.url.UrlDecoder;
 import org.dromara.hutool.core.net.url.UrlUtil;
@@ -169,13 +171,16 @@ public final class EmbyProxyUtil {
      */
     public static boolean isCacheLongTimeReq(EmbyContentCacheReqWrapper req) {
         String uri = req.getRequestURI().toLowerCase();
-        if (StrUtil.containsAll(uri, "/users/")) {
-            if (!StrUtil.endWith(uri, "/items")) {
-                return false;
-            }
-            if (null != req.getCachedParam().get("parentid")) {
-                return true;
-            }
+        if (!StrUtil.endWith(uri, "/items")) {
+            return false;
+        }
+        if (!StrUtil.containsAll(uri, "/users/")) {
+            return false;
+        }
+        // 2个歌单长缓存
+        if (CollUtil.contains(ListUtil.of("1616570", "1616572"),
+                MapUtil.getStr(req.getCachedParam(), "parentid"))) {
+            return true;
         }
         return false;
     }

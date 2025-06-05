@@ -29,7 +29,7 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     private static final String VIDEO_UA_CACHE_KEY = "cache:video:{}|{}";
     private static final String PIC_CACHE_KEY = "cache:pic:{}|{}";
     private static final String ORIGIN_CACHE_KEY = "cache:req:{}|{}";
-    private static final String ORIGIN_CACHE_REFRESH_KEY1 = "cache:req:/emby/Users/{}/Items/{}";
+    private static final String ORIGIN_CACHE_REFRESH_KEY1 = "cache:req:/emby/Users/{}/Items";
     private static final String ORIGIN_CACHE_REFRESH_KEY2 = "cache:req:/emby/Shows/{}";
     private static final String ORIGIN_CACHE_REFRESH_KEY3 = "cache:req:/Users/{}/Items";
 
@@ -44,13 +44,8 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
 
     public static List<String> buildOriginRefreshCacheKey(EmbyContentCacheReqWrapper req) {
         List<String> cacheKeys = ListUtil.of();
-        if (StrUtil.isNotBlank(req.getUserId()) && StrUtil.isNotBlank(req.getMediaSourceId())) {
-            cacheKeys.add(StrUtil.format(ORIGIN_CACHE_REFRESH_KEY1, req.getUserId(), req.getMediaSourceId()));
-        }
-        if (StrUtil.isNotBlank(req.getMediaSourceId())) {
-            cacheKeys.add(StrUtil.format(ORIGIN_CACHE_REFRESH_KEY2, req.getMediaSourceId()));
-        }
         if (StrUtil.isNotBlank(req.getUserId())) {
+            cacheKeys.add(StrUtil.format(ORIGIN_CACHE_REFRESH_KEY1, req.getUserId()));
             cacheKeys.add(StrUtil.format(ORIGIN_CACHE_REFRESH_KEY3, req.getUserId()));
         }
         return cacheKeys;

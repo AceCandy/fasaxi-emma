@@ -101,7 +101,8 @@ public class OriginReqService {
         }
     }
 
-    private void execOriginReq(EmbyContentCacheReqWrapper request, HttpServletResponse response,
+    private void execOriginReq(EmbyContentCacheReqWrapper request,
+                               HttpServletResponse response,
                                StopWatch stopWatch) throws Throwable {
         String cacheKey = CacheUtil.buildOriginCacheKey(request);
         EmbyCachedResp cached = redisClient.getBean(cacheKey);
@@ -219,9 +220,12 @@ public class OriginReqService {
         if (!cached.getStatusCode().equals(CODE_200)) {
             return;
         }
-        int exTime = 10;
-        if (isCacheStaticReq(request) || isCacheLongTimeReq(request)) {
+        int exTime = 5;
+        if (isCacheStaticReq(request)) {
             exTime = 2 * 24 * 60 * 60;
+        }
+        if (isCacheLongTimeReq(request)) {
+            exTime = 3 * 60 * 60;
         }
         redisClient.setBean(CacheUtil.buildOriginCacheKey(request), cached, exTime);
     }

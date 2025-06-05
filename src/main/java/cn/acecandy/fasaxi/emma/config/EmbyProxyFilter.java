@@ -113,10 +113,13 @@ public class EmbyProxyFilter implements Filter {
                 }
             }
         } catch (Exception e) {
-            log.warn("转发请求失败[{}]: {}?{}", req.getMethod(), reqWrapper.getRequestURI(), reqWrapper.getQueryString(), e);
+            log.warn("转发请求失败[{}]: {}?{}", req.getMethod(),
+                    reqWrapper.getRequestURI(), reqWrapper.getQueryString(), e);
             originReqService.forwardOriReq(reqWrapper, res);
         } finally {
-            accessLog.log(reqWrapper.getMethod(), reqWrapper.getRequestURI(), reqWrapper.getIp(), req.getQueryString(), res.getStatus(), start);
+            accessLog.log(reqWrapper.getMethod(), reqWrapper.getRequestURI(), reqWrapper.getIp(),
+                    req.getQueryString(), reqWrapper.getCachedHeader(), reqWrapper.getApikey(),
+                    res.getStatus(), start);
         }
     }
 

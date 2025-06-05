@@ -36,7 +36,7 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     private final Map<String, String> paramMap;
 
     @Getter
-    private String cachedBody;
+    private final String cachedBody;
     @Getter
     private final Map<String, String> cachedHeader = MapUtil.newHashMap();
     @Getter
@@ -63,13 +63,6 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         super(request);
         this.paramMap = ServletUtil.getParamMap(request);
 
-        /*byte[] requestBody = ServletUtil.getBodyBytes(request);
-        String contentType = request.getContentType();
-        if (ArrayUtil.isNotEmpty(requestBody) && StrUtil.isNotBlank(contentType)
-                && contentType.startsWith(ContentType.FORM_URLENCODED.getValue())) {
-            this.cachedBody = new String(requestBody, request.getCharacterEncoding());
-            parseFormData(this.cachedBody);
-        }*/
         this.cachedBody = ServletUtil.getBody(request);
         parseFormData(this.cachedBody);
         cacheHeader(request);
@@ -101,7 +94,8 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         Map<String, String> headerMap = MapUtil.newHashMap();
         List<String> headerNameList = ListUtil.of(request.getHeaderNames());
         headerNameList.forEach(headerName -> {
-            if (StrUtil.equalsAnyIgnoreCase(headerName, "Host", "Content-Length", "Referer", "Transfer-Encoding", "Content-Type")) {
+            if (StrUtil.equalsAnyIgnoreCase(headerName, "Host", "Content-Length",
+                    "Referer", "Transfer-Encoding", "Content-Type")) {
                 return;
             }
             String headerValue = request.getHeader(headerName);
@@ -122,7 +116,7 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
                         continue;
                     }
                     String key = CollUtil.getFirst(authParts);
-                    String value = CollUtil.getLast(authParts);
+                    String value = StrUtil.strip(CollUtil.getLast(authParts), "\"");
                     if (StrUtil.equalsIgnoreCase(key, "Emby UserId")) {
                         this.userId = value;
                     } else if (StrUtil.equalsIgnoreCase(key, "DeviceId")) {
@@ -187,6 +181,27 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
             }
         }
         paramUri = HttpUtil.urlWithFormUrlEncoded(request.getRequestURI(), cachedParam, Charset.defaultCharset());
+    }
+
+    public static void main(String[] args) {
+        String s = "MediaBrowser Client=\"Stream Music\", Device=\"MacdeMacBook Pro\", DeviceId=\"9B7SlF3MW6yaREEffJThdiZv\", Version=\"1.3.7\", Token=\"c2ba538641744dadb769c20df9a11ed1\"";
+
+        for (String auth : SplitUtil.splitTrim(s, ",")) {
+            List<String> authParts = SplitUtil.splitTrim(auth, "=");
+            if (CollUtil.size(authParts) < 2) {
+                continue;
+            }
+            String key = CollUtil.getFirst(authParts);
+            // String value = StrUtil.strip(CollUtil.getLast(authParts), "\"");
+            String value = CollUtil.getLast(authParts);
+            if (StrUtil.equalsIgnoreCase(key, "Emby UserId")) {
+                Console.log(value);
+            } else if (StrUtil.equalsIgnoreCase(key, "DeviceId")) {
+                Console.log(value);
+            } else if (StrUtil.equalsAnyIgnoreCase(key, "Token")) {
+                Console.log(value);
+            }
+        }
     }
 
 }
