@@ -6,6 +6,8 @@ import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
+import cn.acecandy.fasaxi.emma.dao.entity.TmdbProvider;
+import cn.acecandy.fasaxi.emma.dao.service.TmdbProviderDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItemsInfoOut;
@@ -42,6 +44,10 @@ import java.util.Map;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_302;
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电影;
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧;
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧_季;
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧_集;
 import static org.dromara.hutool.core.text.StrPool.COMMA;
 
 /**
@@ -62,6 +68,15 @@ public class EmbyProxy {
 
     @Resource
     private RedisClient redisClient;
+
+    @Resource
+    private TmdbProviderDao tmdbProviderDao;
+
+    @Resource
+    private DoubanProxy doubanProxy;
+
+    @Resource
+    private TmdbProxy tmdbProxy;
 
     /**
      * 获取媒体信息
@@ -162,7 +177,44 @@ public class EmbyProxy {
             if (!JSONUtil.isTypeJSON(resBody)) {
                 throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
             }
-            return CollUtil.getFirst(JSONUtil.toBean(resBody, EmbyItemsInfoOut.class).getItems());
+            EmbyItem embyItem = CollUtil.getFirst(JSONUtil.toBean(resBody, EmbyItemsInfoOut.class).getItems());
+            ThreadUtil.execVirtual(() -> {
+                Map<String, String> prividerMap = embyItem.getProviderIds();
+                if (MapUtil.isEmpty(prividerMap)) {
+                    return;
+                }
+                String embyType = embyItem.getType();
+                if (!StrUtil.equalsAnyIgnoreCase(embyType, 电影.getEmbyName(), 电视剧.getEmbyName())) {
+                    return;
+                }
+                String tmdbId = MapUtil.getStr(prividerMap, "Tmdb");
+                if (StrUtil.isBlank(tmdbId)) {
+                    return;
+                }
+                String doubanId = MapUtil.getStr(prividerMap, "Douban");
+                String imdbId = MapUtil.getStr(prividerMap, "Imdb");
+                String tvdbId = MapUtil.getStr(prividerMap, "Tvdb");
+                TmdbProvider tmdbProvider = tmdbProviderDao.findByTmdb(tmdbId, embyType);
+                if (null != tmdbProvider) {
+                    return;
+                }
+                tmdbProvider = TmdbProvider.builder().tmdbId(tmdbId).embyType(embyType)
+                        .doubanId(doubanId).imdbId(imdbId).tvdbId(tvdbId)
+                        .build();
+                EmbyMediaType embyMediaType = EmbyMediaType.fromEmby(embyType);
+                String tmdbInfo = tmdbProxy.getInfoById(embyMediaType, tmdbId);
+                if (StrUtil.isNotBlank(tmdbInfo)) {
+                    tmdbProvider.setTmdbInfo(tmdbInfo);
+                }
+                String doubanInfo = doubanProxy.getInfoById(embyMediaType, doubanId);
+                if (StrUtil.isNotBlank(doubanInfo)) {
+                    tmdbProvider.setDoubanInfo(doubanInfo);
+                    tmdbProvider.setDoubanRate(JSONUtil.parseObj(doubanInfo)
+                            .getJSONObject("rating").getBigDecimal("value"));
+                }
+                tmdbProviderDao.insertOrUpdate(tmdbProvider);
+            });
+            return embyItem;
         } catch (Exception e) {
             log.warn("getItemInfo 网络请求异常: ", e);
         }
@@ -356,8 +408,8 @@ public class EmbyProxy {
         }
         ThreadUtil.execVirtual(() -> {
             EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
-            if (item.getIsFolder() || !StrUtil.equalsAnyIgnoreCase(item.getType(), EmbyMediaType.电影.getValue(),
-                    EmbyMediaType.电视剧.getValue())) {
+            if (item.getIsFolder() || !StrUtil.equalsAnyIgnoreCase(item.getType(), 电影.getEmbyName(),
+                    电视剧_集.getEmbyName(), 电视剧_季.getEmbyName(), 电视剧.getEmbyName())) {
                 return;
             }
             if (!StrUtil.containsAny(item.getUniqueKey(), "tmdb", "tt", "zh-CN-cf")
@@ -376,8 +428,8 @@ public class EmbyProxy {
         });
         ThreadUtil.execVirtual(() -> {
             EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
-            if (item.getIsFolder() || !StrUtil.equalsAnyIgnoreCase(item.getType(), EmbyMediaType.电影.getValue(),
-                    EmbyMediaType.电视剧.getValue())) {
+            if (item.getIsFolder() || !StrUtil.equalsAnyIgnoreCase(item.getType(), 电影.getEmbyName(),
+                    电视剧_集.getEmbyName())) {
                 return;
             }
             String lockKey = LockUtil.buildRefreshMediaLock(request.getMediaSourceId());

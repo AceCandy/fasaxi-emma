@@ -3,6 +3,7 @@ package cn.acecandy.fasaxi.emma.common.enums;
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import org.dromara.hutool.core.text.StrUtil;
 
 /**
  * emby 媒体类型
@@ -15,21 +16,31 @@ import lombok.Getter;
 public enum EmbyMediaType {
     // 接口出的类型
     电影(1, "Movie", "movie", "movie"),
-    电视剧(2, "Episode", "tv", "tv"),
+    电视剧(2, "Series", "tv", "tv"),
     电视剧_季(3, "Season", "", ""),
+    电视剧_集(4, "Episode", "", ""),
     音乐(10, "Audio", "", ""),
     // 书籍(11,"Audio", "",""),
     文件夹(20, "Folder", "", ""),
     ;
 
     private final Integer code;
-    private final String value;
+    private final String embyName;
     private final String tmdbName;
     private final String doubanName;
 
     public static EmbyMediaType fromCode(Integer code) {
         for (EmbyMediaType type : values()) {
             if (type.getCode().equals(code)) {
+                return type;
+            }
+        }
+        throw new BaseException("不存在的EmbyMediaType");
+    }
+
+    public static EmbyMediaType fromEmby(String embyName) {
+        for (EmbyMediaType type : values()) {
+            if (StrUtil.equals(type.getEmbyName(), embyName)) {
                 return type;
             }
         }

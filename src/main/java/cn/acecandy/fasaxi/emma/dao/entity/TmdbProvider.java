@@ -22,8 +22,8 @@ public class TmdbProvider {
     @Schema(name = "自增id")
     private Long id;
 
-    @Schema(name = "类型 1-电影 2-电视剧 参考EmbyMediaType")
-    private String type;
+    @Schema(name = "类型 Movie-电影 Series-电视剧 参考EmbyMediaType")
+    private String embyType;
 
     @Schema(name = "tmdbId")
     private String tmdbId;

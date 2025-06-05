@@ -11,6 +11,8 @@ import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.core.text.UnicodeUtil;
+import org.dromara.hutool.core.util.RandomUtil;
 import org.dromara.hutool.http.HttpUtil;
 import org.dromara.hutool.http.client.Request;
 import org.dromara.hutool.http.client.Response;
@@ -38,6 +40,43 @@ public class DoubanProxy {
 
     @Resource
     private DoubanConfig doubanConfig;
+
+    /**
+     * 按id获取豆瓣配置
+     *
+     * @param type     类型
+     * @param doubanId Douban ID
+     * @return {@link String }
+     */
+    public String getInfoById(EmbyMediaType type, String doubanId) {
+        if (null == type || StrUtil.isBlank(doubanId)) {
+            return null;
+        }
+        String url = doubanConfig.getWxmini().getHost() +
+                StrUtil.format(doubanConfig.getWxmini().getDetailInfoUrl(),
+                        type.getDoubanName(), doubanId);
+        List<String> apiKeyList = doubanConfig.getWxmini().getApikey();
+        String apiKey = CollUtil.get(apiKeyList, doubanId.hashCode() % 2);
+        String referer = StrUtil.format("https://servicewechat.com/wx2f9b06c1de1ccfca/{}/page-frame.html",
+                RandomUtil.randomInt(15, 97));
+        try (Response res = httpClient.send(Request.of(url)
+                .form(MapUtil.<String, Object>builder("apikey", apiKey).map())
+                .header("Referer", referer)
+                .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 MicroMessenger/7.0.20.1781(0x6700143B) NetType/WIFI MiniProgramEnv/Mac MacWechat/WMPF MacWechat/3.8.7(0x13080712) UnifiedPCMacWechat(0xf2640509) XWEB/13822")
+                .method(Method.GET))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常: {}", res.getStatus()));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常: {}", resBody));
+            }
+            return UnicodeUtil.toString(resBody);
+        } catch (Exception e) {
+            log.warn("getDoubanConfigById 网络请求异常: ", e);
+        }
+        return null;
+    }
 
 
     /**
@@ -69,6 +108,9 @@ public class DoubanProxy {
      * @return {@link TmdbImageInfoOut }
      */
     public String getInfoByImdbId(Integer type, String imdbId) {
+        if (null == type || StrUtil.isBlank(imdbId)) {
+            return null;
+        }
         String url = StrUtil.format("{}/v2/{}/imdb/{}", doubanConfig.getApp().getHost(),
                 EmbyMediaType.fromCode(type).getDoubanName(), imdbId);
         List<String> apiKeyList = doubanConfig.getApp().getApikey();
@@ -96,6 +138,9 @@ public class DoubanProxy {
      * @return {@link TmdbImageInfoOut }
      */
     public String getHtmlByImdbId(String imdbId) {
+        if (StrUtil.isBlank(imdbId)) {
+            return null;
+        }
         String url = StrUtil.format(
                 "https://movie.douban.com/subject_search?search_text={}&cat=1002", imdbId);
         try (Response res = httpClient.send(Request.of(url).method(Method.GET))) {

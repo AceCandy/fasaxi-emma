@@ -41,7 +41,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_206;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_500;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电影;
-import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧;
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧_集;
 import static java.nio.file.StandardOpenOption.CREATE;
 import static java.nio.file.StandardOpenOption.WRITE;
 
@@ -86,7 +86,7 @@ public class FileCacheUtil {
         String type = embyItem.getType();
         String md5FileName = SecureUtil.md5(PathUtil.getLastPathEle(Paths.get(filePath)).toString());
 
-        if (电视剧.getValue().equals(type)) {
+        if (电视剧_集.getEmbyName().equals(type)) {
             return PathUtil.of(embyConfig.getCachePath(), type,
                     embyItem.getSeriesId(), embyItem.getSeasonId(), itemId, md5FileName);
         }
@@ -345,7 +345,7 @@ public class FileCacheUtil {
      */
     public void cacheNextEpisode(EmbyItem embyItem) {
         // 不是剧集就跳过
-        if (!StrUtil.equals(电视剧.getValue(), embyItem.getType())) {
+        if (!StrUtil.equals(电视剧_集.getEmbyName(), embyItem.getType())) {
             return;
         }
         List<EmbyItem> seasonItem = embyProxy.getEpisodes(embyItem.getItemId(), embyItem.getSeasonId());
@@ -378,6 +378,6 @@ public class FileCacheUtil {
     }
 
     public static void main(String[] args) {
-        Console.log(getCachePath("12345", 电影.getValue(), "/vol2/1000/dockerThirdConf/bili-sync-rs/docker-compose.yml"));
+        Console.log(getCachePath("12345", 电影.getEmbyName(), "/vol2/1000/dockerThirdConf/bili-sync-rs/docker-compose.yml"));
     }
 }

@@ -24,6 +24,11 @@ public class TmdbConfig {
     private String apiKey;
 
     /**
+     * 详情信息url
+     */
+    private String detailInfoUrl;
+
+    /**
      * 图片信息url
      */
     private String imageInfoUrl;

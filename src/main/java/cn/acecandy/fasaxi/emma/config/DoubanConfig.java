@@ -33,6 +33,10 @@ public class DoubanConfig {
          * apikey
          */
         private List<String> apikey;
+        /**
+         * 详情信息url
+         */
+        private String detailInfoUrl;
     }
 
 }
