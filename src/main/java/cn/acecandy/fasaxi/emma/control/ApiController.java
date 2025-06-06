@@ -130,24 +130,26 @@ public class ApiController {
     public Rsres<Object> buildTmdbDouban() {
         String uniqueKey = "unique:tmdb-douban";
         // List<Integer> itemIds = embyItemPicDao.findAllItemId();
-        ThreadUtil.execVirtual(() -> {
+        ThreadUtil.execAsync(() -> {
             AtomicInteger i = new AtomicInteger();
             IntStream.rangeClosed(10_000, 2_000_000).boxed().toList()
-                    .parallelStream().forEach(itemId -> {
+                    .forEach(itemId -> {
                         String value = redisClient.hgetStr(uniqueKey, itemId.toString());
                         if (StrUtil.isNotBlank(value)) {
                             return;
                         }
-                        try {
-                            EmbyItem embyItem = embyProxy.getItemInfoByCache(itemId.toString());
-                            embyProxy.initTmdbProvider(embyItem);
-                            redisClient.hset(uniqueKey, itemId.toString(), "1");
-                            i.getAndIncrement();
-                        } catch (Exception e) {
-                            log.warn("Controller-[itemId:{}]构建tmdb-douban失败: ", itemId, e);
-                        } finally {
-                            ThreadUtil.safeSleep(RandomUtil.randomInt(400, 1400));
-                        }
+                        ThreadUtil.execVirtual(() -> {
+                            try {
+                                EmbyItem embyItem = embyProxy.getItemInfoByCache(itemId.toString());
+                                embyProxy.initTmdbProvider(embyItem);
+                                redisClient.hset(uniqueKey, itemId.toString(), "1");
+                                i.getAndIncrement();
+                            } catch (Exception e) {
+                                log.warn("Controller-[itemId:{}]构建tmdb-douban失败: ", itemId, e);
+                            } finally {
+                                ThreadUtil.safeSleep(RandomUtil.randomInt(400, 1400));
+                            }
+                        });
                     });
             log.warn("构建tmdb&豆瓣本地库==>执行完成, 共处理: {}条", i.get());
         });
@@ -160,7 +162,7 @@ public class ApiController {
         String uniqueKey = "unique:imdbId-doubanId";
         List<TmdbProvider> tmdbProviders = tmdbProviderDao.findAllImdbNoDouBan();
 
-        ThreadUtil.execVirtual(() -> {
+        ThreadUtil.execAsync(() -> {
             AtomicInteger i = new AtomicInteger();
             tmdbProviders.forEach(tmdbProvider -> {
                 String imdbId = tmdbProvider.getImdbId();
@@ -195,7 +197,7 @@ public class ApiController {
         String uniqueKey = "unique:doubanInfo";
         List<TmdbProvider> tmdbProviders = tmdbProviderDao.findAllNoDouBanInfo();
 
-        ThreadUtil.execVirtual(() -> {
+        ThreadUtil.execAsync(() -> {
             AtomicInteger i = new AtomicInteger();
             tmdbProviders.forEach(tmdbProvider -> {
                 String doubanId = tmdbProvider.getDoubanId();
