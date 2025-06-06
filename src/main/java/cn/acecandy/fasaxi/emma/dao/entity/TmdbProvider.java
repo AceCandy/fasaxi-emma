@@ -1,5 +1,6 @@
 package cn.acecandy.fasaxi.emma.dao.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
@@ -18,7 +19,7 @@ import java.util.Date;
 @Data
 public class TmdbProvider {
 
-    @TableId
+    @TableId(value = "id", type = IdType.AUTO)
     @Schema(name = "自增id")
     private Long id;
 

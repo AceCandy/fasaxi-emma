@@ -144,7 +144,7 @@ public class DoubanProxy {
         String url = StrUtil.format(
                 "https://movie.douban.com/subject_search?search_text={}&cat=1002", imdbId);
         try (Response res = httpClient.send(Request.of(url).method(Method.GET))) {
-            if (!res.isOk()) {
+            if (!res.isOk() && res.getStatus() != 302) {
                 throw new BaseException(StrUtil.format("返回码异常: {}", res.getStatus()));
             }
             return res.bodyStr();

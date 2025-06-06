@@ -51,7 +51,25 @@ public class RedisClient {
         }
     }
 
-    public boolean setnx(String key, Object value, Integer time) {
+    public boolean hset(String key, String field, Object value) {
+        try {
+            redisTemplate.opsForHash().put(key, field, value);
+            return true;
+        } catch (Exception e) {
+            log.warn("redis hset方法异常:", e);
+            return false;
+        }
+    }
+
+    public String hgetStr(String key, String field) {
+        Object value = redisTemplate.opsForHash().get(key, field);
+        if (value == null) {
+            return null;
+        }
+        return (String) value;
+    }
+
+    public Boolean setnx(String key, Object value, Integer time) {
         try {
             return redisTemplate.opsForValue().setIfAbsent(key, value, time, TimeUnit.SECONDS);
         } catch (Exception e) {
@@ -146,7 +164,11 @@ public class RedisClient {
     }
 
     public <T> T getBean(String key) {
-        return (T) redisTemplate.opsForValue().get(key);
+        Object result = redisTemplate.opsForValue().get(key);
+        if (null == result) {
+            return null;
+        }
+        return (T) result;
     }
 
     public void del(String... key) {

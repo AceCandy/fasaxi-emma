@@ -15,6 +15,7 @@ import cn.acecandy.fasaxi.emma.sao.out.EmbyMediaSource;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyPlaybackOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
+import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.CompressUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
@@ -165,6 +166,9 @@ public class EmbyProxy {
      * @return {@link TmdbImageInfoOut }
      */
     public EmbyItem getItemInfo(String mediaSourceId) {
+        if (StrUtil.isBlank(mediaSourceId)) {
+            return null;
+        }
         String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
         try (Response res = httpClient.send(Request.of(url).method(Method.GET)
                 .form(MapUtil.<String, Object>builder("Fields", "Path,MediaSources,ProviderIds")
@@ -178,9 +182,6 @@ public class EmbyProxy {
                 throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
             }
             EmbyItem embyItem = CollUtil.getFirst(JSONUtil.toBean(resBody, EmbyItemsInfoOut.class).getItems());
-            ThreadUtil.execVirtual(() -> {
-                expertTmdbProvider(embyItem);
-            });
             return embyItem;
         } catch (Exception e) {
             log.warn("getItemInfo 网络请求异常: ", e);
@@ -188,52 +189,124 @@ public class EmbyProxy {
         return null;
     }
 
-    private void expertTmdbProvider(EmbyItem embyItem) {
-        Map<String, String> prividerMap = embyItem.getProviderIds();
-        String embyType = embyItem.getType();
-        if (MapUtil.isEmpty(prividerMap) ||
-                !StrUtil.equalsAnyIgnoreCase(embyType, 电影.getEmbyName(), 电视剧.getEmbyName())) {
-            return;
+    /**
+     * 获取项目信息
+     *
+     * @param mediaSourceId 媒体源id
+     * @return {@link TmdbImageInfoOut }
+     */
+    public EmbyItem getItemInfoByCache(String mediaSourceId) {
+        if (StrUtil.isBlank(mediaSourceId)) {
+            return null;
         }
+        String cacheKey = CacheUtil.buildThirdCacheKey("getItemInfo", mediaSourceId);
+        EmbyItem result = redisClient.getBean(cacheKey);
+        if (null != result) {
+            return result;
+        }
+        result = getItemInfo(mediaSourceId);
+        if (null != result) {
+            redisClient.setBean(cacheKey, result, 5 * 60);
+        }
+        return result;
+    }
 
-        String tmdbId = MapUtil.getStr(prividerMap, "Tmdb");
-        if (StrUtil.isBlank(tmdbId)) {
-            return;
-        }
-        TmdbProvider tmdbProvider = tmdbProviderDao.findByTmdb(tmdbId, embyType);
-        if (null != tmdbProvider) {
-            return;
-        }
-        String doubanId = MapUtil.getStr(prividerMap, "Douban");
-        String imdbId = MapUtil.getStr(prividerMap, "Imdb");
-        String tvdbId = MapUtil.getStr(prividerMap, "Tvdb");
-        tmdbProvider = TmdbProvider.builder().tmdbId(tmdbId).embyType(embyType)
-                .doubanId(doubanId).imdbId(imdbId).tvdbId(tvdbId)
-                .build();
-        EmbyMediaType embyMediaType = EmbyMediaType.fromEmby(embyType);
 
-        // 获取tmdb信息
-        String tmdbInfo = tmdbProxy.getInfoById(embyMediaType, tmdbId);
-        if (StrUtil.isNotBlank(tmdbInfo)) {
-            tmdbProvider.setTmdbInfo(tmdbInfo);
+    public void initTmdbProvider(EmbyItem embyItem) {
+        try {
+            if (null == embyItem) {
+                return;
+            }
+            Map<String, String> prividerMap = embyItem.getProviderIds();
+            String embyType = embyItem.getType();
+            if (MapUtil.isEmpty(prividerMap) ||
+                    !StrUtil.equalsAnyIgnoreCase(embyType, 电影.getEmbyName(), 电视剧.getEmbyName())) {
+                return;
+            }
+
+            String tmdbId = MapUtil.getStr(prividerMap, "Tmdb");
+            if (StrUtil.isBlank(tmdbId)) {
+                return;
+            }
+            TmdbProvider tmdbProvider = tmdbProviderDao.findByTmdb(tmdbId, embyType);
+            if (null != tmdbProvider) {
+                return;
+            }
+            String doubanId = MapUtil.getStr(prividerMap, "Douban");
+            String imdbId = MapUtil.getStr(prividerMap, "Imdb");
+            String tvdbId = MapUtil.getStr(prividerMap, "Tvdb");
+            tmdbProvider = TmdbProvider.builder().tmdbId(tmdbId).embyType(embyType)
+                    .doubanId(doubanId).imdbId(imdbId).tvdbId(tvdbId)
+                    .build();
+            EmbyMediaType embyMediaType = EmbyMediaType.fromEmby(embyType);
+
+            // 获取tmdb信息
+            String tmdbInfo = tmdbProxy.getInfoById(embyMediaType, tmdbId);
+            if (StrUtil.isNotBlank(tmdbInfo)) {
+                tmdbProvider.setTmdbInfo(tmdbInfo);
+            }
+            tmdbProviderDao.insertOrUpdate(tmdbProvider);
+        } catch (Exception e) {
+            log.warn("[itemId:{}]初始化构建tmdb-douban失败: ", embyItem.getItemId(), e);
         }
-        // 获取豆瓣信息
-        if (StrUtil.isBlank(doubanId) && StrUtil.isNotBlank(imdbId)) {
-            // 如果没有豆瓣id 但是有imdbid 则尝试通过imdbid获取豆瓣id
-            doubanId = doubanProxy.getDoubanIdByImdbId(embyMediaType, imdbId);
+    }
+
+
+    public synchronized void expertTmdbProvider(EmbyItem embyItem) {
+        try {
+            if (null == embyItem) {
+                return;
+            }
+            Map<String, String> prividerMap = embyItem.getProviderIds();
+            String embyType = embyItem.getType();
+            if (MapUtil.isEmpty(prividerMap) ||
+                    !StrUtil.equalsAnyIgnoreCase(embyType, 电影.getEmbyName(), 电视剧.getEmbyName())) {
+                return;
+            }
+
+            String tmdbId = MapUtil.getStr(prividerMap, "Tmdb");
+            if (StrUtil.isBlank(tmdbId)) {
+                return;
+            }
+            TmdbProvider tmdbProvider = tmdbProviderDao.findByTmdb(tmdbId, embyType);
+            if (null != tmdbProvider) {
+                return;
+            }
+            String doubanId = MapUtil.getStr(prividerMap, "Douban");
+            String imdbId = MapUtil.getStr(prividerMap, "Imdb");
+            String tvdbId = MapUtil.getStr(prividerMap, "Tvdb");
+            tmdbProvider = TmdbProvider.builder().tmdbId(tmdbId).embyType(embyType)
+                    .doubanId(doubanId).imdbId(imdbId).tvdbId(tvdbId)
+                    .build();
+            EmbyMediaType embyMediaType = EmbyMediaType.fromEmby(embyType);
+
+            // 获取tmdb信息
+            String tmdbInfo = tmdbProxy.getInfoById(embyMediaType, tmdbId);
+            if (StrUtil.isNotBlank(tmdbInfo)) {
+                tmdbProvider.setTmdbInfo(tmdbInfo);
+            }
+            // 获取豆瓣信息
+            if (StrUtil.isBlank(doubanId) && StrUtil.isNotBlank(imdbId)) {
+                // 如果没有豆瓣id 但是有imdbid 则尝试通过imdbid获取豆瓣id
+                /*doubanId = doubanProxy.getDoubanIdByImdbId(embyMediaType, imdbId);
+                if (StrUtil.isNotBlank(doubanId)) {
+                    tmdbProvider.setDoubanId(doubanId);
+                }*/
+            }
             if (StrUtil.isNotBlank(doubanId)) {
-                tmdbProvider.setDoubanId(doubanId);
+                /*String doubanInfo = doubanProxy.getInfoById(embyMediaType, doubanId);
+                ThreadUtil.safeSleep(5000);
+                if (StrUtil.isNotBlank(doubanInfo)) {
+                    tmdbProvider.setDoubanInfo(doubanInfo);
+                    tmdbProvider.setDoubanRate(JSONUtil.parseObj(doubanInfo)
+                            .getJSONObject("rating").getBigDecimal("value"));
+                    tmdbProvider.setRateUpdateTime(new DateTime());
+                }*/
             }
+            tmdbProviderDao.insertOrUpdate(tmdbProvider);
+        } catch (Exception e) {
+            log.warn("[itemId:{}]构建tmdb-douban失败: ", embyItem.getItemId(), e);
         }
-        if (StrUtil.isNotBlank(doubanId)) {
-            String doubanInfo = doubanProxy.getInfoById(embyMediaType, doubanId);
-            if (StrUtil.isNotBlank(doubanInfo)) {
-                tmdbProvider.setDoubanInfo(doubanInfo);
-                tmdbProvider.setDoubanRate(JSONUtil.parseObj(doubanInfo)
-                        .getJSONObject("rating").getBigDecimal("value"));
-            }
-        }
-        tmdbProviderDao.insertOrUpdate(tmdbProvider);
     }
 
     /**

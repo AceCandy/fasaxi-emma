@@ -29,6 +29,9 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     private static final String VIDEO_UA_CACHE_KEY = "cache:video:{}|{}";
     private static final String PIC_CACHE_KEY = "cache:pic:{}|{}";
     private static final String ORIGIN_CACHE_KEY = "cache:req:{}|{}";
+
+    private static final String THIRD_CACHE_KEY = "cache:third:{}|{}";
+
     private static final String ORIGIN_CACHE_REFRESH_KEY1 = "cache:req:/emby/Users/{}/Items";
     private static final String ORIGIN_CACHE_REFRESH_KEY2 = "cache:req:/emby/Shows/{}";
     private static final String ORIGIN_CACHE_REFRESH_KEY3 = "cache:req:/Users/{}/Items";
@@ -36,6 +39,16 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     private static final String ORIGIN_CACHE_REFRESH_KEY1_ALL = "cache:req:/emby/Users/";
     private static final String ORIGIN_CACHE_REFRESH_KEY2_ALL = "cache:req:/Users/";
 
+
+    /**
+     * 通过上一个方法名+参数构建 请求第三方的缓存key
+     *
+     * @param param 参数字符串
+     * @return {@link String }
+     */
+    public static String buildThirdCacheKey(String methodName, String param) {
+        return StrUtil.format(THIRD_CACHE_KEY, methodName, param);
+    }
 
     public static String buildOriginCacheKey(EmbyContentCacheReqWrapper req) {
         return StrUtil.format(ORIGIN_CACHE_KEY, req.getRequestURI(),

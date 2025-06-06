@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.text.StrUtil;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
  * tmdb外部信息 dao
  *
@@ -47,5 +49,21 @@ public class TmdbProviderDao extends ServiceImpl<TmdbProviderMapper, TmdbProvide
                 .eq(TmdbProvider::getEmbyType, embyType);
         ;
         return baseMapper.selectOne(wrapper);
+    }
+
+    public List<TmdbProvider> findAllImdbNoDouBan() {
+        LambdaQueryWrapper<TmdbProvider> wrapper = new LambdaQueryWrapper<>();
+        wrapper.isNotNull(TmdbProvider::getImdbId)
+                .isNull(TmdbProvider::getDoubanId)
+        ;
+        return baseMapper.selectList(wrapper);
+    }
+
+    public List<TmdbProvider> findAllNoDouBanInfo() {
+        LambdaQueryWrapper<TmdbProvider> wrapper = new LambdaQueryWrapper<>();
+        wrapper.isNotNull(TmdbProvider::getDoubanId)
+                .isNull(TmdbProvider::getDoubanInfo)
+        ;
+        return baseMapper.selectList(wrapper);
     }
 }

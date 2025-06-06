@@ -83,10 +83,10 @@ douban:
   app:
     host: https://api.douban.com
     apikey:
-      - 0ac44ae016490db2204ce0a042db2916
-      - 054022eaeae0b00e0fc068c0c0a2102a
+      - 0ab215a8b1977939201640fa14c66bab
   wxmini:
     host: https://frodo.douban.com
     apikey:
-      - 0ab215a8b1977939201640fa14c66bab
+      - 0ac44ae016490db2204ce0a042db2916
+      - 054022eaeae0b00e0fc068c0c0a2102a
     detail-info-url: /api/v2/{}/{}

@@ -83,7 +83,10 @@ public class VideoRedirectService {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
-        EmbyItem embyItem = embyProxy.getItemInfo(mediaSourceId);
+        EmbyItem embyItem = embyProxy.getItemInfoByCache(mediaSourceId);
+        ThreadUtil.execVirtual(() -> {
+            embyProxy.expertTmdbProvider(embyItem);
+        });
         if (IpUtil.isInnerIp(request.getIp())) {
             if (null == embyItem) {
                 response.setStatus(CODE_404);
@@ -168,7 +171,7 @@ public class VideoRedirectService {
 
     private void exec302(EmbyContentCacheReqWrapper request,
                          HttpServletResponse response, String mediaSourceId) {
-        EmbyItem itemInfo = embyProxy.getItemInfo(mediaSourceId);
+        EmbyItem itemInfo = embyProxy.getItemInfoByCache(mediaSourceId);
         if (null == itemInfo) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return;
@@ -252,7 +255,7 @@ public class VideoRedirectService {
     private void originalVideoStream(EmbyContentCacheReqWrapper request,
                                      HttpServletResponse response) {
         String mediaSourceId = request.getMediaSourceId();
-        EmbyItem embyItem = embyProxy.getItemInfo(mediaSourceId);
+        EmbyItem embyItem = embyProxy.getItemInfoByCache(mediaSourceId);
         if (null == embyItem) {
             response.setStatus(CODE_404);
             return;

@@ -34,6 +34,13 @@ public class EmbyItemPicDao {
         return embyItemPicMapper.insertOrUpdate(dto);
     }
 
+    public List<Integer> findAllItemId() {
+        LambdaQueryWrapper<EmbyItemPic> wrapper = new LambdaQueryWrapper<>();
+        wrapper.select(EmbyItemPic::getItemId).orderByAsc(EmbyItemPic::getItemId)
+        ;
+        return embyItemPicMapper.selectObjs(wrapper);
+    }
+
     public IPage<EmbyItemPic> findAllByPage(Integer pageNum, Integer pageSize) {
         if (pageNum == null || pageSize == null) {
             return null;

@@ -71,10 +71,16 @@ public class EmbyProxyFilter implements Filter {
 
     @Override
     @SneakyThrows
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+            throws IOException, ServletException {
         long start = DateUtil.current();
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse res = (HttpServletResponse) response;
+
+        if (StrUtil.startWith(req.getRequestURI(), "/api/")) {
+            chain.doFilter(request, response);
+            return;
+        }
 
         /*if (isWebSocketHandshake(req)) {
             log.warn("WebSocket请求: {}", req.getRequestURI());
