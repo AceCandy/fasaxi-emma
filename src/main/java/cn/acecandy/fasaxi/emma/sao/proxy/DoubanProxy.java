@@ -56,7 +56,7 @@ public class DoubanProxy {
                 StrUtil.format(doubanConfig.getWxmini().getDetailInfoUrl(),
                         type.getDoubanName(), doubanId);
         List<String> apiKeyList = doubanConfig.getWxmini().getApikey();
-        String apiKey = CollUtil.get(apiKeyList, doubanId.hashCode() % 2);
+        String apiKey = CollUtil.get(apiKeyList, (doubanId.hashCode() & Integer.MAX_VALUE) % 2);
         String referer = StrUtil.format("https://servicewechat.com/wx2f9b06c1de1ccfca/{}/page-frame.html",
                 RandomUtil.randomInt(15, 97));
         try (Response res = httpClient.send(Request.of(url)
@@ -91,7 +91,7 @@ public class DoubanProxy {
             return null;
         }
         String doubanId = null;
-        if (imdbId.hashCode() % 2 == 0) {
+        if ((imdbId.hashCode() & Integer.MAX_VALUE) % 2 == 0) {
             doubanId = ReUtil.findDouBanIdByJson(getInfoByImdbId(type, imdbId));
         } else {
             doubanId = ReUtil.findDouBanIdByHtml(getHtmlByImdbId(imdbId));
@@ -114,7 +114,7 @@ public class DoubanProxy {
         String url = StrUtil.format("{}/v2/{}/imdb/{}", doubanConfig.getApp().getHost(),
                 type.getDoubanName(), imdbId);
         List<String> apiKeyList = doubanConfig.getApp().getApikey();
-        String apiKey = CollUtil.get(apiKeyList, imdbId.hashCode() % 2);
+        String apiKey = CollUtil.get(apiKeyList, (imdbId.hashCode() & Integer.MAX_VALUE) % 2);
         try (Response res = httpClient.send(Request.of(url).form(MapUtil.<String, Object>builder(
                 "apikey", apiKey).map()).method(Method.POST))) {
             if (!res.isOk()) {

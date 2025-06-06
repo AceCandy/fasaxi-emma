@@ -127,19 +127,29 @@ public class ApiController {
 
     @Operation(summary = "构建tmdb&豆瓣本地库")
     @GetMapping("/build/tmdb-douban")
-    public Rsres<Object> buildTmdbDouban() {
+    public Rsres<Object> buildTmdbDouban(Integer min, Integer max) {
         String uniqueKey = "unique:tmdb-douban";
         // List<Integer> itemIds = embyItemPicDao.findAllItemId();
+        if (null == min) {
+            min = 100;
+        }
+        if (null == max) {
+            max = 999;
+        }
+        Integer finalMin = min;
+        Integer finalMax = max;
         ThreadUtil.execAsync(() -> {
             AtomicInteger i = new AtomicInteger();
-            IntStream.rangeClosed(10_000, 2_000_000).boxed().toList()
+            IntStream.rangeClosed(finalMin, finalMax).boxed().toList()
                     .forEach(itemId -> {
                         String value = redisClient.hgetStr(uniqueKey, itemId.toString());
                         if (StrUtil.isNotBlank(value)) {
                             return;
                         }
+                        ThreadUtil.safeSleep(RandomUtil.randomInt(50, 500));
                         ThreadUtil.execVirtual(() -> {
                             try {
+                                ThreadUtil.safeSleep(RandomUtil.randomInt(50, 500));
                                 EmbyItem embyItem = embyProxy.getItemInfoByCache(itemId.toString());
                                 embyProxy.initTmdbProvider(embyItem);
                                 redisClient.hset(uniqueKey, itemId.toString(), "1");

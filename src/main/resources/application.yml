@@ -77,7 +77,7 @@ tmdb:
   image-static-url: https://image.tmdb.org/t/p/original
   image-cdn-url:
     - http://static-mdb.v.geilijiasu.com/t/p/w{}
-#    - http://pic.worldline.space/t/p/w{}
+    - http://pic.worldline.space/t/p/w{}
 
 douban:
   app:
