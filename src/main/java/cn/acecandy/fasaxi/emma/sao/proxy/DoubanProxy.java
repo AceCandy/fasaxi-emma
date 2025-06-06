@@ -86,7 +86,7 @@ public class DoubanProxy {
      * @param imdbId IMDb ID
      * @return {@link String }
      */
-    public String getDoubanIdByImdbId(Integer type, String imdbId) {
+    public String getDoubanIdByImdbId(EmbyMediaType type, String imdbId) {
         if (null == type || StrUtil.isBlank(imdbId)) {
             return null;
         }
@@ -107,12 +107,12 @@ public class DoubanProxy {
      * @param imdbId IMDb ID
      * @return {@link TmdbImageInfoOut }
      */
-    public String getInfoByImdbId(Integer type, String imdbId) {
+    public String getInfoByImdbId(EmbyMediaType type, String imdbId) {
         if (null == type || StrUtil.isBlank(imdbId)) {
             return null;
         }
         String url = StrUtil.format("{}/v2/{}/imdb/{}", doubanConfig.getApp().getHost(),
-                EmbyMediaType.fromCode(type).getDoubanName(), imdbId);
+                type.getDoubanName(), imdbId);
         List<String> apiKeyList = doubanConfig.getApp().getApikey();
         String apiKey = CollUtil.get(apiKeyList, imdbId.hashCode() % 2);
         try (Response res = httpClient.send(Request.of(url).form(MapUtil.<String, Object>builder(

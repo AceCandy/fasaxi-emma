@@ -134,7 +134,7 @@ public class VideoRedirectService {
             cacheUrl = getPtUrl(cacheUrl);
             response.setStatus(HttpServletResponse.SC_FOUND);
             response.setHeader("Location", cacheUrl);
-            log.warn("视频重定向(缓存):[{}|{}] => {}", mediaSourceId, ua, cacheUrl);
+            log.warn("视频重定向(缓存):[{}|{}] => {}", mediaSourceId, ua, UrlDecoder.decode(cacheUrl));
             return true;
         }
         return false;
@@ -246,7 +246,7 @@ public class VideoRedirectService {
         response.setStatus(HttpServletResponse.SC_FOUND);
         response.setHeader("Location", realUrl);
         log.warn("视频重定向({}): [{}] => {}",
-                DateUtil.date((DateUtil.currentSeconds() + exTime) * 1000), mediaPath, realUrl);
+                DateUtil.date((DateUtil.currentSeconds() + exTime) * 1000), mediaPath, UrlDecoder.decode(realUrl));
     }
 
     private void originalVideoStream(EmbyContentCacheReqWrapper request,

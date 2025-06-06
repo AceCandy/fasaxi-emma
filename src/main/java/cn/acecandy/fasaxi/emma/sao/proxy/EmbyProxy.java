@@ -179,46 +179,61 @@ public class EmbyProxy {
             }
             EmbyItem embyItem = CollUtil.getFirst(JSONUtil.toBean(resBody, EmbyItemsInfoOut.class).getItems());
             ThreadUtil.execVirtual(() -> {
-                Map<String, String> prividerMap = embyItem.getProviderIds();
-                if (MapUtil.isEmpty(prividerMap)) {
-                    return;
-                }
-                String embyType = embyItem.getType();
-                if (!StrUtil.equalsAnyIgnoreCase(embyType, 电影.getEmbyName(), 电视剧.getEmbyName())) {
-                    return;
-                }
-                String tmdbId = MapUtil.getStr(prividerMap, "Tmdb");
-                if (StrUtil.isBlank(tmdbId)) {
-                    return;
-                }
-                String doubanId = MapUtil.getStr(prividerMap, "Douban");
-                String imdbId = MapUtil.getStr(prividerMap, "Imdb");
-                String tvdbId = MapUtil.getStr(prividerMap, "Tvdb");
-                TmdbProvider tmdbProvider = tmdbProviderDao.findByTmdb(tmdbId, embyType);
-                if (null != tmdbProvider) {
-                    return;
-                }
-                tmdbProvider = TmdbProvider.builder().tmdbId(tmdbId).embyType(embyType)
-                        .doubanId(doubanId).imdbId(imdbId).tvdbId(tvdbId)
-                        .build();
-                EmbyMediaType embyMediaType = EmbyMediaType.fromEmby(embyType);
-                String tmdbInfo = tmdbProxy.getInfoById(embyMediaType, tmdbId);
-                if (StrUtil.isNotBlank(tmdbInfo)) {
-                    tmdbProvider.setTmdbInfo(tmdbInfo);
-                }
-                String doubanInfo = doubanProxy.getInfoById(embyMediaType, doubanId);
-                if (StrUtil.isNotBlank(doubanInfo)) {
-                    tmdbProvider.setDoubanInfo(doubanInfo);
-                    tmdbProvider.setDoubanRate(JSONUtil.parseObj(doubanInfo)
-                            .getJSONObject("rating").getBigDecimal("value"));
-                }
-                tmdbProviderDao.insertOrUpdate(tmdbProvider);
+                expertTmdbProvider(embyItem);
             });
             return embyItem;
         } catch (Exception e) {
             log.warn("getItemInfo 网络请求异常: ", e);
         }
         return null;
+    }
+
+    private void expertTmdbProvider(EmbyItem embyItem) {
+        Map<String, String> prividerMap = embyItem.getProviderIds();
+        String embyType = embyItem.getType();
+        if (MapUtil.isEmpty(prividerMap) ||
+                !StrUtil.equalsAnyIgnoreCase(embyType, 电影.getEmbyName(), 电视剧.getEmbyName())) {
+            return;
+        }
+
+        String tmdbId = MapUtil.getStr(prividerMap, "Tmdb");
+        if (StrUtil.isBlank(tmdbId)) {
+            return;
+        }
+        TmdbProvider tmdbProvider = tmdbProviderDao.findByTmdb(tmdbId, embyType);
+        if (null != tmdbProvider) {
+            return;
+        }
+        String doubanId = MapUtil.getStr(prividerMap, "Douban");
+        String imdbId = MapUtil.getStr(prividerMap, "Imdb");
+        String tvdbId = MapUtil.getStr(prividerMap, "Tvdb");
+        tmdbProvider = TmdbProvider.builder().tmdbId(tmdbId).embyType(embyType)
+                .doubanId(doubanId).imdbId(imdbId).tvdbId(tvdbId)
+                .build();
+        EmbyMediaType embyMediaType = EmbyMediaType.fromEmby(embyType);
+
+        // 获取tmdb信息
+        String tmdbInfo = tmdbProxy.getInfoById(embyMediaType, tmdbId);
+        if (StrUtil.isNotBlank(tmdbInfo)) {
+            tmdbProvider.setTmdbInfo(tmdbInfo);
+        }
+        // 获取豆瓣信息
+        if (StrUtil.isBlank(doubanId) && StrUtil.isNotBlank(imdbId)) {
+            // 如果没有豆瓣id 但是有imdbid 则尝试通过imdbid获取豆瓣id
+            doubanId = doubanProxy.getDoubanIdByImdbId(embyMediaType, imdbId);
+            if (StrUtil.isNotBlank(doubanId)) {
+                tmdbProvider.setDoubanId(doubanId);
+            }
+        }
+        if (StrUtil.isNotBlank(doubanId)) {
+            String doubanInfo = doubanProxy.getInfoById(embyMediaType, doubanId);
+            if (StrUtil.isNotBlank(doubanInfo)) {
+                tmdbProvider.setDoubanInfo(doubanInfo);
+                tmdbProvider.setDoubanRate(JSONUtil.parseObj(doubanInfo)
+                        .getJSONObject("rating").getBigDecimal("value"));
+            }
+        }
+        tmdbProviderDao.insertOrUpdate(tmdbProvider);
     }
 
     /**
