@@ -12,6 +12,7 @@ import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
 import org.dromara.hutool.http.HttpUtil;
+import org.dromara.hutool.http.meta.HeaderName;
 import org.dromara.hutool.http.server.servlet.ServletUtil;
 import org.dromara.hutool.json.JSONObject;
 import org.dromara.hutool.json.JSONUtil;
@@ -75,7 +76,7 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         }
         if (JSONUtil.isTypeJSON(formData)) {
             JSONObject jsonData = JSONUtil.parseObj(formData);
-            Console.log(jsonData);
+            // Console.log(jsonData);
             if (jsonData.containsKey("ItemId")) {
                 mediaSourceId = jsonData.getStr("ItemId");
             }
@@ -99,17 +100,19 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
                 return;
             }
             String headerValue = request.getHeader(headerName);
-            headerMap.put(headerName, headerValue);
             if (StrUtil.equalsIgnoreCase(headerName, "User-Agent")) {
                 this.ua = headerValue;
             }
+            /*if (StrUtil.equalsIgnoreCase(headerName, "Accept-Encoding")) {
+                headerValue = "gzip";
+            }*/
             if (StrUtil.equalsIgnoreCase(headerName, "Range")) {
                 this.range = headerValue;
             }
-            if (StrUtil.equalsIgnoreCase(headerName, "x-emby-token")) {
+            if (StrUtil.equalsIgnoreCase(headerName, "X-Emby-Token")) {
                 this.apikey = headerValue;
             }
-            if (StrUtil.equalsAnyIgnoreCase(headerName, "x-emby-authorization", "authorization")) {
+            if (StrUtil.equalsAnyIgnoreCase(headerName, "X-Emby-Authorization", "Authorization")) {
                 for (String auth : SplitUtil.splitTrim(headerValue, ",")) {
                     List<String> authParts = SplitUtil.splitTrim(auth, "=");
                     if (CollUtil.size(authParts) < 2) {
@@ -126,6 +129,7 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
                     }
                 }
             }
+            headerMap.put(ReUtil.capitalizeWords(headerName), headerValue);
         });
         String xffHeader = request.getHeader("X-Forwarded-For");
         if (StrUtil.isNotBlank(xffHeader)) {
@@ -184,24 +188,9 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     }
 
     public static void main(String[] args) {
-        String s = "MediaBrowser Client=\"Stream Music\", Device=\"MacdeMacBook Pro\", DeviceId=\"9B7SlF3MW6yaREEffJThdiZv\", Version=\"1.3.7\", Token=\"c2ba538641744dadb769c20df9a11ed1\"";
-
-        for (String auth : SplitUtil.splitTrim(s, ",")) {
-            List<String> authParts = SplitUtil.splitTrim(auth, "=");
-            if (CollUtil.size(authParts) < 2) {
-                continue;
-            }
-            String key = CollUtil.getFirst(authParts);
-            // String value = StrUtil.strip(CollUtil.getLast(authParts), "\"");
-            String value = CollUtil.getLast(authParts);
-            if (StrUtil.equalsIgnoreCase(key, "Emby UserId")) {
-                Console.log(value);
-            } else if (StrUtil.equalsIgnoreCase(key, "DeviceId")) {
-                Console.log(value);
-            } else if (StrUtil.equalsAnyIgnoreCase(key, "Token")) {
-                Console.log(value);
-            }
-        }
+        Console.log(ReUtil.capitalizeWords(HeaderName.ACCEPT_ENCODING.getValue()));
+        Console.log(ReUtil.capitalizeWords("ua"));
+        Console.log(ReUtil.capitalizeWords("account-id"));
     }
 
 }

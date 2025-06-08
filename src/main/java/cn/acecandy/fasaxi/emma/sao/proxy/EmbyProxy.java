@@ -26,6 +26,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.compress.ZipUtil;
+import org.dromara.hutool.core.date.DateTime;
 import org.dromara.hutool.core.exception.ExceptionUtil;
 import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.map.MapUtil;
@@ -272,6 +273,7 @@ public class EmbyProxy {
             if (null != tmdbProvider) {
                 return;
             }
+            log.info("hook构建tmdb-douban: itemId: {},tmdbId: {}", embyItem.getItemId(), tmdbId);
             String doubanId = MapUtil.getStr(prividerMap, "Douban");
             String imdbId = MapUtil.getStr(prividerMap, "Imdb");
             String tvdbId = MapUtil.getStr(prividerMap, "Tvdb");
@@ -288,20 +290,20 @@ public class EmbyProxy {
             // 获取豆瓣信息
             if (StrUtil.isBlank(doubanId) && StrUtil.isNotBlank(imdbId)) {
                 // 如果没有豆瓣id 但是有imdbid 则尝试通过imdbid获取豆瓣id
-                /*doubanId = doubanProxy.getDoubanIdByImdbId(embyMediaType, imdbId);
+                doubanId = doubanProxy.getDoubanIdByImdbId(embyMediaType, imdbId);
                 if (StrUtil.isNotBlank(doubanId)) {
                     tmdbProvider.setDoubanId(doubanId);
-                }*/
+                }
             }
             if (StrUtil.isNotBlank(doubanId)) {
-                /*String doubanInfo = doubanProxy.getInfoById(embyMediaType, doubanId);
+                String doubanInfo = doubanProxy.getInfoById(embyMediaType, doubanId);
                 ThreadUtil.safeSleep(5000);
                 if (StrUtil.isNotBlank(doubanInfo)) {
                     tmdbProvider.setDoubanInfo(doubanInfo);
                     tmdbProvider.setDoubanRate(JSONUtil.parseObj(doubanInfo)
                             .getJSONObject("rating").getBigDecimal("value"));
                     tmdbProvider.setRateUpdateTime(new DateTime());
-                }*/
+                }
             }
             tmdbProviderDao.insertOrUpdate(tmdbProvider);
         } catch (Exception e) {
@@ -422,7 +424,7 @@ public class EmbyProxy {
             return embyCachedResp;
         }
         res.headers().forEach((k, v) -> {
-            if (k == null || StrUtil.equalsIgnoreCase(k, "content-length")) {
+            if (k == null || StrUtil.equalsAnyIgnoreCase(k, "content-length")) {
                 return;
             }
             embyCachedResp.getHeaders().put(k, StrUtil.join(COMMA, v));
@@ -442,6 +444,9 @@ public class EmbyProxy {
             if (StrUtil.equalsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "br")) {
                 String bodyStr = new String(CompressUtil.decode(body.getBytes()));
                 content = changeRespBody(request, bodyStr);
+            } else if (StrUtil.containsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "deflate")) {
+                String bodyStr = new String(ZipUtil.unZlib(body.getBytes()));
+                content = changeRespBody(request, bodyStr);
             } else if (StrUtil.containsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "gzip")) {
                 String bodyStr = new String(ZipUtil.unGzip(body.getBytes()));
                 content = changeRespBody(request, bodyStr);
@@ -450,9 +455,11 @@ public class EmbyProxy {
                 content = changeRespBody(request, bodyStr);
             }
             embyCachedResp.setContent(content.getBytes());
+            embyCachedResp.getHeaders().remove("Content-Encoding");
         } else {
             embyCachedResp.setContent(body.getBytes());
         }
+
         return embyCachedResp;
     }
 

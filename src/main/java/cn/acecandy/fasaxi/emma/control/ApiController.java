@@ -228,10 +228,10 @@ public class ApiController {
                     }
                     redisClient.hset(uniqueKey, doubanId, "1");
                     i.getAndIncrement();
+                    ThreadUtil.safeSleep(RandomUtil.randomInt(8_000, 24_000));
                 } catch (Exception e) {
                     log.warn("Controller-[itemId:{}]构建tmdb-douban-补全豆瓣Info失败: ", doubanId, e);
-                } finally {
-                    ThreadUtil.safeSleep(RandomUtil.randomInt(30_000, 6_000));
+                    ThreadUtil.safeSleep(120_000);
                 }
             });
             log.warn("构建tmdb&豆瓣本地库(补全豆瓣json)==>执行完成, 共处理: {}条", i.get());

@@ -222,10 +222,10 @@ public final class EmbyProxyUtil {
             return "";
         }
         mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath, Charset.defaultCharset()));
-        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/emby",
-                "http://alist.rn238.worldline.space/p/pt/emby");
-        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/emby1",
-                "http://alist.rn238.worldline.space/p/bt/emby1");
+        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby",
+                "http://alist.rn238.worldline.space/p/pt/Emby");
+        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby1",
+                "http://alist.rn238.worldline.space/p/bt/Emby1");
 
         // mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt",
         // "http://8.210.221.216:5244/p/bt/Emby1/");

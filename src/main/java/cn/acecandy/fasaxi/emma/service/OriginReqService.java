@@ -10,6 +10,7 @@ import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import jakarta.annotation.Resource;
+import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -146,6 +147,7 @@ public class OriginReqService {
                                          Throwable e, EmbyCachedResp cached) throws Throwable {
         if (StrUtil.contains(ExceptionUtil.getSimpleMessage(e), "Cannot invoke " +
                 "\"org.apache.hc.core5.http.HttpEntity.getContent()\" because \"this.entity\" is null")) {
+            // log.error("204还是有报错:{}", ExceptionUtil.getSimpleMessage(e));
             cached.setStatusCode(CODE_204);
             writeCacheResponse(response, cached);
         } else {
@@ -165,8 +167,6 @@ public class OriginReqService {
         Request originalRequest = Request.of(embyConfig.getHost() + request.getParamUri())
                 .method(Method.valueOf(request.getMethod()))
                 .body(request.getCachedBody()).header(request.getCachedHeader());
-        // Console.log(originalRequest);
-        // 非get请求不等待返回
         return httpClient.send(originalRequest);
     }
 
@@ -195,8 +195,8 @@ public class OriginReqService {
         res.setStatus(cached.getStatusCode());
         cached.getHeaders().forEach(res::setHeader);
         if (ArrayUtil.isNotEmpty(cached.getContent())) {
-            try {
-                res.getOutputStream().write(cached.getContent());
+            try (ServletOutputStream outputStream = res.getOutputStream()) {
+                outputStream.write(cached.getContent());
             } catch (ClientAbortException e) {
                 // 客户端中止连接 不做处理
             }

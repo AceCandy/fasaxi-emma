@@ -146,9 +146,14 @@ public class FileCacheUtil {
         File tmpTag = FileUtil.touch(cacheFilePair.getRight().toString() + ".tag");
         String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();
         mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
-        Request originalRequest = Request.of(mediaPath).method(Method.GET).header("range", range.toHeader()).setMaxRedirects(1);
+        Request originalRequest = Request.of(mediaPath).method(Method.GET).header("Range", range.toHeader()).setMaxRedirects(1);
         try (Response res = httpClient.send(originalRequest);
              FileChannel fileChannel = FileChannel.open(tmpTag.toPath(), CREATE, WRITE)) {
+            if (!res.isOk()) {
+                throw new RuntimeException(StrUtil.format("下载视频失败: [{}]{}",
+                        range.toHeader(), mediaPath));
+            }
+            Console.log(res.getStatus());
             fileChannel.position(range.start());
             ReadableByteChannel remoteChannel = Channels.newChannel(res.body().getStream());
             fileChannel.transferFrom(remoteChannel, 0, range.len());
@@ -203,9 +208,13 @@ public class FileCacheUtil {
         File tmpTag = FileUtil.touch(writePath.toFile(), "moov.tag");
 
         Request originalRequest = Request.of(mediaPath).method(Method.GET)
-                .header("range", moovPos.toHead()).setMaxRedirects(1);
+                .header("Range", moovPos.toHead()).setMaxRedirects(1);
         try (Response res = httpClient.send(originalRequest);
              FileChannel fileChannel = FileChannel.open(tmpTag.toPath(), CREATE, WRITE)) {
+            if (!res.isOk()) {
+                throw new RuntimeException(StrUtil.format("下载视频失败: [{}]{}",
+                        moovPos.toHead(), mediaPath));
+            }
             fileChannel.position(moovPos.getStart());
             ReadableByteChannel remoteChannel = Channels.newChannel(res.body().getStream());
             fileChannel.transferFrom(remoteChannel, 0, moovPos.getSize());
@@ -287,44 +296,6 @@ public class FileCacheUtil {
                 log.warn("传输不完整，offset:{}, 预期:{}, 实际:{}", offset, actualLen, transferred);
                 return false;
             }
-
-
-            /*AsyncContext asyncContext = request.startAsync();
-            asyncContext.setTimeout(30000);
-
-            ServletOutputStream out = response.getOutputStream();
-            WritableByteChannel outChannel = Channels.newChannel(out);
-
-            long chunkSize = 8 * 1024 * 1024;
-            AtomicLong remaining = new AtomicLong(actualLen);
-            AtomicLong offset = new AtomicLong(actualStart - cacheFile.start());
-            AtomicLong totalTransferred = new AtomicLong();
-
-            Thread.startVirtualThread(() -> {
-                try {
-                    while (remaining.get() > 0) {
-                        long currentChunk = Math.min(chunkSize, remaining.get());
-                        long transferred = inChannel.transferTo(offset.get(), currentChunk, outChannel);
-                        if (transferred <= 0) {
-                            throw new IOException("传输中断，剩余字节: " + remaining.get());
-                        }
-                        offset.addAndGet(transferred);
-                        remaining.addAndGet(-transferred);
-                        totalTransferred.addAndGet(transferred);
-
-                        if (out.isReady()) {
-                            Thread.onSpinWait();
-                        }
-                    }
-
-                    log.info("缓存文件传输完成: {} ({} bytes)", fileName, totalTransferred.get());
-                    asyncContext.complete();
-                } catch (IOException e) {
-                    log.error("传输过程中发生错误", e);
-                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                    asyncContext.complete();
-                }
-            });*/
             return true;
         } catch (ClientAbortException e) {
             log.info("客户端主动中断下载: {}", cacheFile.file().getName());
@@ -351,7 +322,7 @@ public class FileCacheUtil {
         List<EmbyItem> seasonItem = embyProxy.getEpisodes(embyItem.getItemId(), embyItem.getSeasonId());
         int index = -1;
         for (int i = 0; i < seasonItem.size(); i++) {
-            if (seasonItem.get(i).getSeasonId().equals(embyItem.getSeasonId())) {
+            if (seasonItem.get(i).getItemId().equals(embyItem.getItemId())) {
                 index = i;
                 break;
             }

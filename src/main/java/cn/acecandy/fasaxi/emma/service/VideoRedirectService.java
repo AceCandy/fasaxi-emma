@@ -103,7 +103,7 @@ public class VideoRedirectService {
                 return;
             }
         }
-        if (StrUtil.containsIgnoreCase(embyItem.getPath(), "micu")) {
+        if (StrUtil.containsIgnoreCase(embyItem.getPath(), "strm-micu")) {
             ThreadUtil.execVirtual(() -> {
                 fileCacheUtil.writeCacheAndMoov(embyItem);
                 fileCacheUtil.cacheNextEpisode(embyItem);

@@ -86,16 +86,16 @@
         </dependency>
 
         <!-- http -->
-        <!--<dependency>
+        <dependency>
             <groupId>org.apache.httpcomponents.client5</groupId>
             <artifactId>httpclient5</artifactId>
             <version>5.5</version>
-        </dependency>-->
-        <dependency>
+        </dependency>
+        <!--<dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp</artifactId>
             <version>4.12.0</version>
-        </dependency>
+        </dependency>-->
         <!-- https://mvnrepository.com/artifact/media.emby/embyclient -->
 
         <!-- 缓存 -->
@@ -108,6 +108,11 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-pool2</artifactId>
             <version>2.12.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>1.27.1</version>
         </dependency>
 
         <!-- 压缩 -->

@@ -6,6 +6,7 @@ import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.regex.PatternPool;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.core.text.split.SplitUtil;
 
 import java.util.List;
 import java.util.regex.Pattern;
@@ -131,6 +132,24 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
 
     public static boolean isItemsUrl(String url) {
         return isMatch(REGEX_ITEMS, url.toLowerCase());
+    }
+
+
+    /**
+     * 将连接符号两边的单词首字母转为大写
+     *
+     * @param input 输入字符串
+     * @return 转换后的字符串
+     */
+    public static String capitalizeWords(String input) {
+        if (StrUtil.isBlank(input)) {
+            return input;
+        }
+        // 使用第一个分隔符分割字符串
+        List<String> parts = SplitUtil.split(input, "-");
+
+        // 首字母大写后重新拼接
+        return StrUtil.join("-", parts.stream().map(StrUtil::upperFirst).toList());
     }
 
     public static void main(String[] args) {
