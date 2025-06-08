@@ -68,20 +68,6 @@ public class OriginReqService {
      */
     @SneakyThrows
     public void forwardOriReq(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
-        StopWatch stopWatch = StopWatch.of("原始请求");
-        if (!StrUtil.equalsIgnoreCase(request.getMethod(), HTTP_GET)) {
-            try {
-                execOriginReq(request, response, stopWatch);
-            } finally {
-                if (StrUtil.equalsIgnoreCase(request.getMethod(), HTTP_DELETE)) {
-                    redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheAllKey(request));
-                } else {
-                    redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheKey(request));
-                }
-            }
-            return;
-        }
-
         String cacheKey = CacheUtil.buildOriginCacheKey(request);
         EmbyCachedResp cached = redisClient.getBean(cacheKey);
         if (cached != null) {
@@ -96,15 +82,31 @@ public class OriginReqService {
             return;
         }
         try {
-            execOriginReq(request, response, stopWatch);
+            execOriginReq(request, response);
         } finally {
             LockUtil.unlockOrigin(lock, request);
         }
     }
 
+    @SneakyThrows
+    public boolean notGetReq(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
+        if (StrUtil.equalsIgnoreCase(request.getMethod(), HTTP_GET)) {
+            return false;
+        }
+        try {
+            execOriginReq(request, response);
+        } finally {
+            if (StrUtil.equalsIgnoreCase(request.getMethod(), HTTP_DELETE)) {
+                redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheAllKey(request));
+            } else {
+                redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheKey(request));
+            }
+        }
+        return true;
+    }
+
     private void execOriginReq(EmbyContentCacheReqWrapper request,
-                               HttpServletResponse response,
-                               StopWatch stopWatch) throws Throwable {
+                               HttpServletResponse response) throws Throwable {
         String cacheKey = CacheUtil.buildOriginCacheKey(request);
         EmbyCachedResp cached = redisClient.getBean(cacheKey);
         if (cached != null) {
@@ -112,6 +114,7 @@ public class OriginReqService {
             return;
         }
 
+        StopWatch stopWatch = StopWatch.of("原始请求");
         stopWatch.start("转发");
         cached = new EmbyCachedResp();
         try (Response res = sendOriginReq(request)) {
