@@ -109,8 +109,8 @@ public final class EmbyProxyUtil {
         }
         // int index = 0;
         int index = (path.hashCode() & Integer.MAX_VALUE) % 10;
-        if (index != 1) {
-            index = 0;
+        if (index != 0) {
+            index = 1;
         }
         return StrUtil.format(CollUtil.get(tmdbConfig.getImageCdnUrl(), index), maxWidth) + path;
     }
