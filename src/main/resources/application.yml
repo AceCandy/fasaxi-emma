@@ -76,8 +76,8 @@ tmdb:
   image-info-url: /3/tv/1399/images
   image-static-url: https://image.tmdb.org/t/p/original
   image-cdn-url:
-    - http://static-mdb.v.geilijiasu.com/t/p/w{}
     - http://pic.acecandy.cn/t/p/w{}
+    - http://static-mdb.v.geilijiasu.com/t/p/w{}
 
 douban:
   app:
