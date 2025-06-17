@@ -221,8 +221,9 @@ public class VideoRedirectService {
         String[] localPaths = pathMap.keySet().toArray(new String[0]);
         if (StrUtil.startWithAnyIgnoreCase(mediaPath, localPaths)) {
             // 6. 找到最长匹配前缀的路径映射，避免部分匹配导致的错误替换
+            String localMediaPath = mediaPath;
             String bestMatchKey = pathMap.keySet().stream()
-                    .filter(prefix -> StrUtil.startWithIgnoreCase(mediaPath, prefix))
+                    .filter(prefix -> StrUtil.startWithIgnoreCase(localMediaPath, prefix))
                     .max(Comparator.comparingInt(String::length))
                     .orElse(null);
 
