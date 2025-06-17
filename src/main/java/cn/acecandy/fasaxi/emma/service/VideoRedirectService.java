@@ -190,6 +190,9 @@ public class VideoRedirectService {
                 // realut
             } else {
                 // 2. head获取处理其他网盘直链远程路径
+                if (StrUtil.containsAny(mediaPath, "/d/123", "/d/zong123")) {
+                    mediaPath = StrUtil.replace(mediaPath, "192.168.1.205", "192.168.1.249");
+                }
                 Map<String, String> header302 = MapUtil.<String, String>builder()
                         .put("User-Agent", request.getUa()).put("Range", request.getRange()).build();
                 realUrl = embyProxy.fetch302Path(mediaPath, header302);
