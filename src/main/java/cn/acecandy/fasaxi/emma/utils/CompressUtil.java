@@ -27,15 +27,19 @@ public final class CompressUtil extends org.dromara.hutool.extra.compress.Compre
      */
     @SneakyThrows
     public static byte[] decode(byte[] input) {
-        ByteArrayInputStream bis = new ByteArrayInputStream(input);
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        try (BrotliInputStream brotliInputStream = new BrotliInputStream(bis)) {
+        if (input == null || input.length == 0) {
+            return new byte[0]; // 处理空输入
+        }
+        try (ByteArrayInputStream bis = new ByteArrayInputStream(input);
+             BrotliInputStream brotliInputStream = new BrotliInputStream(bis);
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+
             byte[] buffer = new byte[4096];
             int bytesRead;
             while ((bytesRead = brotliInputStream.read(buffer)) != -1) {
                 bos.write(buffer, 0, bytesRead);
             }
+            return bos.toByteArray();
         }
-        return bos.toByteArray();
     }
 }

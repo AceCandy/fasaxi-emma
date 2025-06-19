@@ -87,16 +87,16 @@ public class EmbyProxyFilter implements Filter {
             handleWebSocket(req, res);
             return;
         }*/
-
+        if (needClose(req)) {
+            res.setStatus(CODE_416);
+            return;
+        }
+        if (originReqService.notGetReq(res, req)) {
+            return;
+        }
         EmbyContentCacheReqWrapper reqWrapper = new EmbyContentCacheReqWrapper(req);
         try {
-            if (needClose(req)) {
-                res.setStatus(CODE_416);
-                return;
-            }
-            if (originReqService.notGetReq(reqWrapper, res)) {
-                return;
-            }
+
             /*if (!StrUtil.containsAny(reqWrapper.getUa(), "okhttp", "EmbyTheater", "libmpv",
                     "Yamby", "Hills", "AfuseKt",
                     "SenPlayer", "VidHub", "Forward")) {

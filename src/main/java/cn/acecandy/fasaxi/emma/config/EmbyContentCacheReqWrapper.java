@@ -95,10 +95,13 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         Map<String, String> headerMap = MapUtil.newHashMap();
         List<String> headerNameList = ListUtil.of(request.getHeaderNames());
         headerNameList.forEach(headerName -> {
-            if (StrUtil.equalsAnyIgnoreCase(headerName, "Host", "Content-Length",
-                    "Referer", "Content-Type")) {
+            if (StrUtil.equalsAnyIgnoreCase(headerName, "Connection", "Keep-Alive", "Proxy-Connection",
+                            "Transfer-Encoding", "Host", "Upgrade", "TE", "Trailer")) {
                 return;
             }
+            // if (StrUtil.equalsAnyIgnoreCase(headerName, "Host", "Referer")) {
+            //     return;
+            // }
             String headerValue = request.getHeader(headerName);
             if (StrUtil.equalsIgnoreCase(headerName, "User-Agent")) {
                 this.ua = headerValue;

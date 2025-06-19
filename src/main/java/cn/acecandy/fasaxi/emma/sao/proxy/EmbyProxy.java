@@ -424,7 +424,8 @@ public class EmbyProxy {
             return embyCachedResp;
         }
         res.headers().forEach((k, v) -> {
-            if (k == null || StrUtil.equalsAnyIgnoreCase(k, "content-length")) {
+            if (k == null || StrUtil.equalsAnyIgnoreCase(k, "Connection", "Keep-Alive", "Proxy-Connection",
+                    "Transfer-Encoding", "Content-Encoding", "Content-MD5", "ETag")) {
                 return;
             }
             embyCachedResp.getHeaders().put(k, StrUtil.join(COMMA, v));
@@ -440,24 +441,39 @@ public class EmbyProxy {
 
         if (StrUtil.equalsAnyIgnoreCase(request.getMethod(), "get") && StrUtil.containsIgnoreCase(
                 embyCachedResp.getHeaders().get("Content-Type"), "application/json")) {
+            embyCachedResp.getHeaders().remove("Content-Length");
             String content = "";
+            byte[] bodyBytes = body.getBytes();
             if (StrUtil.equalsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "br")) {
-                String bodyStr = new String(CompressUtil.decode(body.getBytes()));
+                String bodyStr = new String(CompressUtil.decode(bodyBytes));
                 content = changeRespBody(request, bodyStr);
+                embyCachedResp.setContent(content.getBytes());
+                embyCachedResp.getHeaders().remove("Content-Encoding");
+                log.info("br解码: {}", bodyStr);
             } else if (StrUtil.containsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "deflate")) {
-                String bodyStr = new String(ZipUtil.unZlib(body.getBytes()));
+                String bodyStr = new String(ZipUtil.unZlib(bodyBytes));
                 content = changeRespBody(request, bodyStr);
+                embyCachedResp.setContent(ZipUtil.zlib(content.getBytes(), 5));
+                log.info("deflate解码: {}", bodyStr);
             } else if (StrUtil.containsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "gzip")) {
-                String bodyStr = new String(ZipUtil.unGzip(body.getBytes()));
+                String bodyStr = new String(ZipUtil.unGzip(bodyBytes));
                 content = changeRespBody(request, bodyStr);
+                embyCachedResp.setContent(ZipUtil.gzip(content.getBytes()));
+                log.info("gzip解码: {}", bodyStr);
             } else {
-                String bodyStr = body.getString();
+                String bodyStr = new String(bodyBytes);
+                if (!JSONUtil.isTypeJSON(bodyStr)) {
+                    log.warn("非json: {}", bodyStr);
+                }
                 content = changeRespBody(request, bodyStr);
+                embyCachedResp.setContent(content.getBytes());
             }
-            embyCachedResp.setContent(content.getBytes());
-            embyCachedResp.getHeaders().remove("Content-Encoding");
-            // embyCachedResp.getHeaders().put("Content-Length",);
-            embyCachedResp.getHeaders().put("Transfer-Encoding", "chunked");
+
+            // 禁用缓存（防止客户端缓存未替换的内容）
+            embyCachedResp.getHeaders().put("Cache-Control", "no-cache, no-store, must-revalidate");
+            embyCachedResp.getHeaders().put("Pragma", "no-cache");
+            embyCachedResp.getHeaders().put("Expires", "0");
+            // embyCachedResp.getHeaders().put("Content-Length", content.getBytes().length + "");
         } else {
             embyCachedResp.setContent(body.getBytes());
         }

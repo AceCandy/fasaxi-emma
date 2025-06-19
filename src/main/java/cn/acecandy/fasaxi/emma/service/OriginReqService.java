@@ -11,18 +11,23 @@ import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.connector.ClientAbortException;
 import org.dromara.hutool.core.array.ArrayUtil;
+import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.date.StopWatch;
 import org.dromara.hutool.core.exception.ExceptionUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.http.client.Request;
 import org.dromara.hutool.http.client.Response;
+import org.dromara.hutool.http.client.body.BytesBody;
 import org.dromara.hutool.http.client.engine.ClientEngine;
+import org.dromara.hutool.http.client.engine.ClientEngineFactory;
 import org.dromara.hutool.http.meta.Method;
+import org.dromara.hutool.http.server.servlet.ServletUtil;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.locks.Lock;
@@ -30,7 +35,6 @@ import java.util.concurrent.locks.Lock;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_599;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_DELETE;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_GET;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheLongTimeReq;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheStaticReq;
@@ -89,18 +93,30 @@ public class OriginReqService {
     }
 
     @SneakyThrows
-    public boolean notGetReq(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
-        if (StrUtil.equalsIgnoreCase(request.getMethod(), HTTP_GET)) {
+    public boolean notGetReq(HttpServletResponse response, HttpServletRequest req) {
+        if (StrUtil.equalsIgnoreCase(req.getMethod(), HTTP_GET)) {
             return false;
         }
         try {
-            execOriginReq(request, response);
-        } finally {
-            if (StrUtil.equalsIgnoreCase(request.getMethod(), HTTP_DELETE)) {
-                redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheAllKey(request));
-            } else {
-                redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheKey(request));
+            Request originalRequest = Request.of(embyConfig.getHost() + req.getRequestURI())
+                    .method(Method.valueOf(req.getMethod()))
+                    .body(new BytesBody(ServletUtil.getBodyBytes(req))).header(ServletUtil.getHeadersMap(req), true);
+            try (Response res = ClientEngineFactory.createEngine("JdkClient").send(originalRequest)) {
+                response.setStatus(res.getStatus());
+                res.headers().forEach((k, v) -> response.setHeader(k, CollUtil.getFirst(v)));
+
+                try (ServletOutputStream outputStream = response.getOutputStream()) {
+                    outputStream.write(res.bodyBytes());
+                } catch (ClientAbortException e) {
+                    // 客户端中止连接 不做处理
+                }
             }
+        } finally {
+            /*if (StrUtil.equalsIgnoreCase(req.getMethod(), HTTP_DELETE)) {
+                redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheAllKey(req));
+            } else {
+                redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheKey(req));
+            }*/
         }
         return true;
     }
@@ -169,7 +185,8 @@ public class OriginReqService {
     public Response sendOriginReq(EmbyContentCacheReqWrapper request) {
         Request originalRequest = Request.of(embyConfig.getHost() + request.getParamUri())
                 .method(Method.valueOf(request.getMethod()))
-                .body(request.getCachedBody()).header(request.getCachedHeader());
+                .body(request.getCachedBody());
+        request.getCachedHeader().forEach((k, v) -> originalRequest.header(k, v, true));
         return httpClient.send(originalRequest);
     }
 
