@@ -456,6 +456,8 @@ public class EmbyProxy {
             }
             embyCachedResp.setContent(content.getBytes());
             embyCachedResp.getHeaders().remove("Content-Encoding");
+            // embyCachedResp.getHeaders().put("Content-Length",);
+            embyCachedResp.getHeaders().put("Transfer-Encoding", "chunked");
         } else {
             embyCachedResp.setContent(body.getBytes());
         }
