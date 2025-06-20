@@ -91,11 +91,12 @@ public class EmbyProxyFilter implements Filter {
             res.setStatus(CODE_416);
             return;
         }
-        if (originReqService.notGetReq(res, req)) {
-            return;
-        }
+
         EmbyContentCacheReqWrapper reqWrapper = new EmbyContentCacheReqWrapper(req);
         try {
+            if (originReqService.notGetReq(res, reqWrapper)) {
+                return;
+            }
 
             /*if (!StrUtil.containsAny(reqWrapper.getUa(), "okhttp", "EmbyTheater", "libmpv",
                     "Yamby", "Hills", "AfuseKt",

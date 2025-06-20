@@ -9,9 +9,9 @@ import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
+import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +23,6 @@ import org.dromara.hutool.core.exception.ExceptionUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.http.client.Request;
 import org.dromara.hutool.http.client.Response;
-import org.dromara.hutool.http.client.body.BytesBody;
 import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.dromara.hutool.http.client.engine.ClientEngineFactory;
 import org.dromara.hutool.http.meta.Method;
@@ -35,6 +34,7 @@ import java.util.concurrent.locks.Lock;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_599;
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_DELETE;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_GET;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheLongTimeReq;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheStaticReq;
@@ -93,19 +93,22 @@ public class OriginReqService {
     }
 
     @SneakyThrows
-    public boolean notGetReq(HttpServletResponse response, HttpServletRequest req) {
+    public boolean notGetReq(HttpServletResponse response, EmbyContentCacheReqWrapper req) {
         if (StrUtil.equalsIgnoreCase(req.getMethod(), HTTP_GET)) {
             return false;
         }
         try {
-            Request originalRequest = Request.of(embyConfig.getHost()
-                            + req.getRequestURI() + "?" + req.getQueryString())
-                    .method(Method.valueOf(req.getMethod()))
-                    .body(new BytesBody(ServletUtil.getBodyBytes(req))).header(ServletUtil.getHeadersMap(req), true);
-            try (Response res = ClientEngineFactory.createEngine("JdkClient").send(originalRequest)) {
+            String queryStr = StrUtil.isNotBlank(req.getQueryString()) ? "?" + req.getQueryString() : "";
+            // String url = embyConfig.getHost() + req.getRequestURI() + queryStr;
+            String url = embyConfig.getHost() + req.getParamUri();
+            Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod()))
+                    .body(req.getCachedBody());
+            ServletUtil.getHeadersMap(req).forEach((k, v) -> {
+                originalRequest.header(ReUtil.capitalizeWords(k), CollUtil.getFirst(v));
+            });
+            try (Response res = ClientEngineFactory.createEngine("OkHttp").send(originalRequest)) {
                 response.setStatus(res.getStatus());
                 res.headers().forEach((k, v) -> response.setHeader(k, CollUtil.getFirst(v)));
-
                 try (ServletOutputStream outputStream = response.getOutputStream()) {
                     outputStream.write(res.bodyBytes());
                 } catch (ClientAbortException e) {
@@ -113,11 +116,11 @@ public class OriginReqService {
                 }
             }
         } finally {
-            /*if (StrUtil.equalsIgnoreCase(req.getMethod(), HTTP_DELETE)) {
+            if (StrUtil.equalsIgnoreCase(req.getMethod(), HTTP_DELETE)) {
                 redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheAllKey(req));
             } else {
                 redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheKey(req));
-            }*/
+            }
         }
         return true;
     }
