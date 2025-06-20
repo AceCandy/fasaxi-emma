@@ -98,7 +98,8 @@ public class OriginReqService {
             return false;
         }
         try {
-            Request originalRequest = Request.of(embyConfig.getHost() + req.getRequestURI())
+            Request originalRequest = Request.of(embyConfig.getHost()
+                            + req.getRequestURI() + "?" + req.getQueryString())
                     .method(Method.valueOf(req.getMethod()))
                     .body(new BytesBody(ServletUtil.getBodyBytes(req))).header(ServletUtil.getHeadersMap(req), true);
             try (Response res = ClientEngineFactory.createEngine("JdkClient").send(originalRequest)) {
