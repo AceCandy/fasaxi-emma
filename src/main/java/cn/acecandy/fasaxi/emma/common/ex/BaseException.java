@@ -2,7 +2,6 @@ package cn.acecandy.fasaxi.emma.common.ex;
 
 
 import cn.acecandy.fasaxi.emma.common.enums.ErrCode;
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 
 /**
@@ -14,10 +13,14 @@ import lombok.Getter;
 @Getter
 public class BaseException extends RuntimeException {
 
-    @Schema(title = "错误码")
+    /**
+     * 错误码
+     */
     protected Integer code;
 
-    @Schema(title = "错误信息")
+    /**
+     * 错误信息
+     */
     protected String msg;
 
     public BaseException(String msg) {

@@ -98,8 +98,6 @@ public class OriginReqService {
             return false;
         }
         try {
-            String queryStr = StrUtil.isNotBlank(req.getQueryString()) ? "?" + req.getQueryString() : "";
-            // String url = embyConfig.getHost() + req.getRequestURI() + queryStr;
             String url = embyConfig.getHost() + req.getParamUri();
             Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod()))
                     .body(req.getCachedBody());

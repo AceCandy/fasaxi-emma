@@ -107,11 +107,13 @@ public final class EmbyProxyUtil {
         if (StrUtil.isBlank(maxWidth)) {
             maxWidth = "400";
         }
-        int index = 0;
-        // int index = (path.hashCode() & Integer.MAX_VALUE) % 10;
-        // if (index != 0) {
-        //     index = 1;
-        // }
+        // int index = 0;
+        int index = (path.hashCode() & Integer.MAX_VALUE) % 10;
+        if (index < 3) {
+            index = 1;
+        } else {
+            index = 0;
+        }
         return StrUtil.format(CollUtil.get(tmdbConfig.getImageCdnUrl(), index), maxWidth) + path;
     }
 

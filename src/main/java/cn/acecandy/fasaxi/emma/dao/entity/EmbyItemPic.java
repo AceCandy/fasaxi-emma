@@ -1,7 +1,6 @@
 package cn.acecandy.fasaxi.emma.dao.entity;
 
 import com.baomidou.mybatisplus.annotation.TableId;
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Data;
 
@@ -17,22 +16,34 @@ import java.util.Date;
 @Data
 public class EmbyItemPic {
 
+    /**
+     * 项目id
+     */
     @TableId
-    @Schema(name = "项目id")
     private Integer itemId;
 
-    @Schema(name = "封面图")
+    /**
+     * 封面图
+     */
     private String posterPath;
 
-    @Schema(name = "背景图")
+    /**
+     * 背景图
+     */
     private String backdropPath;
 
-    @Schema(name = "logo图")
+    /**
+     * logo图
+     */
     private String logoPath;
 
-    @Schema(name = "创建时间")
+    /**
+     * 创建时间
+     */
     private Date createTime;
 
-    @Schema(name = "更新时间")
+    /**
+     * 更新时间
+     */
     private Date updateTime;
 }

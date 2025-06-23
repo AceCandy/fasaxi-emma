@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.0</version>
+        <version>3.5.2</version>
         <relativePath/>
     </parent>
 
@@ -18,7 +18,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <java.version>21</java.version>
+        <java.version>24</java.version>
     </properties>
 
     <dependencies>
@@ -69,13 +69,6 @@
         <dependency>
             <groupId>org.springframework.retry</groupId>
             <artifactId>spring-retry</artifactId>
-        </dependency>
-
-        <!-- swagger -->
-        <dependency>
-            <groupId>com.github.xiaoymin</groupId>
-            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
-            <version>4.5.0</version>
         </dependency>
 
         <!-- 日志 -->
@@ -143,6 +136,11 @@
             <version>5.8.37</version>
         </dependency>-->
         <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>33.4.8-jre</version>
+        </dependency>
+        <dependency>
             <groupId>org.dromara.hutool</groupId>
             <artifactId>hutool-all</artifactId>
             <version>6.0.0-M21</version>
@@ -175,6 +173,46 @@
         </dependency>
     </dependencies>
 
+    <!--<build>
+        <finalName>fasaxi-emma</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.14.0</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <compilerArgs>
+                        <arg>-Xlint:-options</arg>
+                    </compilerArgs>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.38</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>cn.acecandy.fasaxi.emma.Application</mainClass>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                    &lt;!&ndash; 确保可执行JAR生成 &ndash;&gt;
+                    <executable>true</executable>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>-->
+
     <build>
         <finalName>fasaxi-emma</finalName>
         <plugins>
@@ -188,6 +226,13 @@
                     <compilerArgs>
                         <arg>-Xlint:-options</arg>
                     </compilerArgs>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.38</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <plugin>

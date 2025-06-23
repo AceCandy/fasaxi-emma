@@ -3,7 +3,6 @@ package cn.acecandy.fasaxi.emma.common.resp;
 import cn.acecandy.fasaxi.emma.common.enums.ErrCode;
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -16,18 +15,23 @@ import static cn.acecandy.fasaxi.emma.common.enums.ErrCode.DEFAULT_CODE;
  * @author AceCandy
  * @since 2024/09/14
  */
-@Schema(description = "通用返回包装器")
 @AllArgsConstructor
 @Data
 public class Rsres<T> {
 
-    @Schema(title = "响应编码", description = "0-正常，小于0-系统级错误，大于0-业务级错误")
+    /**
+     * 响应编码 0-正常，小于0-系统级错误，大于0-业务级错误
+     */
     private Integer returncode;
 
-    @Schema(title = "响应消息", description = "code非0时，message非空")
+    /**
+     * 响应消息 code非0时，message非空
+     */
     private String msg;
 
-    @Schema(title = "响应结果", description = "接口的具体相应结果")
+    /**
+     * 响应结果 接口的具体相应结果
+     */
     private T result;
 
     private static <T> Rsres<T> of(int returncode, String msg, T result) {

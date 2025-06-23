@@ -13,8 +13,6 @@ import cn.acecandy.fasaxi.emma.sao.proxy.DoubanProxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
@@ -33,7 +31,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
 @Slf4j
-@Tag(name = "内部api")
 @RestController
 @RequestMapping("/api")
 public class ApiController {
@@ -53,13 +50,13 @@ public class ApiController {
     @Resource
     private RedisClient redisClient;
 
-    @Operation(summary = "当前系统时间")
+    // 当前系统时间
     @GetMapping("/time")
     public Rsres<Object> health() {
         return Rsres.success(System.currentTimeMillis());
     }
 
-    @Operation(summary = "清除db无用图片")
+    // 清除db无用图片
     @GetMapping("/clear/db-pic")
     public Rsres<Object> clearDbPic() {
         int removeCnt = 0;
@@ -92,7 +89,7 @@ public class ApiController {
         return Rsres.success(removeCnt);
     }
 
-    @Operation(summary = "清除缓存文件")
+    // 清除缓存文件
     @GetMapping("/clear/file-cache")
     public Rsres<Object> clearFileCache() {
         int removeCnt = 0;
@@ -125,7 +122,7 @@ public class ApiController {
         return Rsres.success(removeCnt);
     }
 
-    @Operation(summary = "构建tmdb&豆瓣本地库")
+    // 构建tmdb&豆瓣本地库
     @GetMapping("/build/tmdb-douban")
     public Rsres<Object> buildTmdbDouban(Integer min, Integer max) {
         String uniqueKey = "unique:tmdb-douban";
@@ -166,7 +163,7 @@ public class ApiController {
         return Rsres.success("构建tmdb&豆瓣本地库==>执行中");
     }
 
-    @Operation(summary = "构建tmdb&豆瓣本地库-补全豆瓣id")
+    // 构建tmdb&豆瓣本地库-补全豆瓣id
     @GetMapping("/build/completion-doubanId")
     public Rsres<Object> buildCompletionDoubanId() {
         String uniqueKey = "unique:imdbId-doubanId";
@@ -201,7 +198,7 @@ public class ApiController {
         return Rsres.success("构建tmdb&豆瓣本地库(补全豆瓣id)==>执行中");
     }
 
-    @Operation(summary = "构建tmdb&豆瓣本地库-补全豆瓣json")
+    // 构建tmdb&豆瓣本地库-补全豆瓣json
     @GetMapping("/build/completion-doubanInfo")
     public Rsres<Object> buildCompletionDoubanInfo() {
         String uniqueKey = "unique:doubanInfo";
