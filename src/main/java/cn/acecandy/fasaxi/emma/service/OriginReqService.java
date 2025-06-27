@@ -106,7 +106,13 @@ public class OriginReqService {
             });
             try (Response res = ClientEngineFactory.createEngine("OkHttp").send(originalRequest)) {
                 response.setStatus(res.getStatus());
-                res.headers().forEach((k, v) -> response.setHeader(k, CollUtil.getFirst(v)));
+                /*res.headers().forEach((k, v) -> {
+                    if (StrUtil.equalsAnyIgnoreCase(k, "content-encoding", "content-length")) {
+                        return;
+                    }
+                    response.setHeader(k, CollUtil.getFirst(v));
+                });*/
+                // ServletUtil.write(response, res.bodyStream());
                 try (ServletOutputStream outputStream = response.getOutputStream()) {
                     outputStream.write(res.bodyBytes());
                 } catch (ClientAbortException e) {
