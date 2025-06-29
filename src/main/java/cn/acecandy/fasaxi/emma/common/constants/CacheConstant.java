@@ -25,7 +25,5 @@ public interface CacheConstant {
     Integer CODE_599 = 599;
 
     // http请求方法
-
-    String HTTP_GET = "GET";
     String HTTP_DELETE = "DELETE";
 }

@@ -16,15 +16,14 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.connector.ClientAbortException;
+import org.brotli.dec.BrotliInputStream;
 import org.dromara.hutool.core.array.ArrayUtil;
-import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.date.StopWatch;
 import org.dromara.hutool.core.exception.ExceptionUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.http.client.Request;
 import org.dromara.hutool.http.client.Response;
 import org.dromara.hutool.http.client.engine.ClientEngine;
-import org.dromara.hutool.http.client.engine.ClientEngineFactory;
 import org.dromara.hutool.http.meta.Method;
 import org.dromara.hutool.http.server.servlet.ServletUtil;
 import org.springframework.stereotype.Component;
@@ -35,7 +34,6 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_599;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_DELETE;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_GET;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheLongTimeReq;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheStaticReq;
 
@@ -94,7 +92,7 @@ public class OriginReqService {
 
     @SneakyThrows
     public boolean notGetReq(HttpServletResponse response, EmbyContentCacheReqWrapper req) {
-        if (StrUtil.equalsIgnoreCase(req.getMethod(), HTTP_GET)) {
+        if (ServletUtil.isGetMethod(req)) {
             return false;
         }
         try {
@@ -102,21 +100,37 @@ public class OriginReqService {
             Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod()))
                     .body(req.getCachedBody());
             ServletUtil.getHeadersMap(req).forEach((k, v) -> {
-                originalRequest.header(ReUtil.capitalizeWords(k), CollUtil.getFirst(v));
+                if (!EmbyProxyUtil.isAllowedReqHeader(k)) {
+                    return;
+                }
+                for (String value : v) {
+                    originalRequest.header(ReUtil.capitalizeWords(k), value, true);
+                }
             });
-            try (Response res = ClientEngineFactory.createEngine("OkHttp").send(originalRequest)) {
+            // try (Response res = ClientEngineFactory.createEngine("OkHttp").send(originalRequest)) {
+            try (Response res = httpClient.send(originalRequest)) {
                 response.setStatus(res.getStatus());
-                /*res.headers().forEach((k, v) -> {
-                    if (StrUtil.equalsAnyIgnoreCase(k, "content-encoding", "content-length")) {
-                        return;
+                if (StrUtil.containsIgnoreCase(res.header("Content-Type"), "application/json")) {
+                    res.headers().forEach((k, v) -> {
+                        if (!EmbyProxyUtil.isAllowedHeader(k)) {
+                            return;
+                        }
+                        for (String value : v) {
+                            response.addHeader(k, value);
+                        }
+                    });
+                    byte[] data;
+                    if (StrUtil.equalsIgnoreCase(res.header("Content-Encoding"), "br")) {
+                        data = (new BrotliInputStream(res.bodyStream())).readAllBytes();
+                    } else {
+                        // 非压缩内容直接转发
+                        data = res.bodyBytes();
                     }
-                    response.setHeader(k, CollUtil.getFirst(v));
-                });*/
-                // ServletUtil.write(response, res.bodyStream());
-                try (ServletOutputStream outputStream = response.getOutputStream()) {
-                    outputStream.write(res.bodyBytes());
-                } catch (ClientAbortException e) {
-                    // 客户端中止连接 不做处理
+                    try (ServletOutputStream outputStream = response.getOutputStream()) {
+                        outputStream.write(data);
+                    } catch (ClientAbortException e) {
+                        // 客户端中止连接 不做处理
+                    }
                 }
             }
         } finally {
@@ -174,7 +188,7 @@ public class OriginReqService {
                                          Throwable e, EmbyCachedResp cached) throws Throwable {
         if (StrUtil.contains(ExceptionUtil.getSimpleMessage(e), "Cannot invoke " +
                 "\"org.apache.hc.core5.http.HttpEntity.getContent()\" because \"this.entity\" is null")) {
-            // log.error("204还是有报错:{}", ExceptionUtil.getSimpleMessage(e));
+            log.error("204还是有报错:{}", ExceptionUtil.getSimpleMessage(e));
             cached.setStatusCode(CODE_204);
             writeCacheResponse(response, cached);
         } else {
@@ -242,7 +256,7 @@ public class OriginReqService {
         if (null == request) {
             return;
         }
-        if (!StrUtil.equalsIgnoreCase(request.getMethod(), HTTP_GET)) {
+        if (!ServletUtil.isGetMethod(request)) {
             return;
         }
         if (!cached.getStatusCode().equals(CODE_200)) {

@@ -143,7 +143,7 @@
         <dependency>
             <groupId>org.dromara.hutool</groupId>
             <artifactId>hutool-all</artifactId>
-            <version>6.0.0-M21</version>
+            <version>6.0.0-M22</version>
         </dependency>
         <dependency>
             <groupId>com.github.stuxuhai</groupId>

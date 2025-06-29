@@ -183,8 +183,7 @@ public final class EmbyProxyUtil {
             return false;
         }
         // 2个歌单长缓存
-        if (CollUtil.contains(ListUtil.of("1616570", "1616572"),
-                MapUtil.getStr(req.getCachedParam(), "parentid"))) {
+        if (CollUtil.contains(ListUtil.of("1616570", "1616572"), MapUtil.getStr(req.getCachedParam(), "parentid"))) {
             return true;
         }
         return false;
@@ -212,6 +211,28 @@ public final class EmbyProxyUtil {
         };
     }
 
+    /**
+     * 返回时不允许修改的请求头
+     *
+     * @param headerName 标头名称
+     * @return boolean
+     */
+    public static boolean isAllowedHeader(String headerName) {
+        return !StrUtil.equalsAnyIgnoreCase(headerName, "connection", "content-length", "transfer-encoding",
+                "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers", "upgrade", "Content-Encoding");
+    }
+
+    /**
+     * 请求时允许转发的请求头 白名单
+     *
+     * @param headerName 标头名称
+     * @return boolean
+     */
+    public static boolean isAllowedReqHeader(String headerName) {
+        return StrUtil.equalsAnyIgnoreCase(headerName, "content-type", "accept", "cache-control",
+                "pragma", "User-Agent") || StrUtil.startWithAnyIgnoreCase(headerName, "X-Emby-", "X-MediaBrowser-");
+    }
+
     public static boolean isHttpOk(int statusCode) {
         return statusCode >= 200 && statusCode < 300;
     }
@@ -227,10 +248,8 @@ public final class EmbyProxyUtil {
             return "";
         }
         mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath, Charset.defaultCharset()));
-        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby",
-                "http://alist.rn238.worldline.space/p/pt/Emby");
-        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby1",
-                "http://alist.rn238.worldline.space/p/bt/Emby1");
+        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby", "http://alist.rn238.worldline.space/p/pt/Emby");
+        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby1", "http://alist.rn238.worldline.space/p/bt/Emby1");
 
         // mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt",
         // "http://8.210.221.216:5244/p/bt/Emby1/");

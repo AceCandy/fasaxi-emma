@@ -16,7 +16,7 @@ import cn.acecandy.fasaxi.emma.sao.out.EmbyPlaybackOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
-import cn.acecandy.fasaxi.emma.utils.CompressUtil;
+import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.acecandy.fasaxi.emma.utils.SortUtil;
@@ -25,7 +25,6 @@ import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.compress.ZipUtil;
 import org.dromara.hutool.core.date.DateTime;
 import org.dromara.hutool.core.exception.ExceptionUtil;
 import org.dromara.hutool.core.lang.Console;
@@ -37,6 +36,7 @@ import org.dromara.hutool.http.client.Response;
 import org.dromara.hutool.http.client.body.ResponseBody;
 import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.dromara.hutool.http.meta.Method;
+import org.dromara.hutool.http.server.servlet.ServletUtil;
 import org.dromara.hutool.json.JSONUtil;
 import org.springframework.stereotype.Component;
 
@@ -424,8 +424,7 @@ public class EmbyProxy {
             return embyCachedResp;
         }
         res.headers().forEach((k, v) -> {
-            if (k == null || StrUtil.equalsAnyIgnoreCase(k, "Connection", "Keep-Alive", "Proxy-Connection",
-                    "Transfer-Encoding", "Content-Encoding", "Content-MD5", "ETag")) {
+            if (!EmbyProxyUtil.isAllowedHeader(k)) {
                 return;
             }
             embyCachedResp.getHeaders().put(k, StrUtil.join(COMMA, v));
@@ -439,12 +438,12 @@ public class EmbyProxy {
             return embyCachedResp;
         }
 
-        if (StrUtil.equalsAnyIgnoreCase(request.getMethod(), "get") && StrUtil.containsIgnoreCase(
+        if (ServletUtil.isGetMethod(request) && StrUtil.containsIgnoreCase(
                 embyCachedResp.getHeaders().get("Content-Type"), "application/json")) {
-            embyCachedResp.getHeaders().remove("Content-Length");
+            // embyCachedResp.getHeaders().remove("Content-Length");
             String content = "";
             byte[] bodyBytes = body.getBytes();
-            if (StrUtil.equalsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "br")) {
+            /*if (StrUtil.equalsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "br")) {
                 String bodyStr = new String(CompressUtil.decode(bodyBytes));
                 content = changeRespBody(request, bodyStr);
                 embyCachedResp.setContent(content.getBytes());
@@ -460,19 +459,19 @@ public class EmbyProxy {
                 content = changeRespBody(request, bodyStr);
                 embyCachedResp.setContent(ZipUtil.gzip(content.getBytes()));
                 log.info("gzip解码: {}", bodyStr);
-            } else {
-                String bodyStr = new String(bodyBytes);
-                if (!JSONUtil.isTypeJSON(bodyStr)) {
-                    log.warn("非json: {}", bodyStr);
-                }
-                content = changeRespBody(request, bodyStr);
-                embyCachedResp.setContent(content.getBytes());
+            } else {*/
+            String bodyStr = new String(bodyBytes);
+            if (!JSONUtil.isTypeJSON(bodyStr)) {
+                log.warn("非json: {}", bodyStr);
             }
+            content = changeRespBody(request, bodyStr);
+            embyCachedResp.setContent(content.getBytes());
+            // }
 
             // 禁用缓存（防止客户端缓存未替换的内容）
-            embyCachedResp.getHeaders().put("Cache-Control", "no-cache, no-store, must-revalidate");
-            embyCachedResp.getHeaders().put("Pragma", "no-cache");
-            embyCachedResp.getHeaders().put("Expires", "0");
+            // embyCachedResp.getHeaders().put("Cache-Control", "no-cache, no-store, must-revalidate");
+            // embyCachedResp.getHeaders().put("Pragma", "no-cache");
+            // embyCachedResp.getHeaders().put("Expires", "0");
             // embyCachedResp.getHeaders().put("Content-Length", content.getBytes().length + "");
         } else {
             embyCachedResp.setContent(body.getBytes());
