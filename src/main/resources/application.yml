@@ -51,6 +51,7 @@ tmdb:
   image-cdn-url:
     - http://pic.acecandy.cn/t/p/w{}
     - http://pic1.acecandy.cn/t/p/w{}
+    - http://pic.worldline.space/t/p/w{}
     - http://static-mdb.v.geilijiasu.com/t/p/w{}
 
 douban:
