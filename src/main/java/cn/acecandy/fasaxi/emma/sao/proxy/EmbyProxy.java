@@ -525,7 +525,10 @@ public class EmbyProxy {
                 return;
             }
             if (!StrUtil.containsAny(item.getUniqueKey(), "tmdb", "tt", "zh-CN-cf")
-                    || StrUtil.isNotBlank(item.getImageTags().getPrimary())) {
+                    || StrUtil.isNotBlank(item.getImageTags().getPrimary())
+                    || StrUtil.equalsIgnoreCase(item.getContainer(), "strm")
+                    || item.getSize() < 1024 * 1024L) {
+
                 return;
             }
             String lockKey = LockUtil.buildRefreshTmdbLock(item.getItemId());
