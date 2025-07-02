@@ -87,7 +87,8 @@ public class VideoRedirectService {
         ThreadUtil.execVirtual(() -> {
             embyProxy.expertTmdbProvider(embyItem);
         });
-        if (IpUtil.isInnerIp(request.getIp())) {
+        if (!StrUtil.containsIgnoreCase(request.getRequestURI(), "download")
+                && IpUtil.isInnerIp(request.getIp())) {
             if (null == embyItem) {
                 response.setStatus(CODE_404);
                 return;
@@ -151,21 +152,21 @@ public class VideoRedirectService {
         /*if (minute == 0) {
             // 使用原始路径
         } else */
-        if (minute % 10 == 0) {
+        /*if (minute % 10 == 0) {
             cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
                     embyConfig.getOriginPt(), embyConfig.getTransPt1());
-        } else {
-            if (minute % 3 == 0) {
-                cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
-                        embyConfig.getOriginPt(), embyConfig.getTransPt2());
-            } else if (minute % 3 == 1) {
-                cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
-                        embyConfig.getOriginPt(), embyConfig.getTransPt3());
-            } else if (minute % 3 == 2) {
-                cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
-                        embyConfig.getOriginPt(), embyConfig.getTransPt4());
-            }
+        } else {*/
+        if (minute % 3 == 0) {
+            cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
+                    embyConfig.getOriginPt(), embyConfig.getTransPt2());
+        } else if (minute % 3 == 1) {
+            cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
+                    embyConfig.getOriginPt(), embyConfig.getTransPt3());
+        } else if (minute % 3 == 2) {
+            cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
+                    embyConfig.getOriginPt(), embyConfig.getTransPt4());
         }
+        // }
         return cacheUrl;
     }
 
@@ -191,7 +192,7 @@ public class VideoRedirectService {
             } else {
                 // 2. head获取处理其他网盘直链远程路径
                 if (StrUtil.containsAny(mediaPath, "/d/123", "/d/zong123",
-                        "/d/%2F123%2F%","/d/%2Fzong123%2F%")) {
+                        "/d/%2F123%2F%", "/d/%2Fzong123%2F%")) {
                     mediaPath = StrUtil.replace(mediaPath, "192.168.1.205", "192.168.1.249");
                 }
                 Map<String, String> header302 = MapUtil.<String, String>builder()
