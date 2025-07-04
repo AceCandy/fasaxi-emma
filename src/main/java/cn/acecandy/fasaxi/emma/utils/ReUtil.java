@@ -43,7 +43,7 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
      * 匹配类似 /emby/Users/656fcefa283149708880b416786e5fde/Items/1417552/Delete
      */
     private static final Pattern REGEX_SIMILAR_ITEM = PatternPool.get(
-            "^/emby/users/([a-z0-9]+)/(?:[a-z]*items|items)/([0-9]+)(/delete)?$", Pattern.DOTALL);
+            "(/emby)?/users/([a-z0-9]+)/(?:[a-z]*items|items)/([0-9]+)(/delete)?$", Pattern.DOTALL);
 
     /**
      * 匹配类似 /emby/Users/656fcefa283149708880b416786e5fde/Items/1417552
@@ -119,7 +119,7 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
         if (groups == null || groups.size() < 2) {
             return null;
         }
-        return ListUtil.of(CollUtil.get(groups, 1), CollUtil.get(groups, 2));
+        return ListUtil.of(CollUtil.get(groups, 2), CollUtil.get(groups, 3));
     }
 
     public static List<String> isItemUrl(String url) {

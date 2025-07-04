@@ -424,7 +424,7 @@ public class EmbyProxy {
             return embyCachedResp;
         }
         res.headers().forEach((k, v) -> {
-            if (!EmbyProxyUtil.isAllowedHeader(k)) {
+            if (EmbyProxyUtil.isNotAllowedHeader(k)) {
                 return;
             }
             embyCachedResp.getHeaders().put(k, StrUtil.join(COMMA, v));
@@ -547,12 +547,12 @@ public class EmbyProxy {
                     电视剧_集.getEmbyName())) {
                 return;
             }
-            String lockKey = LockUtil.buildRefreshMediaLock(request.getMediaSourceId());
+            String lockKey = LockUtil.buildRefreshMediaLock(item.getItemId());
             if (!redisClient.setnx(lockKey, 1, 5 * 60)) {
                 return;
             }
             try {
-                getPlayback(request.getMediaSourceId());
+                getPlayback(item.getItemId());
             } finally {
                 redisClient.del(lockKey);
             }

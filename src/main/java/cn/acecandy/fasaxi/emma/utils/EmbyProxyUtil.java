@@ -217,8 +217,8 @@ public final class EmbyProxyUtil {
      * @param headerName 标头名称
      * @return boolean
      */
-    public static boolean isAllowedHeader(String headerName) {
-        return !StrUtil.equalsAnyIgnoreCase(headerName, "connection", "content-length", "transfer-encoding",
+    public static boolean isNotAllowedHeader(String headerName) {
+        return StrUtil.equalsAnyIgnoreCase(headerName, "connection", "content-length", "transfer-encoding",
                 "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers", "upgrade", "Content-Encoding");
     }
 
@@ -230,7 +230,8 @@ public final class EmbyProxyUtil {
      */
     public static boolean isAllowedReqHeader(String headerName) {
         return StrUtil.equalsAnyIgnoreCase(headerName, "content-type", "accept", "cache-control",
-                "pragma", "User-Agent") || StrUtil.startWithAnyIgnoreCase(headerName, "X-Emby-", "X-MediaBrowser-");
+                "pragma", "User-Agent") || StrUtil.startWithAnyIgnoreCase(headerName, "X-Emby-",
+                "X-MediaBrowser-", "X-Emby-Authorization", "Authorization");
     }
 
     public static boolean isHttpOk(int statusCode) {

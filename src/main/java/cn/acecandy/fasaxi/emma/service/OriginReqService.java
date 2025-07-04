@@ -100,7 +100,8 @@ public class OriginReqService {
             Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod()))
                     .body(req.getCachedBody());
             ServletUtil.getHeadersMap(req).forEach((k, v) -> {
-                if (!EmbyProxyUtil.isAllowedReqHeader(k)) {
+                // if (!EmbyProxyUtil.isAllowedReqHeader(k)) {
+                if (EmbyProxyUtil.isNotAllowedHeader(k)) {
                     return;
                 }
                 for (String value : v) {
@@ -112,7 +113,7 @@ public class OriginReqService {
                 response.setStatus(res.getStatus());
                 if (StrUtil.containsIgnoreCase(res.header("Content-Type"), "application/json")) {
                     res.headers().forEach((k, v) -> {
-                        if (!EmbyProxyUtil.isAllowedHeader(k)) {
+                        if (EmbyProxyUtil.isNotAllowedHeader(k)) {
                             return;
                         }
                         for (String value : v) {
