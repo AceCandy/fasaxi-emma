@@ -8,7 +8,6 @@ import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.catalina.connector.ClientAbortException;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.io.file.FileNameUtil;
 import org.dromara.hutool.core.io.file.FileUtil;
@@ -297,13 +296,15 @@ public class FileCacheUtil {
                 return false;
             }
             return true;
-        } catch (ClientAbortException e) {
-            log.info("客户端主动中断下载: {}", cacheFile.file().getName());
-            return true;
         } catch (IOException e) {
-            log.error("读取缓存文件失败: {}", fileName, e);
-            response.setStatus(CODE_500);
-            return false;
+            if (ExceptUtil.isConnectionTerminated(e)) {
+                log.info("客户端主动中断下载: {}", cacheFile.file().getName());
+                return true;
+            } else {
+                log.error("读取缓存文件失败: {}", fileName, e);
+                response.setStatus(CODE_500);
+                return false;
+            }
         }
     }
 

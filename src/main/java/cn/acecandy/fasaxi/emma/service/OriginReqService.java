@@ -7,6 +7,7 @@ import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
+import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
@@ -15,7 +16,6 @@ import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.catalina.connector.ClientAbortException;
 import org.brotli.dec.BrotliInputStream;
 import org.dromara.hutool.core.array.ArrayUtil;
 import org.dromara.hutool.core.date.StopWatch;
@@ -28,6 +28,7 @@ import org.dromara.hutool.http.meta.Method;
 import org.dromara.hutool.http.server.servlet.ServletUtil;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.util.concurrent.locks.Lock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
@@ -129,8 +130,10 @@ public class OriginReqService {
                     }
                     try (ServletOutputStream outputStream = response.getOutputStream()) {
                         outputStream.write(data);
-                    } catch (ClientAbortException e) {
-                        // 客户端中止连接 不做处理
+                    } catch (IOException e) {
+                        if (!ExceptUtil.isConnectionTerminated(e)) {
+                            throw e;
+                        }
                     }
                 }
             }
@@ -240,8 +243,10 @@ public class OriginReqService {
         if (ArrayUtil.isNotEmpty(cached.getContent())) {
             try (ServletOutputStream outputStream = res.getOutputStream()) {
                 outputStream.write(cached.getContent());
-            } catch (ClientAbortException e) {
-                // 客户端中止连接 不做处理
+            } catch (IOException e) {
+                if (!ExceptUtil.isConnectionTerminated(e)) {
+                    throw e;
+                }
             }
         }
     }
