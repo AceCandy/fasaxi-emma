@@ -10,12 +10,10 @@ import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
-import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.catalina.connector.ClientAbortException;
 import org.brotli.dec.BrotliInputStream;
 import org.dromara.hutool.core.array.ArrayUtil;
 import org.dromara.hutool.core.date.StopWatch;
@@ -26,7 +24,8 @@ import org.dromara.hutool.http.client.Response;
 import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.dromara.hutool.http.meta.Method;
 import org.dromara.hutool.http.server.servlet.ServletUtil;
-import org.springframework.stereotype.Component;
+import org.noear.solon.annotation.Component;
+import org.noear.solon.annotation.Inject;
 
 import java.util.concurrent.locks.Lock;
 
@@ -47,19 +46,19 @@ import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheStaticReq;
 @Component
 public class OriginReqService {
 
-    @Resource
+    @Inject
     private EmbyConfig embyConfig;
 
-    @Resource
+    @Inject
     private RedisClient redisClient;
 
-    @Resource
+    @Inject
     private ClientEngine httpClient;
 
-    @Resource
+    @Inject
     private EmbyProxy embyProxy;
 
-    @Resource
+    @Inject
     private FileCacheUtil fileCacheUtil;
 
     /**
@@ -128,8 +127,9 @@ public class OriginReqService {
                     }
                     try (ServletOutputStream outputStream = response.getOutputStream()) {
                         outputStream.write(data);
-                    } catch (ClientAbortException e) {
+                    } catch (Exception e) {
                         // 客户端中止连接 不做处理
+                        log.warn("中断通知", e);
                     }
                 }
             }
@@ -239,8 +239,9 @@ public class OriginReqService {
         if (ArrayUtil.isNotEmpty(cached.getContent())) {
             try (ServletOutputStream outputStream = res.getOutputStream()) {
                 outputStream.write(cached.getContent());
-            } catch (ClientAbortException e) {
+            } catch (Exception e) {
                 // 客户端中止连接 不做处理
+                log.warn("中断通知", e);
             }
         }
     }

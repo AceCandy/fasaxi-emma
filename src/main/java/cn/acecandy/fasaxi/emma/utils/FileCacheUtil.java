@@ -3,12 +3,10 @@ package cn.acecandy.fasaxi.emma.utils;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
-import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.catalina.connector.ClientAbortException;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.io.file.FileNameUtil;
 import org.dromara.hutool.core.io.file.FileUtil;
@@ -22,10 +20,12 @@ import org.dromara.hutool.http.client.Request;
 import org.dromara.hutool.http.client.Response;
 import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.dromara.hutool.http.meta.Method;
-import org.springframework.stereotype.Component;
+import org.noear.solon.annotation.Component;
+import org.noear.solon.annotation.Inject;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.SocketException;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
@@ -56,17 +56,17 @@ import static java.nio.file.StandardOpenOption.WRITE;
 @Component
 public class FileCacheUtil {
 
-    @Resource
+    @Inject
     private ClientEngine httpClient;
 
-    @Resource
+    @Inject
     private EmbyProxy embyProxy;
 
-    @Resource
+    @Inject
     private EmbyConfig embyConfig;
 
     private static final Map<String, ReentrantLock> FILE_CACHE_LOCK = MapUtil.newSafeConcurrentHashMap();
-    @Resource
+    @Inject
     private VideoUtil videoUtil;
 
     public static Path getCachePath(String itemId, String mediaType, String filePath) {
@@ -297,7 +297,7 @@ public class FileCacheUtil {
                 return false;
             }
             return true;
-        } catch (ClientAbortException e) {
+        } catch (SocketException e) {
             log.info("客户端主动中断下载: {}", cacheFile.file().getName());
             return true;
         } catch (IOException e) {

@@ -1,17 +1,18 @@
 package cn.acecandy.fasaxi.emma.sao.client;
 
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
-import jakarta.annotation.Resource;
+import io.lettuce.core.AbstractRedisClient;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.array.ArrayUtil;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.collection.set.SetUtil;
 import org.dromara.hutool.core.text.StrUtil;
+import org.noear.solon.annotation.Component;
+import org.noear.solon.annotation.Inject;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ScanOptions;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Set;
@@ -26,14 +27,14 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
-public class RedisClient {
+public class RedisClient  {
 
-    @Resource
-    private RedisTemplate<String, Object> redisTemplate;
+    @Inject
+    private org.noear.redisx.RedisClient redisClientBase;
 
     public boolean set(String key, Object value) {
         try {
-            redisTemplate.opsForValue().set(key, value);
+            redisClientBase.jedis().set()connect().sync().set(key, value);
             return true;
         } catch (Exception e) {
             log.warn("redis set方法异常:", e);

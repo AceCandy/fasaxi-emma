@@ -6,7 +6,6 @@ import cn.acecandy.fasaxi.emma.service.PicRedirectService;
 import cn.acecandy.fasaxi.emma.service.VideoRedirectService;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
-import jakarta.annotation.Resource;
 import jakarta.servlet.AsyncContext;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
@@ -20,9 +19,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.logging.log4j.core.config.Order;
 import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.text.StrUtil;
-import org.springframework.core.annotation.Order;
+import org.noear.solon.annotation.Inject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -50,22 +50,22 @@ import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.needClose;
 @WebFilter("/*")
 public class EmbyProxyFilter implements Filter {
 
-    @Resource
+    @Inject
     private EmbyConfig embyConfig;
 
-    @Resource
+    @Inject
     private FileCacheUtil fileCacheUtil;
 
-    @Resource
+    @Inject
     private AccessLog accessLog;
 
-    @Resource
+    @Inject
     private PicRedirectService picRedirectService;
 
-    @Resource
+    @Inject
     private VideoRedirectService videoRedirectService;
 
-    @Resource
+    @Inject
     private OriginReqService originReqService;
 
 

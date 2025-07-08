@@ -13,7 +13,6 @@ import cn.acecandy.fasaxi.emma.sao.proxy.DoubanProxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.date.DateTime;
@@ -22,42 +21,42 @@ import org.dromara.hutool.core.math.NumberUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.util.RandomUtil;
 import org.dromara.hutool.json.JSONUtil;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.noear.solon.annotation.Controller;
+import org.noear.solon.annotation.Get;
+import org.noear.solon.annotation.Inject;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
 @Slf4j
-@RestController
+@Controller
 @RequestMapping("/api")
 public class ApiController {
 
-    @Resource
+    @Inject
     private EmbyItemPicDao embyItemPicDao;
 
-    @Resource
+    @Inject
     private TmdbProviderDao tmdbProviderDao;
 
-    @Resource
+    @Inject
     private EmbyProxy embyProxy;
 
-    @Resource
+    @Inject
     private DoubanProxy doubanProxy;
 
-    @Resource
+    @Inject
     private RedisClient redisClient;
 
     // 当前系统时间
-    @GetMapping("/time")
+    @Get("/time")
     public Rsres<Object> health() {
         return Rsres.success(System.currentTimeMillis());
     }
 
     // 清除db无用图片
-    @GetMapping("/clear/db-pic")
+    @Get("/clear/db-pic")
     public Rsres<Object> clearDbPic() {
         int removeCnt = 0;
         int pageNum = 1;
@@ -90,7 +89,7 @@ public class ApiController {
     }
 
     // 清除缓存文件
-    @GetMapping("/clear/file-cache")
+    @Get("/clear/file-cache")
     public Rsres<Object> clearFileCache() {
         int removeCnt = 0;
         int pageNum = 1;
@@ -123,7 +122,7 @@ public class ApiController {
     }
 
     // 构建tmdb&豆瓣本地库
-    @GetMapping("/build/tmdb-douban")
+    @Get("/build/tmdb-douban")
     public Rsres<Object> buildTmdbDouban(Integer min, Integer max) {
         String uniqueKey = "unique:tmdb-douban";
         // List<Integer> itemIds = embyItemPicDao.findAllItemId();
@@ -164,7 +163,7 @@ public class ApiController {
     }
 
     // 构建tmdb&豆瓣本地库-补全豆瓣id
-    @GetMapping("/build/completion-doubanId")
+    @Get("/build/completion-doubanId")
     public Rsres<Object> buildCompletionDoubanId() {
         String uniqueKey = "unique:imdbId-doubanId";
         List<TmdbProvider> tmdbProviders = tmdbProviderDao.findAllImdbNoDouBan();
@@ -199,7 +198,7 @@ public class ApiController {
     }
 
     // 构建tmdb&豆瓣本地库-补全豆瓣json
-    @GetMapping("/build/completion-doubanInfo")
+    @Get("/build/completion-doubanInfo")
     public Rsres<Object> buildCompletionDoubanInfo() {
         String uniqueKey = "unique:doubanInfo";
         List<TmdbProvider> tmdbProviders = tmdbProviderDao.findAllNoDouBanInfo();

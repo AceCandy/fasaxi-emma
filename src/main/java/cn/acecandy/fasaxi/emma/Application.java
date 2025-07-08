@@ -22,12 +22,6 @@ import java.net.InetAddress;
  * @since 2025/01/03
  */
 @Slf4j
-@EnableScheduling
-@EnableRetry
-@RestController
-@ConfigurationPropertiesScan
-@ServletComponentScan
-@SpringBootApplication
 public class Application {
 
     @SneakyThrows

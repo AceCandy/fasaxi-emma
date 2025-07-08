@@ -1,6 +1,5 @@
 package cn.acecandy.fasaxi.emma.utils;
 
-import jakarta.annotation.Resource;
 import lombok.Builder;
 import lombok.Data;
 import lombok.SneakyThrows;
@@ -14,7 +13,8 @@ import org.dromara.hutool.http.client.Response;
 import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.dromara.hutool.http.meta.HeaderName;
 import org.dromara.hutool.http.meta.Method;
-import org.springframework.stereotype.Component;
+import org.noear.solon.annotation.Component;
+import org.noear.solon.annotation.Inject;
 
 import java.util.Arrays;
 
@@ -28,7 +28,7 @@ import java.util.Arrays;
 @Component
 public class VideoUtil {
 
-    @Resource
+    @Inject
     private ClientEngine httpClient;
 
     /**

@@ -12,14 +12,14 @@ import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
-import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.math.NumberUtil;
 import org.dromara.hutool.core.text.StrUtil;
-import org.springframework.stereotype.Component;
+import org.noear.solon.annotation.Component;
+import org.noear.solon.annotation.Inject;
 
 import java.util.concurrent.locks.Lock;
 
@@ -42,19 +42,19 @@ import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.parseItemIdByUrl;
 @Component
 public class PicRedirectService {
 
-    @Resource
+    @Inject
     private OriginReqService originReqService;
 
-    @Resource
+    @Inject
     private EmbyProxy embyProxy;
 
-    @Resource
+    @Inject
     private EmbyItemPicDao embyItemPicDao;
 
-    @Resource
+    @Inject
     private TmdbConfig tmdbConfig;
 
-    @Resource
+    @Inject
     private RedisClient redisClient;
 
     /**
