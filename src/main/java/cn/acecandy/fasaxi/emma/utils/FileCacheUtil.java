@@ -132,20 +132,24 @@ public class FileCacheUtil {
         if (null == size || size == 0) {
             return false;
         }
-        Long cacheSize = Math.max(size / (embyItem.getRunTimeTicks() / 10000 / 60 / 1000), 1024 * 1024 * 10);
+        long cacheSize = Math.max(size / (embyItem.getRunTimeTicks() / 10000 / 60 / 1000), 1024 * 1024 * 10);
+        if (size < cacheSize) {
+            return false;
+        }
         EmbyProxyUtil.Range range = new EmbyProxyUtil.Range(0, cacheSize, embyItem.getSize());
         Pair<Path, Path> cacheFilePair = getCacheFullPath(embyItem, range);
         PathUtil.mkdir(cacheFilePair.getLeft());
         Path cacheFilePath = cacheFilePair.getRight();
         if (PathUtil.exists(cacheFilePath, false)) {
             log.debug("缓存文件已存在: {}", cacheFilePath);
-            return false;
+            return true;
         }
         log.info("准备写入本地缓存文件->{}", cacheFilePath);
         File tmpTag = FileUtil.touch(cacheFilePair.getRight().toString() + ".tag");
         String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();
         mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
-        Request originalRequest = Request.of(mediaPath).method(Method.GET).header("Range", range.toHeader()).setMaxRedirects(1);
+        Request originalRequest = Request.of(mediaPath).method(Method.GET)
+                .header("Range", range.toHeader()).setMaxRedirects(1);
         try (Response res = httpClient.send(originalRequest);
              FileChannel fileChannel = FileChannel.open(tmpTag.toPath(), CREATE, WRITE)) {
             if (!res.isOk()) {
@@ -347,8 +351,9 @@ public class FileCacheUtil {
             return;
         }
         try {
-            writeFile(embyItem);
-            writeMoovFile(embyItem);
+            if (writeFile(embyItem)) {
+                writeMoovFile(embyItem);
+            }
         } finally {
             LockUtil.unlockVideoCache(lock, embyItem.getItemId());
         }
