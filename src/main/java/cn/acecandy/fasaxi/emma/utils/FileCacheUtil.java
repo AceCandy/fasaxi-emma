@@ -184,9 +184,14 @@ public class FileCacheUtil {
         if (null == moovPos) {
             return false;
         }
-        moovPos.setStart(moovPos.getStart() - 16 * 1024);
-        moovPos.setSize(moovPos.getSize() + 16 * 1024);
-        Long moovEnd = moovPos.getStart() + moovPos.getSize() - 1;
+        int adjustment = 16 * 1024;
+        long newStart = Math.max(0, moovPos.getStart() - adjustment);
+        // size需要补偿 start 被截断的部分
+        long sizeIncrease = adjustment + (moovPos.getStart() - newStart);
+
+        moovPos.setStart(newStart);
+        moovPos.setSize(moovPos.getSize() + sizeIncrease);
+        long moovEnd = moovPos.getStart() + moovPos.getSize() - 1;
 
         boolean cacheContainMoov = FileUtil.loopFiles(writePath.toFile()).stream().filter(file -> {
             String fileName = FileNameUtil.getName(file);
