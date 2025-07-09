@@ -26,6 +26,7 @@ import org.springframework.stereotype.Component;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.Channels;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Path;
@@ -283,6 +284,11 @@ public class FileCacheUtil {
         long actualEnd = cacheFile.end();
         long actualLen = actualEnd - actualStart + 1;
 
+        /*response.setStatus(HttpServletResponse.SC_FOUND);
+        response.setHeader("Location", "https://alist.acecandy.cn:880/d/local-vol2" +
+                StrUtil.removePrefix(cacheFilePair.getRight().toString(),"/vol2/1000"));
+        return true;*/
+
         try (FileChannel inChannel = FileChannel.open(cacheFile.file().toPath(), StandardOpenOption.READ);
              ServletOutputStream out = response.getOutputStream()) {
 
@@ -304,6 +310,9 @@ public class FileCacheUtil {
                 log.warn("传输不完整，offset:{}, 预期:{}, 实际:{}", offset, actualLen, transferred);
                 return false;
             }
+            return true;
+        } catch (ClosedChannelException ce) {
+            log.info("客户端关闭，无须写入: {}", cacheFile.file().getName());
             return true;
         } catch (IOException e) {
             if (ExceptUtil.isConnectionTerminated(e)) {
