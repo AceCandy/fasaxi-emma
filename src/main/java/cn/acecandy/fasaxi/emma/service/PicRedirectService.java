@@ -166,13 +166,12 @@ public class PicRedirectService {
      */
     private void asyncWriteItemPic(Integer itemId, String url, EmbyPicType picType) {
         ThreadUtil.execVirtual(() -> {
-            EmbyItemPic picDto = switch (picType) {
-                case 封面 -> EmbyItemPic.builder().itemId(itemId).posterPath(url).build();
-                case 背景图 -> EmbyItemPic.builder().itemId(itemId).backdropPath(url).build();
-                case Logo -> EmbyItemPic.builder().itemId(itemId).logoPath(url).build();
+            switch (picType) {
+                case 封面 -> EmbyItemPic.x().setItemId(itemId).setPosterPath(url).saveOrUpdate();
+                case 背景图 -> EmbyItemPic.x().setItemId(itemId).setBackdropPath(url).saveOrUpdate();
+                case Logo -> EmbyItemPic.x().setItemId(itemId).setLogoPath(url).saveOrUpdate();
                 default -> throw new BaseException("图片类型异常: " + picType);
-            };
-            embyItemPicDao.insertOrUpdate(picDto);
+            }
             redisClient.set(CacheUtil.buildPicCacheKey(String.valueOf(itemId), picType), url, 2 * 24 * 60 * 60);
         });
     }

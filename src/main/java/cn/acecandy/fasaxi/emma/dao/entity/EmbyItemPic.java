@@ -1,8 +1,11 @@
 package cn.acecandy.fasaxi.emma.dao.entity;
 
-import com.baomidou.mybatisplus.annotation.TableId;
-import lombok.Builder;
+import com.mybatisflex.annotation.Id;
+import com.mybatisflex.annotation.Table;
+import com.mybatisflex.core.activerecord.Model;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.experimental.Accessors;
 
 import java.util.Date;
 
@@ -12,14 +15,16 @@ import java.util.Date;
  * @author AceCandy
  * @since 2025/5/3
  */
-@Builder
-@Data
-public class EmbyItemPic {
+@Table("emby_item_pic")
+@EqualsAndHashCode(callSuper = false)
+@Accessors(chain = true)
+@Data(staticConstructor = "x")
+public class EmbyItemPic extends Model<EmbyItemPic> {
 
     /**
      * 项目id
      */
-    @TableId
+    @Id
     private Integer itemId;
 
     /**

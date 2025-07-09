@@ -40,7 +40,6 @@ public class VideoUtil {
     private static final String 尾部 = "尾部";
     private static final String mdat之后 = "mdat之后";
 
-    @SneakyThrows
     public static void main(String[] args) {
         /*try {
             // 示例：分析指定URL的MP4视频

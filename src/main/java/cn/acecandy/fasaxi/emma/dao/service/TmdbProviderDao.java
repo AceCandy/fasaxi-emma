@@ -2,13 +2,15 @@ package cn.acecandy.fasaxi.emma.dao.service;
 
 import cn.acecandy.fasaxi.emma.dao.entity.TmdbProvider;
 import cn.acecandy.fasaxi.emma.dao.mapper.TmdbProviderMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.spring.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.text.StrUtil;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+
+import static cn.acecandy.fasaxi.emma.dao.entity.table.TmdbProviderTableDef.TMDB_PROVIDER;
 
 /**
  * tmdb外部信息 dao
@@ -30,7 +32,7 @@ public class TmdbProviderDao extends ServiceImpl<TmdbProviderMapper, TmdbProvide
         if (dto == null) {
             return false;
         }
-        return baseMapper.insertOrUpdate(dto);
+        return mapper.insertOrUpdate(dto) > 0;
     }
 
     /**
@@ -44,26 +46,24 @@ public class TmdbProviderDao extends ServiceImpl<TmdbProviderMapper, TmdbProvide
         if (StrUtil.isBlank(tmdbId) || StrUtil.isBlank(embyType)) {
             return null;
         }
-        LambdaQueryWrapper<TmdbProvider> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TmdbProvider::getTmdbId, tmdbId)
-                .eq(TmdbProvider::getEmbyType, embyType);
-        ;
-        return baseMapper.selectOne(wrapper);
+
+        QueryWrapper wrapper = QueryWrapper.create()
+                .where(TMDB_PROVIDER.TMDB_ID.eq(tmdbId))
+                .and(TMDB_PROVIDER.EMBY_TYPE.eq(embyType));
+        return mapper.selectOneByQuery(wrapper);
     }
 
     public List<TmdbProvider> findAllImdbNoDouBan() {
-        LambdaQueryWrapper<TmdbProvider> wrapper = new LambdaQueryWrapper<>();
-        wrapper.isNotNull(TmdbProvider::getImdbId)
-                .isNull(TmdbProvider::getDoubanId)
-        ;
-        return baseMapper.selectList(wrapper);
+        QueryWrapper wrapper = QueryWrapper.create()
+                .where(TMDB_PROVIDER.IMDB_ID.isNotNull())
+                .and(TMDB_PROVIDER.DOUBAN_ID.isNull());
+        return mapper.selectListByQuery(wrapper);
     }
 
     public List<TmdbProvider> findAllNoDouBanInfo() {
-        LambdaQueryWrapper<TmdbProvider> wrapper = new LambdaQueryWrapper<>();
-        wrapper.isNotNull(TmdbProvider::getDoubanId)
-                .isNull(TmdbProvider::getDoubanInfo)
-        ;
-        return baseMapper.selectList(wrapper);
+        QueryWrapper wrapper = QueryWrapper.create()
+                .where(TMDB_PROVIDER.DOUBAN_ID.isNotNull())
+                .and(TMDB_PROVIDER.DOUBAN_INFO.isNull());
+        return mapper.selectListByQuery(wrapper);
     }
 }

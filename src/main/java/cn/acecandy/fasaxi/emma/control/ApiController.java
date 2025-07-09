@@ -12,7 +12,7 @@ import cn.acecandy.fasaxi.emma.sao.out.EmbyItemsInfoOut;
 import cn.acecandy.fasaxi.emma.sao.proxy.DoubanProxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.mybatisflex.core.paginate.Page;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
@@ -63,10 +63,11 @@ public class ApiController {
         int pageNum = 1;
         int pageSize = 200;
         while (true) {
-            IPage<EmbyItemPic> picPage = embyItemPicDao.findAllByPage(pageNum, pageSize);
+            Console.log("{}-------{}", pageNum, pageSize);
+            Page<EmbyItemPic> picPage = embyItemPicDao.findAllByPage(pageNum, pageSize);
             List<EmbyItemPic> records = picPage.getRecords();
 
-            List<List<EmbyItemPic>> partitions = CollUtil.partition(records, 50);
+            List<List<EmbyItemPic>> partitions = CollUtil.partition(records, 100);
             for (List<EmbyItemPic> p : partitions) {
                 List<String> itemIds = p.stream().map(i -> NumberUtil.toStr(i.getItemId())).toList();
                 EmbyItemsInfoOut infoOut = embyProxy.getItemInfos(itemIds);
@@ -75,12 +76,11 @@ public class ApiController {
                 }
                 List<String> realItemIds = infoOut.getItems().stream().map(EmbyItem::getItemId).toList();
                 List<String> removeItemIds = CollUtil.subtractToList(itemIds, realItemIds);
-                Console.log(CollUtil.subtractToList(itemIds, realItemIds));
+                Console.log(removeItemIds);
                 removeCnt += embyItemPicDao.delById(removeItemIds.stream().map(NumberUtil::parseInt).toList());
             }
 
-            long totalPages = picPage.getPages();
-            if (pageNum >= totalPages) {
+            if (pageNum >= picPage.getTotalPage()) {
                 break;
             }
             pageNum++;
@@ -96,7 +96,7 @@ public class ApiController {
         int pageNum = 1;
         int pageSize = 200;
         while (true) {
-            IPage<EmbyItemPic> picPage = embyItemPicDao.findAllByPage(pageNum, pageSize);
+            Page<EmbyItemPic> picPage = embyItemPicDao.findAllByPage(pageNum, pageSize);
             List<EmbyItemPic> records = picPage.getRecords();
 
             List<List<EmbyItemPic>> partitions = CollUtil.partition(records, 50);
@@ -112,8 +112,7 @@ public class ApiController {
                 removeCnt += embyItemPicDao.delById(removeItemIds.stream().map(NumberUtil::parseInt).toList());
             }
 
-            long totalPages = picPage.getPages();
-            if (pageNum >= totalPages) {
+            if (pageNum >= picPage.getTotalPage()) {
                 break;
             }
             pageNum++;

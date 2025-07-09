@@ -1,9 +1,12 @@
 package cn.acecandy.fasaxi.emma.dao.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import lombok.Builder;
+import com.mybatisflex.annotation.Id;
+import com.mybatisflex.annotation.KeyType;
+import com.mybatisflex.annotation.Table;
+import com.mybatisflex.core.activerecord.Model;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.experimental.Accessors;
 
 import java.math.BigDecimal;
 import java.util.Date;
@@ -14,14 +17,16 @@ import java.util.Date;
  * @author AceCandy
  * @since 2025/5/3
  */
-@Builder
-@Data
-public class TmdbProvider {
+@Table("tmdb_provider")
+@EqualsAndHashCode(callSuper = false)
+@Accessors(chain = true)
+@Data(staticConstructor = "x")
+public class TmdbProvider extends Model<TmdbProvider> {
 
     /**
      * id
      */
-    @TableId(value = "id", type = IdType.AUTO)
+    @Id(keyType = KeyType.Auto)
     private Long id;
 
     /**

@@ -236,9 +236,8 @@ public class EmbyProxy {
             String doubanId = MapUtil.getStr(prividerMap, "Douban");
             String imdbId = MapUtil.getStr(prividerMap, "Imdb");
             String tvdbId = MapUtil.getStr(prividerMap, "Tvdb");
-            tmdbProvider = TmdbProvider.builder().tmdbId(tmdbId).embyType(embyType)
-                    .doubanId(doubanId).imdbId(imdbId).tvdbId(tvdbId)
-                    .build();
+            tmdbProvider = TmdbProvider.x().setTmdbId(tmdbId).setEmbyType(embyType)
+                    .setDoubanId(doubanId).setImdbId(imdbId).setTvdbId(tvdbId);
             EmbyMediaType embyMediaType = EmbyMediaType.fromEmby(embyType);
 
             // 获取tmdb信息
@@ -277,9 +276,8 @@ public class EmbyProxy {
             String doubanId = MapUtil.getStr(prividerMap, "Douban");
             String imdbId = MapUtil.getStr(prividerMap, "Imdb");
             String tvdbId = MapUtil.getStr(prividerMap, "Tvdb");
-            tmdbProvider = TmdbProvider.builder().tmdbId(tmdbId).embyType(embyType)
-                    .doubanId(doubanId).imdbId(imdbId).tvdbId(tvdbId)
-                    .build();
+            tmdbProvider = TmdbProvider.x().setTmdbId(tmdbId).setEmbyType(embyType)
+                    .setDoubanId(doubanId).setImdbId(imdbId).setTvdbId(tvdbId);
             EmbyMediaType embyMediaType = EmbyMediaType.fromEmby(embyType);
 
             // 获取tmdb信息

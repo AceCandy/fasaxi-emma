@@ -1,7 +1,7 @@
 package cn.acecandy.fasaxi.emma.dao.mapper;
 
 import cn.acecandy.fasaxi.emma.dao.entity.TmdbProvider;
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.mybatisflex.core.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
 /**

@@ -2,17 +2,17 @@ package cn.acecandy.fasaxi.emma.dao.service;
 
 import cn.acecandy.fasaxi.emma.dao.entity.EmbyItemPic;
 import cn.acecandy.fasaxi.emma.dao.mapper.EmbyItemPicMapper;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import jakarta.annotation.Resource;
+import com.mybatisflex.core.paginate.Page;
+import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.spring.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+
+import static cn.acecandy.fasaxi.emma.dao.entity.table.EmbyItemPicTableDef.EMBY_ITEM_PIC;
 
 /**
  * 卧底用户 dao
@@ -22,51 +22,36 @@ import java.util.List;
  */
 @Slf4j
 @Component
-public class EmbyItemPicDao {
-
-    @Resource
-    private EmbyItemPicMapper embyItemPicMapper;
-
-    public boolean insertOrUpdate(EmbyItemPic dto) {
-        if (dto == null) {
-            return false;
-        }
-        return embyItemPicMapper.insertOrUpdate(dto);
-    }
+public class EmbyItemPicDao extends ServiceImpl<EmbyItemPicMapper, EmbyItemPic> {
 
     public List<Integer> findAllItemId() {
-        LambdaQueryWrapper<EmbyItemPic> wrapper = new LambdaQueryWrapper<>();
-        wrapper.select(EmbyItemPic::getItemId).orderByAsc(EmbyItemPic::getItemId)
-        ;
-        return embyItemPicMapper.selectObjs(wrapper);
+        QueryWrapper wrapper = QueryWrapper.create()
+                .select(EMBY_ITEM_PIC.ITEM_ID)
+                .orderBy(EMBY_ITEM_PIC.ITEM_ID, true);
+        return mapper.selectListByQueryAs(wrapper, Integer.class);
     }
 
-    public IPage<EmbyItemPic> findAllByPage(Integer pageNum, Integer pageSize) {
+    public Page<EmbyItemPic> findAllByPage(Integer pageNum, Integer pageSize) {
         if (pageNum == null || pageSize == null) {
             return null;
         }
-        Page<EmbyItemPic> page = new Page<>(pageNum, pageSize);
-
-        // 执行分页查询（这里可以添加查询条件，若无则传null）
-        QueryWrapper<EmbyItemPic> queryWrapper = new QueryWrapper<>();
-        return embyItemPicMapper.selectPage(page, queryWrapper);
+        return mapper.paginate(pageNum, pageSize, QueryWrapper.create());
     }
 
     public int delById(List<Integer> itemIds) {
         if (CollUtil.isEmpty(itemIds)) {
             return 0;
         }
-        return embyItemPicMapper.deleteByIds(itemIds);
+        return mapper.deleteBatchByIds(itemIds);
     }
 
     public List<EmbyItemPic> findByItemId(List<Integer> itemIds) {
         if (CollUtil.isEmpty(itemIds)) {
             return ListUtil.of();
         }
-        LambdaQueryWrapper<EmbyItemPic> wrapper = new LambdaQueryWrapper<>();
-        wrapper.in(EmbyItemPic::getItemId, itemIds)
-        ;
-        return embyItemPicMapper.selectList(wrapper);
+        QueryWrapper wrapper = QueryWrapper.create()
+                .where(EMBY_ITEM_PIC.ITEM_ID.in(itemIds));
+        return mapper.selectListByQuery(wrapper);
     }
 
     public EmbyItemPic findByItemId(Integer itemId) {

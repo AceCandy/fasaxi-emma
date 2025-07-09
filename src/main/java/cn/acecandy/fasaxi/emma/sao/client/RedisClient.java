@@ -90,7 +90,10 @@ public class RedisClient {
         if (value == null) {
             return null;
         }
-        return (String) value;
+        if (value instanceof String valueStr) {
+            return valueStr;
+        }
+        return null;
     }
 
     /**
@@ -134,8 +137,8 @@ public class RedisClient {
                 return null;
             }
             for (Object v : value) {
-                if (v instanceof String) {
-                    return (String) v;
+                if (v instanceof String vStr) {
+                    return vStr;
                 }
             }
             return null;
@@ -163,6 +166,7 @@ public class RedisClient {
         }
     }
 
+    @SuppressWarnings("unchecked")
     public <T> T getBean(String key) {
         Object result = redisTemplate.opsForValue().get(key);
         if (null == result) {
