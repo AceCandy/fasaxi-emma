@@ -3,6 +3,7 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
+import cn.acecandy.fasaxi.emma.config.DoubanConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.config.TmdbConfig;
 import cn.acecandy.fasaxi.emma.dao.entity.EmbyItemPic;
@@ -100,12 +101,10 @@ public final class EmbyProxyUtil {
      * @param tmdbConfig tmdb配置
      * @return {@link String }
      */
-    public static String getCdnPicUrl(String path, TmdbConfig tmdbConfig, String maxWidth) {
-        if (StrUtil.isBlank(path) || StrUtil.startWith(path, "http")) {
-            return null;
-        }
-        if (StrUtil.isBlank(maxWidth)) {
-            maxWidth = "400";
+    public static String getCdnPicUrl(String path, DoubanConfig dbConfig,
+                                      TmdbConfig tmdbConfig, String maxWidth) {
+        if (StrUtil.isBlank(path)) {
+            return path;
         }
         int index = 2;
         /*int index = (path.hashCode() & Integer.MAX_VALUE) % 10;
@@ -114,7 +113,15 @@ public final class EmbyProxyUtil {
         } else {
             index = 0;
         }*/
-        return StrUtil.format(CollUtil.get(tmdbConfig.getImageCdnUrl(), index), maxWidth) + path;
+        if (StrUtil.startWith(path, "http")) {
+            return StrUtil.replaceFirst(path, dbConfig.getImageStaticUrl(),
+                    dbConfig.getImageCdnUrl(), true);
+        }
+        if (StrUtil.isBlank(maxWidth)) {
+            maxWidth = "400";
+        }
+        String cdnPrefix = CollUtil.get(tmdbConfig.getImageCdnUrl(), index);
+        return StrUtil.format(cdnPrefix, maxWidth) + path;
     }
 
     /**

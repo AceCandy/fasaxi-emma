@@ -2,6 +2,7 @@ package cn.acecandy.fasaxi.emma.service;
 
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
+import cn.acecandy.fasaxi.emma.config.DoubanConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.config.TmdbConfig;
 import cn.acecandy.fasaxi.emma.dao.entity.EmbyItemPic;
@@ -53,6 +54,9 @@ public class PicRedirectService {
 
     @Resource
     private TmdbConfig tmdbConfig;
+
+    @Resource
+    private DoubanConfig doubanConfig;
 
     @Resource
     private RedisClient redisClient;
@@ -110,7 +114,7 @@ public class PicRedirectService {
         EmbyItemPic itemPic = embyItemPicDao.findByItemId(NumberUtil.parseInt(itemId));
         String uri = getPic302Uri(itemPic, picType);
         if (StrUtil.isNotBlank(uri)) {
-            String url = getCdnPicUrl(uri, tmdbConfig, maxWidth);
+            String url = getCdnPicUrl(uri, doubanConfig, tmdbConfig, maxWidth);
             response.setStatus(CODE_308);
             response.setHeader("Location", url);
             log.info("{}-图片重定向(DB):[{}-{}] => {}", picType, itemId, maxWidth, url);
@@ -124,7 +128,7 @@ public class PicRedirectService {
                                String itemId, String maxWidth) {
         String uri = redisClient.getStr(CacheUtil.buildPicCacheKey(itemId, picType));
         if (StrUtil.isNotBlank(uri)) {
-            String url = getCdnPicUrl(uri, tmdbConfig, maxWidth);
+            String url = getCdnPicUrl(uri, doubanConfig, tmdbConfig, maxWidth);
             response.setStatus(CODE_308);
             response.setHeader("Location", url);
             log.debug("{}-图片重定向(缓存):[{}-{}] => {}", picType, itemId, maxWidth, url);
@@ -149,7 +153,11 @@ public class PicRedirectService {
             return;
         }
         String uri = getPicUri(imageInfo.getUrl(), tmdbConfig);
-        String url = getCdnPicUrl(uri, tmdbConfig, maxWidth);
+        String url = getCdnPicUrl(uri, doubanConfig, tmdbConfig, maxWidth);
+        if (StrUtil.isBlank(url)) {
+            originReqService.forwardOriReq(request, response);
+            return;
+        }
 
         response.setStatus(CODE_308);
         response.setHeader("Location", url);

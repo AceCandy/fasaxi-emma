@@ -15,6 +15,14 @@ import java.util.List;
 @ConfigurationProperties(prefix = "douban")
 public class DoubanConfig {
     /**
+     * 图片静态url
+     */
+    private String imageStaticUrl;
+    /**
+     * 图片cdn url
+     */
+    private String imageCdnUrl;
+    /**
      * app相关
      */
     private HostInfo app;
