@@ -20,6 +20,7 @@ import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
 
 import java.io.File;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.List;
 
@@ -114,8 +115,11 @@ public final class EmbyProxyUtil {
             index = 0;
         }*/
         if (StrUtil.startWith(path, "http")) {
-            return StrUtil.replaceFirst(path, dbConfig.getImageStaticUrl(),
-                    dbConfig.getImageCdnUrl(), true);
+            URI pathUrl = UrlUtil.toURI(path);
+            if (StrUtil.containsIgnoreCase(pathUrl.getHost(), dbConfig.getImageStaticUrl())) {
+                return dbConfig.getImageCdnUrl() + pathUrl.getPath();
+            }
+            return path;
         }
         if (StrUtil.isBlank(maxWidth)) {
             maxWidth = "400";

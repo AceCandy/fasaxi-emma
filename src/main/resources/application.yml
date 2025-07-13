@@ -56,8 +56,8 @@ tmdb:
     - http://static-mdb.v.geilijiasu.com/t/p/w{}
 
 douban:
-  image-static-url: https://img2.doubanio.com
-  image-cdn-url: http://pic.worldline.space
+  image-static-url: doubanio.com
+  image-cdn-url: http://db-pic.worldline.space
   app:
     host: https://api.douban.com
     apikey:
