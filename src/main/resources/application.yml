@@ -53,11 +53,16 @@ tmdb:
     - http://pic.acecandy.cn/t/p/w{}
     - http://pic1.acecandy.cn/t/p/w{}
     - http://pic.worldline.space/t/p/w{}
-    - http://static-mdb.v.geilijiasu.com/t/p/w{}
+    - https://wsrv.nl/?url=http://image.tmdb.org/t/p/w{}
 
 douban:
   image-static-url: doubanio.com
-  image-cdn-url: http://db-pic.worldline.space
+  image-cdn-url:
+    - http://db-pic.worldline.space
+    - https://wsrv.nl/?url=http://img3.doubanio.com
+    - https://img1.doubanio.com
+    - https://img2.doubanio.com
+    - https://img3.doubanio.com
   app:
     host: https://api.douban.com
     apikey:

@@ -18,6 +18,7 @@ import org.dromara.hutool.core.regex.ReUtil;
 import org.dromara.hutool.core.regex.RegexPool;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
+import org.dromara.hutool.core.util.RandomUtil;
 
 import java.io.File;
 import java.net.URI;
@@ -117,14 +118,15 @@ public final class EmbyProxyUtil {
         if (StrUtil.startWith(path, "http")) {
             URI pathUrl = UrlUtil.toURI(path);
             if (StrUtil.containsIgnoreCase(pathUrl.getHost(), dbConfig.getImageStaticUrl())) {
-                return dbConfig.getImageCdnUrl() + pathUrl.getPath();
+                return RandomUtil.randomEle(dbConfig.getImageCdnUrl()) + pathUrl.getPath();
             }
             return path;
         }
         if (StrUtil.isBlank(maxWidth)) {
             maxWidth = "400";
         }
-        String cdnPrefix = CollUtil.get(tmdbConfig.getImageCdnUrl(), index);
+        // String cdnPrefix = CollUtil.get(tmdbConfig.getImageCdnUrl(), index);
+        String cdnPrefix = RandomUtil.randomEle(tmdbConfig.getImageCdnUrl());
         return StrUtil.format(cdnPrefix, maxWidth) + path;
     }
 

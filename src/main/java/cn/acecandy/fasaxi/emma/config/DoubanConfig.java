@@ -21,7 +21,7 @@ public class DoubanConfig {
     /**
      * 图片cdn url
      */
-    private String imageCdnUrl;
+    private List<String> imageCdnUrl;
     /**
      * app相关
      */
