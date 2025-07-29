@@ -18,7 +18,6 @@ import org.dromara.hutool.core.regex.ReUtil;
 import org.dromara.hutool.core.regex.RegexPool;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
-import org.dromara.hutool.core.util.RandomUtil;
 
 import java.io.File;
 import java.net.URI;
@@ -108,25 +107,22 @@ public final class EmbyProxyUtil {
         if (StrUtil.isBlank(path)) {
             return path;
         }
-        int index = 2;
-        /*int index = (path.hashCode() & Integer.MAX_VALUE) % 10;
-        if (index < 3) {
-            index = 1;
-        } else {
-            index = 0;
-        }*/
         if (StrUtil.startWith(path, "http")) {
             URI pathUrl = UrlUtil.toURI(path);
             if (StrUtil.containsIgnoreCase(pathUrl.getHost(), dbConfig.getImageStaticUrl())) {
-                return RandomUtil.randomEle(dbConfig.getImageCdnUrl()) + pathUrl.getPath();
+                int index = (path.hashCode() & Integer.MAX_VALUE) % 8;
+                String cdnPrefix = CollUtil.get(dbConfig.getImageCdnUrl(), index);
+                return cdnPrefix + pathUrl.getPath();
+                // return RandomUtil.randomEle(dbConfig.getImageCdnUrl()) + pathUrl.getPath();
             }
             return path;
         }
         if (StrUtil.isBlank(maxWidth)) {
             maxWidth = "400";
         }
-        // String cdnPrefix = CollUtil.get(tmdbConfig.getImageCdnUrl(), index);
-        String cdnPrefix = RandomUtil.randomEle(tmdbConfig.getImageCdnUrl());
+        // String cdnPrefix = RandomUtil.randomEle(tmdbConfig.getImageCdnUrl());
+        int index = (path.hashCode() & Integer.MAX_VALUE) % 4;
+        String cdnPrefix = CollUtil.get(tmdbConfig.getImageCdnUrl(), index);
         return StrUtil.format(cdnPrefix, maxWidth) + path;
     }
 
