@@ -8,7 +8,6 @@ import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
-import cn.acecandy.fasaxi.emma.utils.IpUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.acecandy.fasaxi.emma.utils.VideoUtil;
@@ -87,29 +86,29 @@ public class VideoRedirectService {
         ThreadUtil.execVirtual(() -> {
             embyProxy.expertTmdbProvider(embyItem);
         });
-        if (!StrUtil.containsIgnoreCase(request.getRequestURI(), "download")
-                && IpUtil.isInnerIp(request.getIp())) {
-            if (null == embyItem) {
-                response.setStatus(CODE_404);
-                return;
-            }
-
-            EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
-            if (null == range) {
-                response.setHeader("Content-Range", "bytes */" + embyItem.getSize());
-                response.setStatus(CODE_416);
-                return;
-            }
-            if (fileCacheUtil.readFile(response, embyItem, range)) {
-                return;
-            }
-        }
-        if (StrUtil.containsIgnoreCase(embyItem.getPath(), "strm-micu")) {
+        // if (!StrUtil.containsIgnoreCase(request.getRequestURI(), "download")
+        //         && IpUtil.isInnerIp(request.getIp())) {
+        //     if (null == embyItem) {
+        //         response.setStatus(CODE_404);
+        //         return;
+        //     }
+        //
+        //     EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
+        //     if (null == range) {
+        //         response.setHeader("Content-Range", "bytes */" + embyItem.getSize());
+        //         response.setStatus(CODE_416);
+        //         return;
+        //     }
+        //     if (fileCacheUtil.readFile(response, embyItem, range)) {
+        //         return;
+        //     }
+        // }
+        /*if (StrUtil.containsIgnoreCase(embyItem.getPath(), "strm-micu")) {
             ThreadUtil.execVirtual(() -> {
                 fileCacheUtil.writeCacheAndMoov(embyItem);
                 fileCacheUtil.cacheNextEpisode(embyItem);
             });
-        }
+        }*/
 
         String ua = request.getUa();
         if (getByCache(response, mediaSourceId, ua)) {
