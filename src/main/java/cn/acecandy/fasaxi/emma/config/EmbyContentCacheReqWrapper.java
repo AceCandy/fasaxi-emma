@@ -96,7 +96,7 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         List<String> headerNameList = ListUtil.of(request.getHeaderNames());
         headerNameList.forEach(headerName -> {
             if (StrUtil.equalsAnyIgnoreCase(headerName, "Connection", "Keep-Alive", "Proxy-Connection",
-                            "Transfer-Encoding", "Host", "Upgrade", "TE", "Trailer")) {
+                    "Transfer-Encoding", "Host", "Upgrade", "TE", "Trailer")) {
                 return;
             }
             // if (StrUtil.equalsAnyIgnoreCase(headerName, "Host", "Referer")) {
@@ -180,7 +180,16 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
                     userId = MapUtil.getStr(cachedParam, "userid");
                 }
                 if (cachedParam.containsKey("x-emby-device-id")) {
-                    deviceId = MapUtil.getStr(cachedParam, "x-emby-device-id");
+                    if (StrUtil.isBlank(deviceId)) {
+                        deviceId = MapUtil.getStr(cachedParam, "x-emby-device-id");
+                    }
+
+                }
+                Console.log(cachedParam);
+                if (cachedParam.containsKey("deviceid")) {
+                    if (StrUtil.isBlank(deviceId)) {
+                        deviceId = MapUtil.getStr(cachedParam, "deviceid");
+                    }
                 }
                 if (cachedParam.containsKey("x-emby-token")) {
                     apikey = MapUtil.getStr(cachedParam, "x-emby-token");

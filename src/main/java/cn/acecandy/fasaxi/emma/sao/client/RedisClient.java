@@ -82,6 +82,54 @@ public class RedisClient {
         return StrUtil.isBlank(key) ? null : redisTemplate.opsForValue().get(key);
     }
 
+    /**
+     * 从多个key中查询
+     *
+     * @param keys 关键
+     * @return {@link String }
+     */
+    public List<Object> get(String... keys) {
+        if (ArrayUtil.isEmpty(keys)) {
+            return ListUtil.of();
+        }
+        try {
+            List<String> validKeys = CollUtil.removeBlank(ListUtil.of(keys));
+            List<Object> value = redisTemplate.opsForValue().multiGet(validKeys);
+            if (CollUtil.isEmpty(value)) {
+                return ListUtil.of();
+            }
+            return value;
+        } catch (Exception e) {
+            // 这里可以根据实际情况进行日志记录或者其他处理
+            log.warn("redis getStr方法异常:", e);
+            return null;
+        }
+    }
+
+    /**
+     * 从多个key中查询
+     *
+     * @param keys 关键
+     * @return {@link String }
+     */
+    public List<Object> get(List<String> keys) {
+        if (CollUtil.isEmpty(keys)) {
+            return ListUtil.of();
+        }
+        try {
+            List<String> validKeys = CollUtil.removeBlank(keys);
+            List<Object> value = redisTemplate.opsForValue().multiGet(validKeys);
+            if (CollUtil.isEmpty(value)) {
+                return ListUtil.of();
+            }
+            return value;
+        } catch (Exception e) {
+            // 这里可以根据实际情况进行日志记录或者其他处理
+            log.warn("redis getStr方法异常:", e);
+            return null;
+        }
+    }
+
     public String getStr(String key) {
         if (StrUtil.isBlank(key)) {
             return null;
@@ -103,21 +151,11 @@ public class RedisClient {
      * @return {@link String }
      */
     public List<String> getStr(String... keys) {
-        if (ArrayUtil.isEmpty(keys)) {
+        List<Object> value = get(keys);
+        if (CollUtil.isEmpty(value)) {
             return ListUtil.of();
         }
-        try {
-            List<String> validKeys = CollUtil.removeBlank(ListUtil.of(keys));
-            List<Object> value = redisTemplate.opsForValue().multiGet(validKeys);
-            if (CollUtil.isEmpty(value)) {
-                return ListUtil.of();
-            }
-            return value.stream().map(Object::toString).collect(Collectors.toList());
-        } catch (Exception e) {
-            // 这里可以根据实际情况进行日志记录或者其他处理
-            log.warn("redis getStr方法异常:", e);
-            return null;
-        }
+        return value.stream().map(Object::toString).collect(Collectors.toList());
     }
 
     /**
@@ -209,5 +247,73 @@ public class RedisClient {
         });
         // TODO 为了让操作同步这里先等待100毫秒，确保删除操作完成
         ThreadUtil.safeSleep(100);
+    }
+
+    /**
+     * 设置set元素
+     *
+     * @param key   钥匙
+     * @param value 值
+     * @return boolean
+     */
+    public boolean sadd(String key, Object value) {
+        try {
+            redisTemplate.opsForSet().add(key, value);
+            return true;
+        } catch (Exception e) {
+            log.warn("redis sadd方法异常", e);
+            return false;
+        }
+    }
+
+    /**
+     * 获取set所有元素
+     *
+     * @param key 钥匙
+     * @return boolean
+     */
+    public Set<Object> smembers(String key) {
+        try {
+            return redisTemplate.opsForSet().members(key);
+        } catch (Exception e) {
+            log.warn("redis smembers方法异常", e);
+            return SetUtil.of();
+        }
+    }
+
+    /**
+     * 删除set元素
+     *
+     * @param key   钥匙
+     * @param value 值
+     * @return boolean
+     */
+    public boolean srem(String key, Object value) {
+        try {
+            redisTemplate.opsForSet().remove(key, value);
+            return true;
+        } catch (Exception e) {
+            log.warn("redis srem方法异常", e);
+            return false;
+        }
+    }
+
+    /**
+     * 获取set元数量
+     *
+     * @param key 钥匙
+     * @return 数量
+     */
+    public int scard(String key) {
+        try {
+            Long size = redisTemplate.opsForSet().size(key);
+            if (null == size) {
+                return 0;
+            }
+            return size.intValue();
+        } catch (Exception e) {
+            log.warn("redis scard方法异常", e);
+            return 0;
+        }
     }
 }

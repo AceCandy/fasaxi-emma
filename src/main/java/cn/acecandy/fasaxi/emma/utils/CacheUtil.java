@@ -25,6 +25,13 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
 
     // 缓存key
 
+    public static final String THREAD_LIMIT_KEY = "cache:a-thread-limit";
+
+    public static String buildThreadLimitKey(String deviceId) {
+        return THREAD_LIMIT_KEY + ":" + deviceId;
+    }
+
+
     private static final String VIDEO_CACHE_KEY = "cache:video:{}";
     private static final String VIDEO_UA_CACHE_KEY = "cache:video:{}|{}";
     private static final String PIC_CACHE_KEY = "cache:pic:{}|{}";

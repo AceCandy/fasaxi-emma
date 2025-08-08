@@ -11,6 +11,7 @@ import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
+import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
@@ -62,6 +63,8 @@ public class OriginReqService {
 
     @Resource
     private FileCacheUtil fileCacheUtil;
+    @Resource
+    private ThreadLimitUtil threadLimitUtil;
 
     /**
      * 转发原始请求
@@ -96,6 +99,7 @@ public class OriginReqService {
         if (ServletUtil.isGetMethod(req)) {
             return false;
         }
+        stopPlay(req);
         try {
             String url = embyConfig.getHost() + req.getParamUri();
             Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod()))
@@ -145,6 +149,13 @@ public class OriginReqService {
             }
         }
         return true;
+    }
+
+    public void stopPlay(EmbyContentCacheReqWrapper req) {
+        if (!StrUtil.containsIgnoreCase(req.getRequestURI(), "Sessions/Playing/Stopped")) {
+            return;
+        }
+        threadLimitUtil.removeThreadCache(req.getDeviceId());
     }
 
     private void execOriginReq(EmbyContentCacheReqWrapper request,

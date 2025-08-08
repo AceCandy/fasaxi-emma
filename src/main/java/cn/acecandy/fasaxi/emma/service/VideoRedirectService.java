@@ -9,6 +9,7 @@ import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
+import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.acecandy.fasaxi.emma.utils.VideoUtil;
 import jakarta.annotation.Resource;
@@ -40,7 +41,6 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.Charset;
 import java.util.Comparator;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 
@@ -62,6 +62,9 @@ public class VideoRedirectService {
     private VideoUtil videoUtil;
 
     @Resource
+    private ThreadLimitUtil threadLimitUtil;
+
+    @Resource
     private ClientEngine httpClient;
 
     @Resource
@@ -75,15 +78,6 @@ public class VideoRedirectService {
 
     @Resource
     private FileCacheUtil fileCacheUtil;
-
-    /**
-     * 线程缓存
-     * <p>
-     * 格式：
-     * key：云盘类型 115 123
-     * value：缓存deviceId列表
-     */
-    private final static Map<Integer, List<String>> THREAD_CACHE = MapUtil.newSafeConcurrentHashMap();
 
     @SneakyThrows
     public void processVideo(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
@@ -121,7 +115,7 @@ public class VideoRedirectService {
         }*/
 
         String ua = request.getUa();
-        if (getByCache(response, mediaSourceId, ua)) {
+        if (getByCache(request, response, mediaSourceId, ua)) {
             return;
         }
 
@@ -132,7 +126,7 @@ public class VideoRedirectService {
             return;
         }
         try {
-            if (getByCache(response, mediaSourceId, ua)) {
+            if (getByCache(request, response, mediaSourceId, ua)) {
                 return;
             }
             exec302(request, response, mediaSourceId);
@@ -141,10 +135,17 @@ public class VideoRedirectService {
         }
     }
 
-    private boolean getByCache(HttpServletResponse response, String mediaSourceId, String ua) {
+    private boolean getByCache(EmbyContentCacheReqWrapper request, HttpServletResponse response,
+                               String mediaSourceId, String ua) {
         String cacheUrl = redisClient.getStrFindOne(CacheUtil.buildVideoCacheKeyList(mediaSourceId, ua));
         if (StrUtil.isNotBlank(cacheUrl)) {
             cacheUrl = getPtUrl(cacheUrl);
+            if (StrUtil.containsIgnoreCase(cacheUrl, "download-cdn")) {
+                threadLimitUtil.setThreadCache(123, request.getDeviceId());
+            } else if (StrUtil.containsIgnoreCase(cacheUrl, "115cdn")) {
+                threadLimitUtil.setThreadCache(115, request.getDeviceId());
+            }
+
             response.setStatus(HttpServletResponse.SC_FOUND);
             response.setHeader("Location", cacheUrl);
             log.warn("视频重定向(缓存):[{}|{}] => {}", mediaSourceId, ua, UrlDecoder.decode(cacheUrl));
@@ -197,39 +198,33 @@ public class VideoRedirectService {
                     realUrl = StrUtil.replaceIgnoreCase(mediaPath, strmPath, embyConfig.getOriginPt());
                 }
                 realUrl = UrlEncoder.encodeQuery(realUrl);
-                // HtmlUtil
-                // realut
             } else {
                 // 2. head获取处理其他网盘直链远程路径
-                /*if (StrUtil.containsAny(mediaPath, "/d/123", "/d/zong123",
-                        "/d/%2F123%2F%", "/d/%2Fzong123%2F%")) {
-                    mediaPath = StrUtil.replace(mediaPath, "192.168.1.205", "192.168.1.249");
-                }*/
-                String proxyUrl = UrlEncoder.encodeQuery(StrUtil.replace(mediaPath,
+                realUrl = UrlEncoder.encodeQuery(StrUtil.replace(mediaPath,
                         "http://192.168.1.249:5244/d", "http://195.128.102.208:5244/p"));
-                if (CollUtil.size(THREAD_CACHE.get(115)) + CollUtil.size(THREAD_CACHE.get(123)) < 6) {
-
-                    String path115 = mediaPath;
-                    String path123 = mediaPath;
-                    if (StrUtil.contains(mediaPath, "/d/new115/emby2/")) {
-                        path123 = StrUtil.replace(mediaPath, "new115/emby2/", "zong123/emby2/");
-                    }
+                String path115 = mediaPath;
+                String path123 = mediaPath;
+                String real123 = "";
+                String real115 = "";
+                if (StrUtil.contains(mediaPath, "/d/new115/emby2/")) {
+                    path123 = StrUtil.replace(mediaPath, "new115/emby2/", "zong123/emby2/");
+                }
+                if (!threadLimitUtil.limitThreadCache()) {
                     Map<String, String> header302 = MapUtil.<String, String>builder()
                             .put("User-Agent", request.getUa()).put("Range", request.getRange()).build();
-                    realUrl = embyProxy.fetch302Path(path123, header302);
-                    if (StrUtil.isBlank(realUrl)) {
-                        embyProxy.trans115To123(mediaPath);
-                        realUrl = embyProxy.fetch302Path(path115, header302);
-                        if (StrUtil.isBlank(realUrl)) {
+                    real123 = embyProxy.fetch302Path(path123, header302);
+                    if (StrUtil.isBlank(real123)) {
+                        embyProxy.trans115To123(real123);
+                        real115 = embyProxy.fetch302Path(path115, header302);
+                        if (StrUtil.isBlank(real115)) {
                             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                             return;
                         }
                     }
                     // 3. 动态计算过期时间
-                    if (!StrUtil.startWithIgnoreCase(realUrl, embyConfig.getOriginPt())) {
-                        exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(realUrl, Charset.defaultCharset()),
-                                "t") - DateUtil.currentSeconds() - 5 * 60);
-                    }
+                    realUrl = StrUtil.isBlank(real123) ? real115 : real123;
+                    exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(realUrl, Charset.defaultCharset()),
+                            "t") - DateUtil.currentSeconds() - 5 * 60);
                 }
             }
             // 4. 统一缓存和重定向逻辑
@@ -239,9 +234,9 @@ public class VideoRedirectService {
             redisClient.set(cacheKey, realUrl, exTime);
             realUrl = getPtUrl(realUrl);
             if (StrUtil.containsIgnoreCase(realUrl, "download-cdn")) {
-                THREAD_CACHE.get(123).add(request.getDeviceId());
+                threadLimitUtil.setThreadCache(123, request.getDeviceId());
             } else if (StrUtil.containsIgnoreCase(realUrl, "115cdn")) {
-                THREAD_CACHE.get(115).add(request.getDeviceId());
+                threadLimitUtil.setThreadCache(115, request.getDeviceId());
             }
             doRedirect(response, realUrl, exTime, mediaPath);
 
