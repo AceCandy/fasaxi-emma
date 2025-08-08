@@ -32,7 +32,7 @@ public class TmdbProviderDao extends ServiceImpl<TmdbProviderMapper, TmdbProvide
         if (dto == null) {
             return false;
         }
-        return mapper.insertOrUpdate(dto) > 0;
+        return mapper.insertOrUpdateSelective(dto) > 0;
     }
 
     /**

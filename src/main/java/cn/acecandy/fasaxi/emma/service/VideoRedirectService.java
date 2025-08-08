@@ -177,7 +177,7 @@ public class VideoRedirectService {
             return;
         }
         String mediaPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
-        int exTime = 2 * 24 * 60 * 60;
+        int exTime = 24 * 60 * 60;
         String realUrl = mediaPath;
         if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
             // 1. 处理pt/Emby的特殊情况 直接替换为168路径
@@ -190,21 +190,35 @@ public class VideoRedirectService {
                 // realut
             } else {
                 // 2. head获取处理其他网盘直链远程路径
-                if (StrUtil.containsAny(mediaPath, "/d/123", "/d/zong123",
+                /*if (StrUtil.containsAny(mediaPath, "/d/123", "/d/zong123",
                         "/d/%2F123%2F%", "/d/%2Fzong123%2F%")) {
                     mediaPath = StrUtil.replace(mediaPath, "192.168.1.205", "192.168.1.249");
-                }
-                Map<String, String> header302 = MapUtil.<String, String>builder()
-                        .put("User-Agent", request.getUa()).put("Range", request.getRange()).build();
-                realUrl = embyProxy.fetch302Path(mediaPath, header302);
-                if (StrUtil.isBlank(realUrl)) {
-                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                    return;
-                }
-                // 3. 动态计算过期时间
-                if (!StrUtil.startWithIgnoreCase(realUrl, embyConfig.getOriginPt())) {
-                    exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(realUrl, Charset.defaultCharset()),
-                            "t") - DateUtil.currentSeconds() - 5 * 60);
+                }*/
+                if (StrUtil.contains(realUrl, "http://192.168.1.249:5244")) {
+                    realUrl = StrUtil.replace(mediaPath, "http://192.168.1.249:5244",
+                            "http://alist.netcup-2o.worldline.space");
+                } else {
+                    String path115 = mediaPath;
+                    String path123 = mediaPath;
+                    if (StrUtil.contains(mediaPath, "/d/new115/emby2/")) {
+                        path123 = StrUtil.replace(mediaPath, "new115/emby2/", "zong123/emby2/");
+                    }
+                    Map<String, String> header302 = MapUtil.<String, String>builder()
+                            .put("User-Agent", request.getUa()).put("Range", request.getRange()).build();
+                    realUrl = embyProxy.fetch302Path(path123, header302);
+                    if (StrUtil.isBlank(realUrl)) {
+                        embyProxy.trans115To123(mediaPath);
+                        realUrl = embyProxy.fetch302Path(path115, header302);
+                        if (StrUtil.isBlank(realUrl)) {
+                            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                            return;
+                        }
+                    }
+                    // 3. 动态计算过期时间
+                    if (!StrUtil.startWithIgnoreCase(realUrl, embyConfig.getOriginPt())) {
+                        exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(realUrl, Charset.defaultCharset()),
+                                "t") - DateUtil.currentSeconds() - 5 * 60);
+                    }
                 }
             }
             // 4. 统一缓存和重定向逻辑

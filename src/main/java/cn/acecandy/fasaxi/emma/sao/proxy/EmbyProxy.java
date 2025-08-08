@@ -27,8 +27,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.date.DateTime;
 import org.dromara.hutool.core.exception.ExceptionUtil;
-import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.map.MapUtil;
+import org.dromara.hutool.core.net.url.UrlBuilder;
+import org.dromara.hutool.core.net.url.UrlDecoder;
+import org.dromara.hutool.core.net.url.UrlPath;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.http.HttpUtil;
 import org.dromara.hutool.http.client.Request;
@@ -557,16 +559,53 @@ public class EmbyProxy {
         });
     }
 
-    public static void main(String[] args) {
-        String param = "Recursive=true&ImageRefreshMode=FullRefresh&MetadataRefreshMode=FullRefresh&ReplaceAllImages=false&ReplaceAllMetadata=true&X-Emby-Client=Emby+Web&X-Emby-Device-Name=Microsoft+Edge+macOS&X-Emby-Device-Id=6a95e0b8-b44e-450e-bf64-6090e799000a&X-Emby-Client-Version=4.9.0.42&X-Emby-Token=e2262107a13c45a7bfc48884be6f98ad&X-Emby-Language=zh-cn";
-        Map<String, Object> paramMap = MapUtil.<String, Object>builder("X-Emby-Token", "b8647127d2fa4ae6b27b6918ed8a0593")
-                .put("imageRefreshMode", "FullRefresh").put("metadataRefreshMode", "FullRefresh")
-                .put("recursive", true).put("replaceAllImages", "true")
-                .put("api_key", "e2262107a13c45a7bfc48884be6f98ad")
-                .put("replaceAllMetadata", true).map();
-        // String res = HttpUtil.post("https://emby-real.acecandy.cn:880/emby/Items/1417549/Refresh", param);
-        // Console.log(res);
-        Console.log(HttpUtil.createClient("JdkClientEngine").send(HttpUtil.createPost(HttpUtil.urlWithFormUrlEncoded("https://emby-real.acecandy.cn:880/emby/Items/1417549/Refresh", paramMap, Charset.defaultCharset()))).getStatus());
+    /**
+     * 115离线至113
+     *
+     * @param strm 扫描隧道显微镜
+     */
+    public void trans115To123(String strm) {
+        if (StrUtil.isBlank(strm)) {
+            return;
+        }
+        UrlBuilder urlBuilder = UrlBuilder.of(UrlDecoder.decode(strm));
+        UrlPath urlPath = urlBuilder.getPath();
+        List<CharSequence> allPath = urlPath.getSegments();
+        List<CharSequence> path115Seq = CollUtil.sub(allPath, 2, -1);
+        List<CharSequence> path113Seq = CollUtil.sub(allPath, 2, -2);
+        String path115 = "/" + StrUtil.join("/", path115Seq);
+        String path123 = "/" + StrUtil.join("/", path113Seq);
 
+        String url = embyConfig.getEmbyNginxHost() + "/api/v1/transfer_115_to_123";
+        try (Response res = httpClient.send(Request.of(url).method(Method.POST)
+                .form(MapUtil.<String, Object>builder("cookie_name_115", "115生活ios端")
+                        .put("path_in_115", path115)
+                        .put("cookie_name_123", "123cookie")
+                        .put("path_in_123", path123)
+                        .put("is_clear_records", "0").map()))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+        } catch (Exception e) {
+            log.warn("trans115To123 网络请求异常: ", e);
+        }
+    }
+
+    public static void main(String[] args) {
+        /*String strm = "http://192.168.1.249:5244/d/new115/电影/动画电影/15名动画人 (2008) [tmdbid=262833]/15名动画人 (2008).mp4";
+        UrlBuilder urlBuilder = UrlBuilder.of(UrlDecoder.decode(strm));
+        UrlPath urlPath = urlBuilder.getPath();
+        List<CharSequence> allPath = urlPath.getSegments();
+        Console.log(allPath);
+        List<CharSequence> path115Seq = CollUtil.sub(allPath, 2, -1);
+        List<CharSequence> path113Seq = CollUtil.sub(allPath, 2, -2);
+        String path115 = "/" + StrUtil.join("/", path115Seq);
+        String path123 = "/" + StrUtil.join("/", path113Seq);
+        Console.log(path115);
+        Console.log(path123);*/
     }
 }
