@@ -155,13 +155,13 @@ public class VideoRedirectService {
             cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
                     embyConfig.getOriginPt(), embyConfig.getTransPt1());
         } else {*/
-        if (minute % 3 == 0) {
+        /*if (minute % 3 == 0) {
             cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
                     embyConfig.getOriginPt(), embyConfig.getTransPt2());
-        } else if (minute % 3 == 1) {
+        } else*/ if (minute % 2 == 0) {
             cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
                     embyConfig.getOriginPt(), embyConfig.getTransPt3());
-        } else if (minute % 3 == 2) {
+        } else if (minute % 2 == 1) {
             cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
                     embyConfig.getOriginPt(), embyConfig.getTransPt4());
         }
@@ -195,8 +195,9 @@ public class VideoRedirectService {
                     mediaPath = StrUtil.replace(mediaPath, "192.168.1.205", "192.168.1.249");
                 }*/
                 if (StrUtil.contains(realUrl, "http://192.168.1.249:5244")) {
-                    realUrl = StrUtil.replace(mediaPath, "http://192.168.1.249:5244",
-                            "http://alist.netcup-2o.worldline.space");
+                    realUrl = StrUtil.replace(mediaPath, "http://192.168.1.249:5244/d",
+                            "http://195.128.102.208:5244/p");
+                    realUrl = UrlEncoder.encodeQuery(realUrl);
                 } else {
                     String path115 = mediaPath;
                     String path123 = mediaPath;
@@ -372,6 +373,6 @@ public class VideoRedirectService {
     }
 
     public static void main(String[] args) {
-        Console.log(UrlEncoder.encodeQuery("http://192.168.1.205:5244/d/pt/Emby1/动画电影/万王之王 (2025)/万王之王 (2025) - 1080p - REDMT.mkv"));
+        Console.log(UrlEncoder.encodeQuery("http://alist.netcup-2o.worldline.space/d/123/整理/短剧3/食尽人间烟火色/S01E02.mp4"));
     }
 }

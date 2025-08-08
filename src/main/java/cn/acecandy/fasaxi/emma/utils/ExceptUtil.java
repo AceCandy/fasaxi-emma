@@ -24,6 +24,7 @@ public final class ExceptUtil extends ExceptionUtil {
      */
     public static boolean isConnectionTerminated(IOException e) {
         String msg = getSimpleMessage(e);
-        return StrUtil.containsAnyIgnoreCase(msg, "Connection terminated", "Broken pipe");
+        return StrUtil.containsAnyIgnoreCase(msg, "Connection terminated",
+                "Broken pipe", "Connection reset by peer");
     }
 }
