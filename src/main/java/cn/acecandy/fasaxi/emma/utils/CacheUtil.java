@@ -84,7 +84,6 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
         return StrUtil.format(PIC_CACHE_KEY, itemId, picType.getValue());
     }
 
-
     /**
      * 媒体直链 缓存
      */

@@ -40,6 +40,7 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.Charset;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 
@@ -74,6 +75,15 @@ public class VideoRedirectService {
 
     @Resource
     private FileCacheUtil fileCacheUtil;
+
+    /**
+     * 线程缓存
+     * <p>
+     * 格式：
+     * key：云盘类型 115 123
+     * value：缓存deviceId列表
+     */
+    private final static Map<Integer, List<String>> THREAD_CACHE = MapUtil.newSafeConcurrentHashMap();
 
     @SneakyThrows
     public void processVideo(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
@@ -158,7 +168,8 @@ public class VideoRedirectService {
         /*if (minute % 3 == 0) {
             cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
                     embyConfig.getOriginPt(), embyConfig.getTransPt2());
-        } else*/ if (minute % 2 == 0) {
+        } else*/
+        if (minute % 2 == 0) {
             cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
                     embyConfig.getOriginPt(), embyConfig.getTransPt3());
         } else if (minute % 2 == 1) {
@@ -194,11 +205,10 @@ public class VideoRedirectService {
                         "/d/%2F123%2F%", "/d/%2Fzong123%2F%")) {
                     mediaPath = StrUtil.replace(mediaPath, "192.168.1.205", "192.168.1.249");
                 }*/
-                if (StrUtil.contains(realUrl, "http://192.168.1.249:5244")) {
-                    realUrl = StrUtil.replace(mediaPath, "http://192.168.1.249:5244/d",
-                            "http://195.128.102.208:5244/p");
-                    realUrl = UrlEncoder.encodeQuery(realUrl);
-                } else {
+                String proxyUrl = UrlEncoder.encodeQuery(StrUtil.replace(mediaPath,
+                        "http://192.168.1.249:5244/d", "http://195.128.102.208:5244/p"));
+                if (CollUtil.size(THREAD_CACHE.get(115)) + CollUtil.size(THREAD_CACHE.get(123)) < 6) {
+
                     String path115 = mediaPath;
                     String path123 = mediaPath;
                     if (StrUtil.contains(mediaPath, "/d/new115/emby2/")) {
@@ -228,6 +238,11 @@ public class VideoRedirectService {
                     : CacheUtil.buildVideoCacheKey(mediaSourceId, request.getUa());
             redisClient.set(cacheKey, realUrl, exTime);
             realUrl = getPtUrl(realUrl);
+            if (StrUtil.containsIgnoreCase(realUrl, "download-cdn")) {
+                THREAD_CACHE.get(123).add(request.getDeviceId());
+            } else if (StrUtil.containsIgnoreCase(realUrl, "115cdn")) {
+                THREAD_CACHE.get(115).add(request.getDeviceId());
+            }
             doRedirect(response, realUrl, exTime, mediaPath);
 
             return;
