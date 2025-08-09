@@ -51,7 +51,7 @@ tmdb:
   image-static-url: https://image.tmdb.org/t/p/original
   image-cdn-url:
     - http://pic.acecandy.cn/t/p/w{}
-    - http://pic1.acecandy.cn/t/p/w{}
+#    - http://pic1.acecandy.cn/t/p/w{}
     - http://pic.worldline.space/t/p/w{}
     - https://wsrv.nl/?url=http://image.tmdb.org/t/p/w{}
 

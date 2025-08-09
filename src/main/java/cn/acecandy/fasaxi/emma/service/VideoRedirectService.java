@@ -189,6 +189,7 @@ public class VideoRedirectService {
             return;
         }
         String mediaPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
+        mediaPath = UrlDecoder.decode(mediaPath);
         int exTime = 24 * 60 * 60;
         String realUrl = mediaPath;
         if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
@@ -214,7 +215,8 @@ public class VideoRedirectService {
                             .put("User-Agent", request.getUa()).put("Range", request.getRange()).build();
                     real123 = embyProxy.fetch302Path(path123, header302);
                     if (StrUtil.isBlank(real123)) {
-                        embyProxy.trans115To123(real123);
+                        // 离线到123
+                        embyProxy.trans115To123(path115);
                         real115 = embyProxy.fetch302Path(path115, header302);
                         if (StrUtil.isBlank(real115)) {
                             response.setStatus(HttpServletResponse.SC_NOT_FOUND);

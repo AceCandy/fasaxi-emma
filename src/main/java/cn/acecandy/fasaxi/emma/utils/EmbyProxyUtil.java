@@ -110,7 +110,7 @@ public final class EmbyProxyUtil {
         if (StrUtil.startWith(path, "http")) {
             URI pathUrl = UrlUtil.toURI(path);
             if (StrUtil.containsIgnoreCase(pathUrl.getHost(), dbConfig.getImageStaticUrl())) {
-                int index = (path.hashCode() & Integer.MAX_VALUE) % 8;
+                int index = (path.hashCode() & Integer.MAX_VALUE) % CollUtil.size(dbConfig.getImageCdnUrl());
                 String cdnPrefix = CollUtil.get(dbConfig.getImageCdnUrl(), index);
                 return cdnPrefix + pathUrl.getPath();
                 // return RandomUtil.randomEle(dbConfig.getImageCdnUrl()) + pathUrl.getPath();
@@ -121,7 +121,7 @@ public final class EmbyProxyUtil {
             maxWidth = "400";
         }
         // String cdnPrefix = RandomUtil.randomEle(tmdbConfig.getImageCdnUrl());
-        int index = (path.hashCode() & Integer.MAX_VALUE) % 4;
+        int index = (path.hashCode() & Integer.MAX_VALUE) % CollUtil.size(tmdbConfig.getImageCdnUrl());
         String cdnPrefix = CollUtil.get(tmdbConfig.getImageCdnUrl(), index);
         return StrUtil.format(cdnPrefix, maxWidth) + path;
     }

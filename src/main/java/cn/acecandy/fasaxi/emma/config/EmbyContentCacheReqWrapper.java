@@ -185,7 +185,6 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
                     }
 
                 }
-                Console.log(cachedParam);
                 if (cachedParam.containsKey("deviceid")) {
                     if (StrUtil.isBlank(deviceId)) {
                         deviceId = MapUtil.getStr(cachedParam, "deviceid");
