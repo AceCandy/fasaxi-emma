@@ -349,7 +349,8 @@ public class EmbyProxy {
                 .form(MapUtil.<String, Object>builder("api_key", embyConfig.getApiKey()).put("Limit", 1)
                         .put("ProviderName", "TheMovieDb").put("Type", picType.getValue()).map()))) {
             if (!res.isOk()) {
-                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+                // throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+                return EmbyRemoteImageOut.Img.builder().url("undefined").build();
             }
             String resBody = res.bodyStr();
             if (!JSONUtil.isTypeJSON(resBody)) {

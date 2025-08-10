@@ -27,6 +27,7 @@ public class EmbyRemoteImageOut {
      * @author AceCandy
      * @since 2025/05/03
      */
+    @Builder
     @Data
     public static class Img {
         /**
