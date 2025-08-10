@@ -24,7 +24,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.concurrent.locks.Lock;
 
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_308;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_404;
@@ -133,7 +132,7 @@ public class PicRedirectService {
         }
         if (StrUtil.equals(uri, "undefined")) {
             // 无效缓存直接返回200
-            response.setStatus(CODE_200);
+            response.setStatus(CODE_404);
         } else {
             String url = getCdnPicUrl(uri, doubanConfig, tmdbConfig, maxWidth);
             response.setStatus(CODE_308);
@@ -157,7 +156,7 @@ public class PicRedirectService {
             originReqService.forwardOriReq(request, response);
             return;
         } else if (StrUtil.equals(imageInfo.getUrl(), "undefined")) {
-            response.setStatus(CODE_200);
+            response.setStatus(CODE_404);
             redisClient.set(CacheUtil.buildPicCacheKey(String.valueOf(itemId), picType), "undefined", 60 * 60);
             return;
         }

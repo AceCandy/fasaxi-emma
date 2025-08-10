@@ -1,6 +1,5 @@
 package cn.acecandy.fasaxi.emma.dao.entity;
 
-import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.Table;
 import com.mybatisflex.core.activerecord.Model;
 import lombok.Data;
@@ -24,7 +23,7 @@ public class EmbyItemPic extends Model<EmbyItemPic> {
     /**
      * 项目id
      */
-    @Id
+    // @Id
     private Integer itemId;
 
     /**
