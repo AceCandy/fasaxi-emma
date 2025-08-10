@@ -27,6 +27,7 @@ import java.util.concurrent.locks.Lock;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_308;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_404;
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_500;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.非图片;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getCdnPicUrl;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getPic302Uri;
@@ -131,7 +132,10 @@ public class PicRedirectService {
             String url = getCdnPicUrl(uri, doubanConfig, tmdbConfig, maxWidth);
             response.setStatus(CODE_308);
             response.setHeader("Location", url);
-            log.debug("{}-图片重定向(缓存):[{}-{}] => {}", picType, itemId, maxWidth, url);
+            // log.debug("{}-图片重定向(缓存):[{}-{}] => {}", picType, itemId, maxWidth, url);
+            return true;
+        } else if (StrUtil.equals(uri, "NULL")) {
+            response.setStatus(CODE_500);
             return true;
         }
         return false;
@@ -149,7 +153,9 @@ public class PicRedirectService {
                             String itemId, EmbyPicType picType, String maxWidth) {
         EmbyRemoteImageOut.Img imageInfo = embyProxy.getRemoteImage(itemId, picType);
         if (null == imageInfo) {
-            originReqService.forwardOriReq(request, response);
+            redisClient.set(CacheUtil.buildPicCacheKey(String.valueOf(itemId), picType), "NULL", 60 * 60);
+            response.setStatus(CODE_500);
+            // originReqService.forwardOriReq(request, response);
             return;
         }
         String uri = getPicUri(imageInfo.getUrl(), tmdbConfig);
