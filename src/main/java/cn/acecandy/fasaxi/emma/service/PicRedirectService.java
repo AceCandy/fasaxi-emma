@@ -3,6 +3,7 @@ package cn.acecandy.fasaxi.emma.service;
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.config.DoubanConfig;
+import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.config.TmdbConfig;
 import cn.acecandy.fasaxi.emma.dao.entity.EmbyItemPic;
@@ -20,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.math.NumberUtil;
 import org.dromara.hutool.core.text.StrUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.locks.Lock;
@@ -60,6 +62,8 @@ public class PicRedirectService {
 
     @Resource
     private RedisClient redisClient;
+    @Autowired
+    private EmbyConfig embyConfig;
 
     /**
      * 处理图片重定向请求
@@ -77,6 +81,11 @@ public class PicRedirectService {
         String itemId = parseItemIdByUrl(request.getRequestURI());
         if (StrUtil.isBlank(itemId)) {
             response.setStatus(CODE_404);
+            return;
+        }
+        if (Integer.parseInt(itemId) < 0) {
+            response.setStatus(CODE_308);
+            response.setHeader("Location", embyConfig.getEmbyToolkitHost() + request.getParamUri());
             return;
         }
 
@@ -153,7 +162,9 @@ public class PicRedirectService {
                             String itemId, EmbyPicType picType, String maxWidth) {
         EmbyRemoteImageOut.Img imageInfo = embyProxy.getRemoteImage(itemId, picType);
         if (null == imageInfo) {
-            originReqService.forwardOriReq(request, response);
+            response.setStatus(CODE_308);
+            response.setHeader("Location", embyConfig.getOuterHost() + request.getParamUri());
+            // originReqService.forwardOriReq(request, response);
             return;
         } else if (StrUtil.equals(imageInfo.getUrl(), "undefined")) {
             response.setStatus(CODE_404);
@@ -182,13 +193,16 @@ public class PicRedirectService {
      */
     private void asyncWriteItemPic(Integer itemId, String url, EmbyPicType picType) {
         ThreadUtil.execVirtual(() -> {
-            switch (picType) {
-                case 封面 -> EmbyItemPic.x().setItemId(itemId).setPosterPath(url).saveOrUpdate();
-                case 背景图 -> EmbyItemPic.x().setItemId(itemId).setBackdropPath(url).saveOrUpdate();
-                case Logo -> EmbyItemPic.x().setItemId(itemId).setLogoPath(url).saveOrUpdate();
-                default -> throw new BaseException("图片类型异常: " + picType);
+            try {
+                switch (picType) {
+                    case 封面 -> embyItemPicDao.saveOrUpdate(EmbyItemPic.x().setItemId(itemId).setPosterPath(url));
+                    case 背景图 -> embyItemPicDao.saveOrUpdate(EmbyItemPic.x().setItemId(itemId).setBackdropPath(url));
+                    case Logo -> embyItemPicDao.saveOrUpdate(EmbyItemPic.x().setItemId(itemId).setLogoPath(url));
+                    default -> throw new BaseException("图片类型异常: " + picType);
+                }
+            } finally {
+                redisClient.set(CacheUtil.buildPicCacheKey(String.valueOf(itemId), picType), url, 2 * 24 * 60 * 60);
             }
-            redisClient.set(CacheUtil.buildPicCacheKey(String.valueOf(itemId), picType), url, 2 * 24 * 60 * 60);
         });
     }
 

@@ -39,6 +39,8 @@ import org.dromara.hutool.http.client.body.ResponseBody;
 import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.dromara.hutool.http.meta.Method;
 import org.dromara.hutool.http.server.servlet.ServletUtil;
+import org.dromara.hutool.json.JSONArray;
+import org.dromara.hutool.json.JSONObject;
 import org.dromara.hutool.json.JSONUtil;
 import org.springframework.stereotype.Component;
 
@@ -484,6 +486,7 @@ public class EmbyProxy {
     private String changeRespBody(EmbyContentCacheReqWrapper request, String bodyStr) {
         refreshItem(request, bodyStr);
         bodyStr = searchItem(request, bodyStr);
+        bodyStr = reBuildView(request, bodyStr);
         return StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
     }
 
@@ -507,6 +510,23 @@ public class EmbyProxy {
                 request.getCachedParam().get("searchterm").toString());
         itemInfo.setItems(items);
         return JSONUtil.toJsonStr(itemInfo);
+    }
+
+    /**
+     * 重建虚拟视图
+     *
+     * @param request 要求
+     * @param bodyStr 身体str
+     * @return {@link String }
+     */
+    private String reBuildView(EmbyContentCacheReqWrapper request, String bodyStr) {
+        if (request.getToolkitView() == null) {
+            return bodyStr;
+        }
+        JSONObject viewJn = JSONUtil.parseObj(bodyStr);
+        JSONArray items = viewJn.getJSONArray("Items");
+        items.addAll(0, request.getToolkitView());
+        return viewJn.toString();
     }
 
     /**

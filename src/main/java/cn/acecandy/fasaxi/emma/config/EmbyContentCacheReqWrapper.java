@@ -14,6 +14,7 @@ import org.dromara.hutool.core.text.split.SplitUtil;
 import org.dromara.hutool.http.HttpUtil;
 import org.dromara.hutool.http.meta.HeaderName;
 import org.dromara.hutool.http.server.servlet.ServletUtil;
+import org.dromara.hutool.json.JSONArray;
 import org.dromara.hutool.json.JSONObject;
 import org.dromara.hutool.json.JSONUtil;
 
@@ -50,6 +51,8 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     @Setter
     public String mediaSourceId;
     @Getter
+    public String parentId;
+    @Getter
     private String userId;
     @Getter
     private String deviceId;
@@ -59,6 +62,17 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     private String ip;
     @Getter
     private final Map<String, Object> cachedParam = new TreeMap<>();
+
+    @Getter
+    private JSONArray toolkitView;
+
+    public void buildToolKit(String toolkitView) {
+        if (!JSONUtil.isTypeJSON(toolkitView)) {
+            return;
+        }
+        JSONObject viewJn = JSONUtil.parseObj(toolkitView);
+        this.toolkitView = viewJn.getJSONArray("Items");
+    }
 
     public EmbyContentCacheReqWrapper(HttpServletRequest request) throws IOException {
         super(request);
@@ -76,9 +90,11 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         }
         if (JSONUtil.isTypeJSON(formData)) {
             JSONObject jsonData = JSONUtil.parseObj(formData);
-            // Console.log(jsonData);
             if (jsonData.containsKey("ItemId")) {
                 mediaSourceId = jsonData.getStr("ItemId");
+            }
+            if (jsonData.containsKey("ParentId")) {
+                parentId = jsonData.getStr("ParentId");
             }
             return;
         }
@@ -87,7 +103,15 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
             if (CollUtil.size(entrys) < 2) {
                 continue;
             }
-            paramMap.computeIfAbsent(CollUtil.getFirst(entrys), v -> CollUtil.getLast(entrys));
+            String key = CollUtil.getFirst(entrys);
+            String value = CollUtil.getLast(entrys);
+            if (StrUtil.equalsIgnoreCase(key, "ItemId")) {
+                mediaSourceId = key;
+            }
+            if (StrUtil.equalsIgnoreCase(key, "ParentId")) {
+                parentId = key;
+            }
+            paramMap.computeIfAbsent(key, v -> value);
         }
     }
 
@@ -166,32 +190,34 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
                 mediaSourceId = itemId;
             }
             if (MapUtil.isNotEmpty(paramMap)) {
-                paramMap.forEach((k, v) -> cachedParam.put(k.toLowerCase(), v));
+                cachedParam.putAll(paramMap);
                 // if (cachedParam.containsKey("searchterm")) {
-                if (cachedParam.containsKey("includeitemtypes")) {
-                    cachedParam.put("includeitemtypes", StrUtil.replaceIgnoreCase(
-                            cachedParam.get("includeitemtypes").toString(), ",BoxSet", ""));
+                if (cachedParam.containsKey("IncludeItemTypes")) {
+                    cachedParam.put("IncludeItemTypes", StrUtil.replaceIgnoreCase(
+                            cachedParam.get("IncludeItemTypes").toString(), ",BoxSet", ""));
                 }
-                if (cachedParam.containsKey("mediasourceid")) {
+                if (cachedParam.containsKey("MediaSourceId")) {
                     mediaSourceId = StrUtil.removePrefixIgnoreCase(
-                            cachedParam.get("mediasourceid").toString(), "mediasource_");
+                            cachedParam.get("MediaSourceId").toString(), "mediasource_");
                 }
-                if (cachedParam.containsKey("userid")) {
-                    userId = MapUtil.getStr(cachedParam, "userid");
+                if (cachedParam.containsKey("UserId")) {
+                    userId = MapUtil.getStr(cachedParam, "UserId");
                 }
-                if (cachedParam.containsKey("x-emby-device-id")) {
+                if (cachedParam.containsKey("X-Emby-Device-Id")) {
                     if (StrUtil.isBlank(deviceId)) {
-                        deviceId = MapUtil.getStr(cachedParam, "x-emby-device-id");
-                    }
-
-                }
-                if (cachedParam.containsKey("deviceid")) {
-                    if (StrUtil.isBlank(deviceId)) {
-                        deviceId = MapUtil.getStr(cachedParam, "deviceid");
+                        deviceId = MapUtil.getStr(cachedParam, "X-Emby-Device-Id");
                     }
                 }
-                if (cachedParam.containsKey("x-emby-token")) {
-                    apikey = MapUtil.getStr(cachedParam, "x-emby-token");
+                if (cachedParam.containsKey("DeviceId")) {
+                    if (StrUtil.isBlank(deviceId)) {
+                        deviceId = MapUtil.getStr(cachedParam, "DeviceId");
+                    }
+                }
+                if (cachedParam.containsKey("X-Emby-Token")) {
+                    apikey = MapUtil.getStr(cachedParam, "X-Emby-Token");
+                }
+                if (cachedParam.containsKey("ParentId")) {
+                    parentId = MapUtil.getStr(cachedParam, "ParentId");
                 }
             }
         }

@@ -15,7 +15,6 @@ import org.dromara.hutool.core.math.NumberUtil;
 import org.dromara.hutool.core.net.url.UrlDecoder;
 import org.dromara.hutool.core.net.url.UrlUtil;
 import org.dromara.hutool.core.regex.ReUtil;
-import org.dromara.hutool.core.regex.RegexPool;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
 
@@ -92,7 +91,7 @@ public final class EmbyProxyUtil {
         if (StrUtil.isBlank(url)) {
             return null;
         }
-        return ReUtil.get(RegexPool.NUMBERS, url, 0);
+        return ReUtil.get("-?\\d+", url, 0);
     }
 
     /**

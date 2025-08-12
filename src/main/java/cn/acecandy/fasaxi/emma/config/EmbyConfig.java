@@ -25,6 +25,14 @@ public class EmbyConfig {
      */
     private String host;
     /**
+     * 外网emby地址
+     */
+    private String outerHost;
+    /**
+     * Emby 工具地址
+     */
+    private String embyToolkitHost;
+    /**
      * Emby Nginx地址
      */
     private String embyNginxHost;

@@ -21,6 +21,7 @@ import org.brotli.dec.BrotliInputStream;
 import org.dromara.hutool.core.array.ArrayUtil;
 import org.dromara.hutool.core.date.StopWatch;
 import org.dromara.hutool.core.exception.ExceptionUtil;
+import org.dromara.hutool.core.math.NumberUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.http.client.Request;
 import org.dromara.hutool.http.client.Response;
@@ -167,11 +168,25 @@ public class OriginReqService {
             return;
         }
 
+        if (StrUtil.containsIgnoreCase(request.getRequestURI(), "/Views")) {
+            try (Response toolkitResp = httpClient.send(Request.of(embyConfig.getEmbyToolkitHost()
+                    + request.getParamUri()).method(Method.valueOf(request.getMethod())))) {
+                request.buildToolKit(toolkitResp.bodyStr());
+            } catch (Throwable e) {
+                log.warn("toolkit异常，请检查, e:", e);
+            }
+        }
+
         StopWatch stopWatch = StopWatch.of("原始请求");
         stopWatch.start("转发");
         cached = new EmbyCachedResp();
         try (Response res = sendOriginReq(request)) {
             cached = embyProxy.transferResp(res, request);
+            /*if (!cached.getStatusCode().equals(CODE_200)) {
+                try (Response res1 = sendOriginToolkitReq(request)) {
+                    cached = embyProxy.transferResp(res1, request);
+                }
+            }*/
             writeCacheResponse(request, response, cached);
         } catch (Throwable e) {
             httpClient5WarningCatch(request, response, e, cached);
@@ -220,7 +235,18 @@ public class OriginReqService {
      * @return {@link Response }
      */
     public Response sendOriginReq(EmbyContentCacheReqWrapper request) {
-        Request originalRequest = Request.of(embyConfig.getHost() + request.getParamUri())
+        String host = (NumberUtil.parseInt(request.getMediaSourceId(), 1) < 0 ||
+                NumberUtil.parseInt(request.getParentId(), 1) < 0) ?
+                embyConfig.getEmbyToolkitHost() : embyConfig.getHost();
+        Request originalRequest = Request.of(host + request.getParamUri())
+                .method(Method.valueOf(request.getMethod()))
+                .body(request.getCachedBody());
+        request.getCachedHeader().forEach((k, v) -> originalRequest.header(k, v, true));
+        return httpClient.send(originalRequest);
+    }
+
+    public Response sendOriginToolkitReq(EmbyContentCacheReqWrapper request) {
+        Request originalRequest = Request.of(embyConfig.getEmbyToolkitHost() + request.getParamUri())
                 .method(Method.valueOf(request.getMethod()))
                 .body(request.getCachedBody());
         request.getCachedHeader().forEach((k, v) -> originalRequest.header(k, v, true));
