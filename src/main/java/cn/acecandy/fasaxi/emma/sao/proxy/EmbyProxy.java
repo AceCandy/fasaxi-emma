@@ -487,6 +487,7 @@ public class EmbyProxy {
         refreshItem(request, bodyStr);
         bodyStr = searchItem(request, bodyStr);
         bodyStr = reBuildView(request, bodyStr);
+        bodyStr = reBuildView(request, bodyStr);
         return StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
     }
 
@@ -497,9 +498,9 @@ public class EmbyProxy {
      * @param request 要求
      * @param bodyStr 身体str
      */
-    private String searchItem(EmbyContentCacheReqWrapper request, String bodyStr) {
+    private static String searchItem(EmbyContentCacheReqWrapper request, String bodyStr) {
         if (!ReUtil.isItemsUrl(request.getRequestURI().toLowerCase()) ||
-                !request.getCachedParam().containsKey("searchterm")) {
+                !request.getCachedParam().containsKey("SearchTerm")) {
             return bodyStr;
         }
         EmbyItemsInfoOut itemInfo = JSONUtil.toBean(bodyStr, EmbyItemsInfoOut.class);
@@ -507,7 +508,7 @@ public class EmbyProxy {
             return bodyStr;
         }
         List<EmbyItem> items = SortUtil.searchSortItem(itemInfo.getItems(),
-                request.getCachedParam().get("searchterm").toString());
+                request.getCachedParam().get("SearchTerm").toString());
         itemInfo.setItems(items);
         return JSONUtil.toJsonStr(itemInfo);
     }
@@ -519,7 +520,7 @@ public class EmbyProxy {
      * @param bodyStr 身体str
      * @return {@link String }
      */
-    private String reBuildView(EmbyContentCacheReqWrapper request, String bodyStr) {
+    private static String reBuildView(EmbyContentCacheReqWrapper request, String bodyStr) {
         if (request.getToolkitView() == null) {
             return bodyStr;
         }
@@ -527,6 +528,23 @@ public class EmbyProxy {
         JSONArray items = viewJn.getJSONArray("Items");
         items.addAll(0, request.getToolkitView());
         return viewJn.toString();
+    }
+
+    /**
+     * 重建虚拟视图
+     *
+     * @param request 要求
+     * @param bodyStr 身体str
+     * @return {@link String }
+     */
+    private static String reBuildLatest(EmbyContentCacheReqWrapper request, String bodyStr) {
+        if (!StrUtil.containsIgnoreCase(request.getRequestURI(), "Items/Latest")) {
+            return bodyStr;
+        }
+        if (!JSONUtil.isTypeJSON(bodyStr)) {
+            return bodyStr;
+        }
+        return JSONUtil.parseObj(bodyStr).getStr("Items");
     }
 
     /**
@@ -615,7 +633,7 @@ public class EmbyProxy {
         }
     }
 
-    public static void main(String[] args) {
+    /*public static void main(String[] args) {
 
         String strm = "http://192.168.1.249:5244/d/new115/emby2/电影/外语电影/侏罗纪世界：重生 (2025) [tmdbid=1234821]/侏罗纪世界：重生 (2025).2160p.DoVi.HDR.H.265.DDP Atmos 5.1.mkv" +
                 "";
@@ -644,5 +662,5 @@ public class EmbyProxy {
         } catch (Exception e) {
             log.warn("trans115To123 网络请求异常: ", e);
         }
-    }
+    }*/
 }

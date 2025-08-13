@@ -245,14 +245,6 @@ public class OriginReqService {
         return httpClient.send(originalRequest);
     }
 
-    public Response sendOriginToolkitReq(EmbyContentCacheReqWrapper request) {
-        Request originalRequest = Request.of(embyConfig.getEmbyToolkitHost() + request.getParamUri())
-                .method(Method.valueOf(request.getMethod()))
-                .body(request.getCachedBody());
-        request.getCachedHeader().forEach((k, v) -> originalRequest.header(k, v, true));
-        return httpClient.send(originalRequest);
-    }
-
     /**
      * 返回响应(满足条件会缓存)
      *

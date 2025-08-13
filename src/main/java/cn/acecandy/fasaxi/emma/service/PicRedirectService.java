@@ -12,18 +12,23 @@ import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
+import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import jakarta.annotation.Resource;
+import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.math.NumberUtil;
 import org.dromara.hutool.core.text.StrUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.dromara.hutool.http.client.Request;
+import org.dromara.hutool.http.client.Response;
+import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
 import java.util.concurrent.locks.Lock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
@@ -62,8 +67,10 @@ public class PicRedirectService {
 
     @Resource
     private RedisClient redisClient;
-    @Autowired
+    @Resource
     private EmbyConfig embyConfig;
+    @Resource
+    private ClientEngine httpClient;
 
     /**
      * 处理图片重定向请求
@@ -84,12 +91,23 @@ public class PicRedirectService {
             return;
         }
         if (Integer.parseInt(itemId) < 0) {
-            response.setStatus(CODE_308);
-            response.setHeader("Location", embyConfig.getEmbyToolkitHost() + request.getParamUri());
+            try (Response res = httpClient.send(Request.of(
+                    embyConfig.getEmbyToolkitHost() + request.getParamUri()))) {
+                response.setStatus(res.getStatus());
+                try (ServletOutputStream outputStream = response.getOutputStream()) {
+                    outputStream.write(res.bodyBytes());
+                } catch (IOException e) {
+                    if (!ExceptUtil.isConnectionTerminated(e)) {
+                        throw e;
+                    }
+                }
+            }
+            // response.setStatus(CODE_308);
+            // response.setHeader("Location", embyConfig.getEmbyToolkitHost() + request.getParamUri());
             return;
         }
 
-        String maxWidth = MapUtil.getStr(request.getCachedParam(), "maxwidth");
+        String maxWidth = MapUtil.getStr(request.getCachedParam(), "MaxWidth");
         if (getByCacheOrDb(response, picType, itemId, maxWidth)) {
             return;
         }
