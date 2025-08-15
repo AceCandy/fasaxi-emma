@@ -36,3 +36,4 @@ diffex.sh
 application-*.yml
 create.sql
 rebel.xml
+workspace/
