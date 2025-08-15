@@ -487,7 +487,7 @@ public class EmbyProxy {
         refreshItem(request, bodyStr);
         bodyStr = searchItem(request, bodyStr);
         bodyStr = reBuildView(request, bodyStr);
-        bodyStr = reBuildView(request, bodyStr);
+        bodyStr = reBuildLatest(request, bodyStr);
         return StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
     }
 
@@ -541,7 +541,7 @@ public class EmbyProxy {
         if (!StrUtil.containsIgnoreCase(request.getRequestURI(), "Items/Latest")) {
             return bodyStr;
         }
-        if (!JSONUtil.isTypeJSON(bodyStr)) {
+        if (!JSONUtil.isTypeJSONObject(bodyStr)) {
             return bodyStr;
         }
         return JSONUtil.parseObj(bodyStr).getStr("Items");

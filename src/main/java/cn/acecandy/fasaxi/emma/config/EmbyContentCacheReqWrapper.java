@@ -7,12 +7,10 @@ import lombok.Getter;
 import lombok.Setter;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
-import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
 import org.dromara.hutool.http.HttpUtil;
-import org.dromara.hutool.http.meta.HeaderName;
 import org.dromara.hutool.http.server.servlet.ServletUtil;
 import org.dromara.hutool.json.JSONArray;
 import org.dromara.hutool.json.JSONObject;
@@ -171,14 +169,14 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         String uri = request.getRequestURI().toLowerCase();
         if (StrUtil.containsAnyIgnoreCase(uri, "/images/primary")) {
             cachedParam.put("tag", request.getParameter("tag"));
-            cachedParam.put("maxwidth", "342");
+            cachedParam.put("maxWidth", "342");
             // cachedParam.put("quality", "90");
         } else if (StrUtil.containsAnyIgnoreCase(uri, "/images/logo")) {
             cachedParam.put("tag", request.getParameter("tag"));
-            cachedParam.put("maxwidth", "154");
+            cachedParam.put("maxWidth", "154");
         } else if (StrUtil.containsAnyIgnoreCase(uri, "/images/backdrop")) {
             cachedParam.put("tag", request.getParameter("tag"));
-            cachedParam.put("maxwidth", "780");
+            cachedParam.put("maxWidth", "780");
         } else {
             List<String> itemUrlGroup = ReUtil.isSimilarItemUrl(uri);
             if (CollUtil.isNotEmpty(itemUrlGroup)) {
@@ -222,12 +220,6 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
             }
         }
         paramUri = HttpUtil.urlWithFormUrlEncoded(request.getRequestURI(), cachedParam, Charset.defaultCharset());
-    }
-
-    public static void main(String[] args) {
-        Console.log(ReUtil.capitalizeWords(HeaderName.ACCEPT_ENCODING.getValue()));
-        Console.log(ReUtil.capitalizeWords("ua"));
-        Console.log(ReUtil.capitalizeWords("account-id"));
     }
 
 }

@@ -107,7 +107,7 @@ public class PicRedirectService {
             return;
         }
 
-        String maxWidth = MapUtil.getStr(request.getCachedParam(), "MaxWidth");
+        String maxWidth = MapUtil.getStr(request.getCachedParam(), "maxWidth");
         if (getByCacheOrDb(response, picType, itemId, maxWidth)) {
             return;
         }
