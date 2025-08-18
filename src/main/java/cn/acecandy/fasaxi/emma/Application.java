@@ -8,6 +8,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.boot.web.servlet.ServletComponentScan;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
 
@@ -23,6 +24,7 @@ import java.net.InetAddress;
 // @EnableScheduling
 // @EnableRetry
 // @RestController
+@EnableFeignClients(basePackages = "cn.acecandy.fasaxi.emma.sao.client")
 @ConfigurationPropertiesScan
 @ServletComponentScan
 @SpringBootApplication

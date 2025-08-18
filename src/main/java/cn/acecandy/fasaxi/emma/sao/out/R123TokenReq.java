@@ -1,5 +1,6 @@
 package cn.acecandy.fasaxi.emma.sao.out;
 
+import lombok.Builder;
 import lombok.Data;
 
 /**
@@ -8,6 +9,7 @@ import lombok.Data;
  * @author tangningzhu
  * @since 2025/8/15
  */
+@Builder
 @Data
 public class R123TokenReq {
     /**

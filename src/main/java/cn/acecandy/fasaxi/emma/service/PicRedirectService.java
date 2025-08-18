@@ -22,6 +22,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.math.NumberUtil;
+import org.dromara.hutool.core.net.url.UrlUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.http.client.Request;
 import org.dromara.hutool.http.client.Response;
@@ -102,8 +103,6 @@ public class PicRedirectService {
                     }
                 }
             }
-            // response.setStatus(CODE_308);
-            // response.setHeader("Location", embyConfig.getEmbyToolkitHost() + request.getParamUri());
             return;
         }
 
@@ -142,8 +141,7 @@ public class PicRedirectService {
         String uri = getPic302Uri(itemPic, picType);
         if (StrUtil.isNotBlank(uri)) {
             String url = getCdnPicUrl(uri, doubanConfig, tmdbConfig, maxWidth);
-            response.setStatus(CODE_308);
-            response.setHeader("Location", url);
+            return308(response, url);
             log.info("{}-图片重定向(DB):[{}-{}] => {}", picType, itemId, maxWidth, url);
             asyncWriteItemPicRedis(itemId, uri, picType);
             return true;
@@ -162,8 +160,7 @@ public class PicRedirectService {
             response.setStatus(CODE_404);
         } else {
             String url = getCdnPicUrl(uri, doubanConfig, tmdbConfig, maxWidth);
-            response.setStatus(CODE_308);
-            response.setHeader("Location", url);
+            return308(response, url);
         }
         return true;
     }
@@ -180,8 +177,7 @@ public class PicRedirectService {
                             String itemId, EmbyPicType picType, String maxWidth) {
         EmbyRemoteImageOut.Img imageInfo = embyProxy.getRemoteImage(itemId, picType);
         if (null == imageInfo) {
-            response.setStatus(CODE_308);
-            response.setHeader("Location", embyConfig.getOuterHost() + request.getParamUri());
+            return308(response, embyConfig.getOuterHost() + request.getParamUri());
             // originReqService.forwardOriReq(request, response);
             return;
         } else if (StrUtil.equals(imageInfo.getUrl(), "undefined")) {
@@ -196,10 +192,15 @@ public class PicRedirectService {
             return;
         }
 
-        response.setStatus(CODE_308);
-        response.setHeader("Location", url);
+        return308(response, url);
         log.warn("{}-图片重定向(请求):[{}-{}] => {}", picType, itemId, maxWidth, url);
         asyncWriteItemPic(NumberUtil.parseInt(itemId), uri, picType);
+    }
+
+    private void return308(HttpServletResponse response,String url){
+        response.setStatus(CODE_308);
+        response.setHeader("Location", url);
+        response.setHeader("Referer", UrlUtil.url(url).getHost());
     }
 
     /**

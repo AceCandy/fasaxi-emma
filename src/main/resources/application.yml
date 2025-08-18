@@ -34,6 +34,12 @@ mybatis-flex:
     # 开启下划线转驼峰
     map-underscore-to-camel-case: true
 
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 5000
 
 emby:
   common-ua: "AceCandy/1.0"
@@ -64,9 +70,9 @@ douban:
 #    - https://wsrv.nl/?url=http://img3.doubanio.com
 #    - https://wsrv.nl/?url=http://img1.doubanio.com
 #    - https://wsrv.nl/?url=http://img2.doubanio.com
-#    - https://img1.doubanio.com
+    - https://img1.doubanio.com
 #    - https://img2.doubanio.com
-#    - https://img3.doubanio.com
+    - https://img3.doubanio.com
   app:
     host: https://api.douban.com
     apikey:
