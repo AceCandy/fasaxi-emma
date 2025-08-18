@@ -70,9 +70,9 @@ douban:
 #    - https://wsrv.nl/?url=http://img3.doubanio.com
 #    - https://wsrv.nl/?url=http://img1.doubanio.com
 #    - https://wsrv.nl/?url=http://img2.doubanio.com
-    - https://img1.doubanio.com
+#    - https://img1.doubanio.com
 #    - https://img2.doubanio.com
-    - https://img3.doubanio.com
+#    - https://img3.doubanio.com
   app:
     host: https://api.douban.com
     apikey:
