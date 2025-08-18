@@ -1,6 +1,7 @@
 package cn.acecandy.fasaxi.emma.control;
 
 import cn.acecandy.fasaxi.emma.common.resp.Rsres;
+import cn.acecandy.fasaxi.emma.sao.out.R123FileListReq;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123Proxy;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -27,5 +28,8 @@ public class DebugController {
         return Rsres.success(r123Proxy.getAccessToken());
     }
 
-
+    @GetMapping("/123/getFileList")
+    public Rsres<Object> getFileList(R123FileListReq req) {
+        return Rsres.success(r123Proxy.getFileList(req));
+    }
 }
