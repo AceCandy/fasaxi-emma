@@ -10,7 +10,6 @@ import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
-import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.acecandy.fasaxi.emma.utils.VideoUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
@@ -86,10 +85,10 @@ public class VideoRedirectService {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
-        EmbyItem embyItem = embyProxy.getItemInfoByCache(mediaSourceId);
+        /*EmbyItem embyItem = embyProxy.getItemInfoByCache(mediaSourceId);
         ThreadUtil.execVirtual(() -> {
             embyProxy.expertTmdbProvider(embyItem);
-        });
+        });*/
         // if (!StrUtil.containsIgnoreCase(request.getRequestURI(), "download")
         //         && IpUtil.isInnerIp(request.getIp())) {
         //     if (null == embyItem) {
