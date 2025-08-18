@@ -33,6 +33,7 @@ target/
 logs/
 diffex.sh
 
+application.yml
 application-*.yml
 create.sql
 rebel.xml
