@@ -6,6 +6,7 @@ import lombok.Data;
 
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123_ZONG;
 
 /**
  * 云盘文件DTO
@@ -43,7 +44,7 @@ public class Rile {
     public void setFileType(CloudStorageType cloudStorage, Integer cloudFileType) {
         if (R_115.equals(cloudStorage)) {
             this.fileType = cloudFileType;
-        } else if (R_123.equals(cloudStorage)) {
+        } else if (R_123.equals(cloudStorage) || R_123_ZONG.equals(cloudStorage)) {
             // 123 0-文件 1-文件夹
             if (cloudFileType == 0) {
                 this.fileType = 1;

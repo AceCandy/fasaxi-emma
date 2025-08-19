@@ -16,7 +16,9 @@ public enum CloudStorageType {
      * 115和123
      */
     R_115("115"),
-    R_123("123");
+    R_123("123"),
+    R_123_ZONG("123_zong"),
+    ;
 
     private final String value;
 }

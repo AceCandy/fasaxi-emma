@@ -1,9 +1,9 @@
 package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
-import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.sao.dto.Rile;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123Proxy;
+import cn.acecandy.fasaxi.emma.sao.proxy.R123ZongProxy;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
@@ -35,6 +35,9 @@ public final class CloudUtil {
     @Resource
     private R123Proxy r123Proxy;
 
+    @Resource
+    private R123ZongProxy r123ZongProxy;
+
     /**
      * 获取文件
      *
@@ -62,21 +65,83 @@ public final class CloudUtil {
             List<Rile> findFileList = ListUtil.of();
             if (cloudStorage.equals(CloudStorageType.R_123)) {
                 findFileList = r123Proxy.listRiles(parentId, segment);
+            } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
+                findFileList = r123ZongProxy.listRiles(parentId, segment);
             } else if (cloudStorage.equals(CloudStorageType.R_115)) {
                 // TODO
                 // findFileList = r115Proxy.listFiles(parentId, segment);
             }
             if (CollUtil.isEmpty(findFileList)) {
-                throw new BaseException(StrUtil.format("[{}云盘]未能查找到[%s]，完整文件路径:{}",
-                        cloudStorage, segment, filePath));
+                log.warn("[{}云盘]未能查找到[{}]，完整文件路径:{}",
+                        cloudStorage, segment, filePath);
+                break;
             }
             file = findFileList.getFirst();
             // 直接使用已获取的file对象，减少重复获取
             parentId = file.getFileId();
         }
-
         return file;
     }
+
+    /**
+     * 获取文件(匹配模式)
+     *
+     * @param cloudStorage 云存储
+     * @param filePath     文件路径
+     * @return {@link Rile }
+     */
+    public Rile getFileMatch(CloudStorageType cloudStorage, String filePath, long size) {
+        filePath = FileUtil.normalize(UrlDecoder.decode(filePath));
+        List<CharSequence> segments = UrlPath.of(filePath, Charset.defaultCharset()).getSegments();
+        CharSequence segment = CollUtil.getLast(segments);
+
+        List<Rile> findFileList = ListUtil.of();
+        if (cloudStorage.equals(CloudStorageType.R_123)) {
+            findFileList = r123Proxy.listRiles(segment);
+        } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
+            findFileList = r123ZongProxy.listRiles(segment);
+        } else if (cloudStorage.equals(CloudStorageType.R_115)) {
+            // TODO
+            // findFileList = r115Proxy.listFiles(parentId, segment);
+        }
+        findFileList = findFileList.stream().filter(item -> item.getFileSize() == size).toList();
+        if (CollUtil.isEmpty(findFileList)) {
+            log.warn("[{}云盘]未能查找到[{}]，完整文件路径:{}", cloudStorage, segment, filePath);
+            return null;
+        }
+        return CollUtil.getFirst(findFileList);
+    }
+
+    /**
+     * 获取下载链接
+     *
+     * @param cloudStorage 云存储
+     * @param filePath     文件路径
+     * @return {@link Rile }
+     */
+    public String getDownloadUrl(CloudStorageType cloudStorage, String filePath, long size) {
+        Rile rile = null;
+        if (size < 1000) {
+            rile = getFile(cloudStorage, filePath);
+        } else {
+            rile = getFileMatch(cloudStorage, filePath, size);
+        }
+        if (null == rile) {
+            return null;
+        }
+        Long rileId = rile.getFileId();
+        String downloadUrl = null;
+        if (cloudStorage.equals(CloudStorageType.R_123)) {
+            downloadUrl = r123Proxy.getDownloadUrl(rileId);
+        } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
+            downloadUrl = r123ZongProxy.getDownloadUrl(rileId);
+        } else if (cloudStorage.equals(CloudStorageType.R_115)) {
+            // TODO
+            // findFileList = r115Proxy.listFiles(parentId, segment);
+        }
+        return downloadUrl;
+    }
+
 
     public static void main(String[] args) {
         String filePath = "//Users/mac/Library//CloudStorage\\OneDrive-%E4%B8%AA%E4%BA%BA%2Fworkspace%2Fgithub%2Fjava%2Ffasaxi-emma%2Fsrc%2Fmain%2Fjava%2Fcn%2Facecandy%2Ffasaxi%2Femma%2Futils%2FCloudUtil.java";

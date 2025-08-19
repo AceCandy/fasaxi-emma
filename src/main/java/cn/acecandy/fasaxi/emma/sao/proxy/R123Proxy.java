@@ -6,23 +6,26 @@ import cn.acecandy.fasaxi.emma.sao.client.R123Client;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.dto.Rile;
 import cn.acecandy.fasaxi.emma.sao.out.R123;
+import cn.acecandy.fasaxi.emma.sao.out.R123DownloadUrlResp;
 import cn.acecandy.fasaxi.emma.sao.out.R123FileListReq;
 import cn.acecandy.fasaxi.emma.sao.out.R123FileListResp;
 import cn.acecandy.fasaxi.emma.sao.out.R123TokenReq;
 import cn.acecandy.fasaxi.emma.sao.out.R123TokenResp;
 import jakarta.annotation.Resource;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
+import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.util.ObjUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import static cn.acecandy.fasaxi.emma.common.enums.ErrCode.ERRCODE_1001;
-import static cn.acecandy.fasaxi.emma.common.enums.ErrCode.ERRCODE_1002;
 import static cn.acecandy.fasaxi.emma.utils.CacheUtil.R_123_TOKEN;
 
 /**
@@ -38,14 +41,20 @@ public class R123Proxy {
     @Resource
     private R123Client r123Client;
 
-    @Value("${cloud.r123.client-id}")
+    @Getter
+    @Value("${cloud.r123.default.client-id}")
     private String clientId;
 
-    @Value("${cloud.r123.client-secret}")
+    @Getter
+    @Value("${cloud.r123.default.client-secret}")
     private String clientSecret;
 
     @Resource
     private RedisClient redisClient;
+
+    public String getCacheTokenKey() {
+        return R_123_TOKEN;
+    }
 
     /**
      * r123页数限制
@@ -57,15 +66,15 @@ public class R123Proxy {
      *
      * @return {@link R123TokenResp }
      */
-    private R123TokenResp getAccessToken() {
-        if (StrUtil.isBlank(clientSecret) || StrUtil.isBlank(clientId)) {
+    public R123TokenResp getAccessToken() {
+        if (StrUtil.isBlank(getClientSecret()) || StrUtil.isBlank(getClientId())) {
             throw new BaseException(ERRCODE_1001);
         }
-        R123<R123TokenResp> result = r123Client
-                .getAccessToken(R123TokenReq.builder().clientID(clientId).clientSecret(clientSecret).build());
+        R123<R123TokenResp> result = r123Client.getAccessToken(
+                R123TokenReq.builder().clientID(getClientId()).clientSecret(getClientSecret()).build());
         if (result == null || !result.isOk()) {
-            throw new BaseException(ERRCODE_1002,
-                    StrUtil.format(" getAccessToken,resp:{}", result));
+            log.warn("getAccessToken,resp异常:{}", result);
+            return null;
         }
         return result.getData();
     }
@@ -78,15 +87,17 @@ public class R123Proxy {
     public String getAccessTokenByCache(boolean force) {
         String r123Token = "";
         if (!force) {
-            r123Token = redisClient.getStr(R_123_TOKEN);
+            r123Token = redisClient.getStr(getCacheTokenKey());
             if (StrUtil.isNotBlank(r123Token)) {
                 return r123Token;
             }
         }
         R123TokenResp result = getAccessToken();
         r123Token = result.getAccessToken();
-        // 缓存20天
-        redisClient.set(R_123_TOKEN, r123Token, 60 * 60 * 24 * 20);
+        int expire = (int) (OffsetDateTime.parse(result.getExpiredAt()).toEpochSecond()
+                - DateUtil.currentSeconds() - 60 * 60 * 12);
+
+        redisClient.set(getCacheTokenKey(), r123Token, expire);
         return r123Token;
     }
 
@@ -100,17 +111,17 @@ public class R123Proxy {
         String auth = getAccessTokenByCache(false);
         R123<R123FileListResp> result = r123Client.getFileList(auth, req);
         if (result == null) {
-            throw new BaseException(ERRCODE_1002,
-                    StrUtil.format(" getFileList,resp为空"));
+            log.warn("getFileList,resp为空,req:{}", req);
+            return null;
         }
         if (result.isOk()) {
             return result.getData();
         }
         if (ObjUtil.equals(result.getCode(), 401)) {
-            redisClient.del(R_123_TOKEN);
+            redisClient.del(getCacheTokenKey());
         }
-        throw new BaseException(ERRCODE_1002,
-                StrUtil.format(" getFileList,resp:{}", result));
+        log.warn("getFileList,resp异常:{},req:{}", result, req);
+        return null;
     }
 
     /**
@@ -147,6 +158,38 @@ public class R123Proxy {
     }
 
     /**
+     * 获取Rile列表(精准搜索，此时文件id无效)
+     *
+     * @param filterFileName 筛选器文件名
+     * @return {@link List }<{@link Rile }>
+     */
+    public List<Rile> listRiles(CharSequence filterFileName) {
+        List<Rile> resultList = ListUtil.of();
+        Long lastFileId = null;
+        do {
+            R123FileListResp resp = getFileList(R123FileListReq.builder()
+                    .parentFileId(0L).searchData(filterFileName.toString()).searchMode(1)
+                    .limit(R123_PAGE_LIMIT).lastFileId(lastFileId).build());
+            lastFileId = resp.getLastFileId();
+            // 过滤非回收站文件，传入文件名则根据文件名筛选
+            List<R123FileListResp.FileInfo> fileList = resp.getFileList().stream()
+                    .filter(item -> item.getTrashed() == 0)
+                    .filter(file -> StrUtil.isBlank(filterFileName) ||
+                            StrUtil.equals(file.getFilename(), filterFileName))
+                    .toList();
+            if (CollUtil.isNotEmpty(fileList)) {
+                resultList.addAll(convertToRile(fileList));
+                // 如果是按文件名筛选且已找到，直接退出循环
+                if (StrUtil.isNotBlank(filterFileName)) {
+                    break;
+                }
+            }
+        } while (lastFileId != -1);
+
+        return resultList;
+    }
+
+    /**
      * 转化为Rile
      *
      * @param files 文件
@@ -161,5 +204,29 @@ public class R123Proxy {
             rile.setFileType(CloudStorageType.R_123, f.getType());
             return rile;
         }).toList();
+    }
+
+
+    /**
+     * 获取文件列表
+     *
+     * @param fileId 文件id
+     * @return {@link R123FileListResp }
+     */
+    public String getDownloadUrl(Long fileId) {
+        String auth = getAccessTokenByCache(false);
+        R123<R123DownloadUrlResp> result = r123Client.getDownloadUrl(auth, fileId);
+        if (result == null) {
+            log.warn("getDownloadUrl,resp为空,fileId:{}", fileId);
+            return null;
+        }
+        if (result.isOk()) {
+            return result.getData().getDownloadUrl();
+        }
+        if (ObjUtil.equals(result.getCode(), 401)) {
+            redisClient.del(getCacheTokenKey());
+        }
+        log.warn("getDownloadUrl,resp异常:{},fileId:{}", result, fileId);
+        return null;
     }
 }

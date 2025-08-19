@@ -29,6 +29,7 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
 
     public static final String R_115_TOKEN = "cache:a-115-token";
     public static final String R_123_TOKEN = "cache:a-123-token";
+    public static final String R_123_ZONG_TOKEN = "cache:a-123-zong-token";
 
     public static String buildThreadLimitKey(String deviceId) {
         return THREAD_LIMIT_KEY + ":" + deviceId;
