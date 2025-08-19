@@ -15,7 +15,7 @@ public class R123FileListResp {
     /**
      * -1代表最后一页（无需再翻页查询），其他代表下一页开始的文件id
      */
-    private int lastFileId;
+    private long lastFileId;
 
     /**
      * 文件列表

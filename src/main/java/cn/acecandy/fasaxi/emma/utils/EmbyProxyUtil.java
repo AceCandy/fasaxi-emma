@@ -20,7 +20,6 @@ import org.dromara.hutool.core.text.split.SplitUtil;
 
 import java.io.File;
 import java.net.URI;
-import java.nio.charset.Charset;
 import java.util.List;
 
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.Logo;
@@ -256,7 +255,7 @@ public final class EmbyProxyUtil {
         if (StrUtil.isBlank(mediaPath)) {
             return "";
         }
-        mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath, Charset.defaultCharset()));
+        mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath));
         mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby", "http://alist.rn238.worldline.space/p/pt/Emby");
         mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby1", "http://alist.rn238.worldline.space/p/bt/Emby1");
 

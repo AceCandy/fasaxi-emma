@@ -310,7 +310,7 @@ public class VideoRedirectService {
         String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();
         Request originalRequest = null;
         if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
-            mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath, Charset.defaultCharset()));
+            mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath));
             if (StrUtil.containsAny(mediaPath, "pt/Emby", "bt/Emby")) {
                 // mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
             } else {
