@@ -2,6 +2,7 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.sao.dto.Rile;
+import cn.acecandy.fasaxi.emma.sao.proxy.R115Proxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123Proxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123ZongProxy;
 import jakarta.annotation.Resource;
@@ -29,8 +30,8 @@ import java.util.Map;
 @Slf4j
 @Component
 public final class CloudUtil {
-    // @Resource
-    // private R115Proxy r115Proxy;
+    @Resource
+    private R115Proxy r115Proxy;
 
     @Resource
     private R123Proxy r123Proxy;
@@ -46,6 +47,9 @@ public final class CloudUtil {
      * @return {@link Rile }
      */
     public Rile getFile(CloudStorageType cloudStorage, String filePath) {
+        if (null == cloudStorage || StrUtil.isBlank(filePath)) {
+            return null;
+        }
         Long parentId = 0L;
         filePath = FileUtil.normalize(UrlDecoder.decode(filePath));
 
@@ -68,12 +72,10 @@ public final class CloudUtil {
             } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
                 findFileList = r123ZongProxy.listRiles(parentId, segment);
             } else if (cloudStorage.equals(CloudStorageType.R_115)) {
-                // TODO
-                // findFileList = r115Proxy.listFiles(parentId, segment);
+                findFileList = r115Proxy.listRiles(parentId, segment);
             }
             if (CollUtil.isEmpty(findFileList)) {
-                log.warn("[{}云盘]未能查找到[{}]，完整文件路径:{}",
-                        cloudStorage, segment, filePath);
+                log.warn("[{}云盘]未能查找到[{}]，完整文件路径:{}", cloudStorage, segment, filePath);
                 break;
             }
             file = findFileList.getFirst();
@@ -101,8 +103,7 @@ public final class CloudUtil {
         } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
             findFileList = r123ZongProxy.listRiles(segment);
         } else if (cloudStorage.equals(CloudStorageType.R_115)) {
-            // TODO
-            // findFileList = r115Proxy.listFiles(parentId, segment);
+            findFileList = r115Proxy.listRiles(segment);
         }
         findFileList = findFileList.stream().filter(item -> item.getFileSize() == size).toList();
         if (CollUtil.isEmpty(findFileList)) {

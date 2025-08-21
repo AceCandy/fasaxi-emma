@@ -1,7 +1,6 @@
 package cn.acecandy.fasaxi.emma.sao.out;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 
 /**
@@ -10,7 +9,6 @@ import lombok.Data;
  * @author tangningzhu
  * @since 2025/8/15
  */
-@AllArgsConstructor
 @Data
 public class R115<T> {
     /**

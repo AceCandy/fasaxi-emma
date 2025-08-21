@@ -1,7 +1,6 @@
 package cn.acecandy.fasaxi.emma.sao.out;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 
 import static cn.acecandy.fasaxi.emma.common.enums.ErrCode.DEFAULT_CODE;
@@ -12,7 +11,6 @@ import static cn.acecandy.fasaxi.emma.common.enums.ErrCode.DEFAULT_CODE;
  * @author tangningzhu
  * @since 2025/8/15
  */
-@AllArgsConstructor
 @Data
 public class R123<T> {
     private Integer code;

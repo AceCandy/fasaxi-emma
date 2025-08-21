@@ -1,15 +1,20 @@
 package cn.acecandy.fasaxi.emma.sao.client;
 
 import cn.acecandy.fasaxi.emma.sao.config.LogFeignConfig;
+import cn.acecandy.fasaxi.emma.sao.out.R115File;
+import cn.acecandy.fasaxi.emma.sao.out.R115FileListReq;
+import cn.acecandy.fasaxi.emma.sao.out.R115FileListResp;
+import cn.acecandy.fasaxi.emma.sao.out.R115Search;
 import cn.acecandy.fasaxi.emma.sao.out.R115SearchFileReq;
+import cn.acecandy.fasaxi.emma.sao.out.R115SearchFileResp;
 import cn.acecandy.fasaxi.emma.sao.out.R123;
-import cn.acecandy.fasaxi.emma.sao.out.R123DownloadUrlResp;
 import cn.acecandy.fasaxi.emma.sao.out.R123FileListResp;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.List;
 
 /**
  * 115 client
@@ -29,18 +34,17 @@ public interface R115Client {
      * @return {@link R123 }<{@link R123FileListResp }>
      */
     @GetMapping(path = "/open/ufile/search")
-    R123<R123FileListResp> searchFile(@RequestHeader("Authorization") String auth,
-                                       @SpringQueryMap R115SearchFileReq req);
+    R115Search<List<R115SearchFileResp>> searchFile(@RequestHeader("Authorization") String auth,
+                                                    @SpringQueryMap R115SearchFileReq req);
 
     /**
-     * 获取下载信息
+     * 获取文件列表
      *
-     * @param auth   auth
-     * @param fileId 文件id
-     * @return {@link R123 }<{@link R123DownloadUrlResp }>
+     * @param auth auth
+     * @param req  请求入参
+     * @return {@link R123 }<{@link R123FileListResp }>
      */
-    @GetMapping(path = "/api/v1/file/download_info", headers = {"Platform=open_platform"})
-    R123<R123DownloadUrlResp> getDownloadUrl(@RequestHeader("Authorization") String auth,
-                                             @RequestParam("fileId") Long fileId);
-
+    @GetMapping(path = "/open/ufile/files")
+    R115File<List<R115FileListResp>> getFileList(@RequestHeader("Authorization") String auth,
+                                                 @SpringQueryMap R115FileListReq req);
 }

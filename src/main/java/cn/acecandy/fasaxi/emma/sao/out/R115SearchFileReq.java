@@ -16,7 +16,7 @@ public class R115SearchFileReq {
      * 查找关键字
      * 是必填参数
      */
-    private String searchValue;
+    private String search_value;
 
     /**
      * 单页记录数
@@ -34,7 +34,7 @@ public class R115SearchFileReq {
      * 文件标签搜索
      * 非必填参数，支持按文件标签筛选
      */
-    private String fileLabel;
+    private String file_label;
 
     /**
      * 目标目录cid
@@ -46,13 +46,13 @@ public class R115SearchFileReq {
      * 搜索结果匹配的开始时间
      * 非必填参数，格式：2020-11-19
      */
-    private String gteDay;
+    private String gte_day;
 
     /**
      * 搜索结果匹配的结束时间
      * 非必填参数，格式：2020-11-20
      */
-    private String lteDay;
+    private String lte_day;
 
     /**
      * 显示类型筛选（文件或文件夹）
