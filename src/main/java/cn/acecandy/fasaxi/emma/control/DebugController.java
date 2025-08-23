@@ -66,8 +66,8 @@ public class DebugController {
     }
 
     @GetMapping("/cloud/getDownloadUrl")
-    public Rsres<Object> getDownloadUrl123(String cloud, String filePath, long size) {
+    public Rsres<Object> getDownloadUrl123(String cloud, String ua, String filePath, long size) {
         CloudStorageType cloudStorage = EnumUtil.likeValueOf(CloudStorageType.class, cloud);
-        return Rsres.success(cloudUtil.getDownloadUrl(cloudStorage, filePath, size));
+        return Rsres.success(cloudUtil.getDownloadUrl(cloudStorage, ua, filePath, size));
     }
 }
