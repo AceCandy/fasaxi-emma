@@ -233,12 +233,7 @@ public class RedisClient {
         }
         ThreadUtil.execVirtual(() -> {
             Set<String> keysToDelete = SetUtil.of();
-            prefixes.forEach(prefix -> {
-                try (Cursor<String> cursor = redisTemplate.scan(ScanOptions.scanOptions()
-                        .match(prefix + "*").count(100).build())) {
-                    cursor.forEachRemaining(keysToDelete::add);
-                }
-            });
+            prefixes.forEach(prefix -> keysToDelete.addAll(scanKeysByPrefix(prefix)));
             if (CollUtil.isEmpty(keysToDelete)) {
                 return;
             }
@@ -247,6 +242,50 @@ public class RedisClient {
         });
         // TODO 为了让操作同步这里先等待100毫秒，确保删除操作完成
         ThreadUtil.safeSleep(100);
+    }
+
+    /**
+     * 获取对应前缀的所有值
+     *
+     * @param prefix 前缀
+     * @return boolean
+     */
+    public List<String> getStrOnScan(String prefix) {
+        if (StrUtil.isBlank(prefix)) {
+            return ListUtil.of();
+        }
+        try {
+            Set<String> matchKeys = scanKeysByPrefix(prefix);
+            if (CollUtil.isEmpty(matchKeys)) {
+                return ListUtil.of();
+            }
+            List<String> result = getStr(matchKeys.toArray(String[]::new));
+            if (CollUtil.isEmpty(result)) {
+                return ListUtil.of();
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("redis getStrOnScan方法异常", e);
+            return ListUtil.of();
+        }
+    }
+
+    /**
+     * 单个前缀的key扫描（封装scan逻辑，避免重复代码）
+     *
+     * @param prefix 单个前缀（如 "user:100:"）
+     * @return 匹配该前缀的所有key
+     */
+    private Set<String> scanKeysByPrefix(String prefix) {
+        Set<String> keys = SetUtil.of();
+        // 每次扫描100个key（可根据Redis性能调整，不宜过大）
+        try (Cursor<String> cursor = redisTemplate.scan(
+                ScanOptions.scanOptions().match(prefix + "*").count(100).build())) {
+            cursor.forEachRemaining(keys::add);
+        } catch (Exception e) {
+            throw new RuntimeException("扫描Redis前缀[" + prefix + "]的key失败", e);
+        }
+        return keys;
     }
 
     /**

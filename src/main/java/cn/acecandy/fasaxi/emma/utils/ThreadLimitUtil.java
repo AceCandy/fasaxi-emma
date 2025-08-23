@@ -37,7 +37,7 @@ public class ThreadLimitUtil {
     public synchronized void setThreadCache(Integer type, String deviceId) {
         redisClient.set(CacheUtil.buildThreadLimitKey(deviceId), type, EXP_TIME);
         // 将设备ID添加到集合中，用于统计总数
-        redisClient.sadd(THREAD_LIMIT_KEY, deviceId);
+        // redisClient.sadd(THREAD_LIMIT_KEY, deviceId);
     }
 
     /**
@@ -49,7 +49,7 @@ public class ThreadLimitUtil {
         // 删除设备ID与类型的映射
         redisClient.del(CacheUtil.buildThreadLimitKey(deviceId));
         // 从集合中移除设备ID
-        redisClient.srem(THREAD_LIMIT_KEY, deviceId);
+        // redisClient.srem(THREAD_LIMIT_KEY, deviceId);
     }
 
     /**
@@ -59,7 +59,8 @@ public class ThreadLimitUtil {
      */
     public synchronized boolean limitThreadCache() {
         // 检查总数量是否超过6
-        int totalCount = redisClient.scard(THREAD_LIMIT_KEY);
+        // int totalCount = redisClient.getscard(THREAD_LIMIT_KEY);
+        int totalCount = CollUtil.size(redisClient.getStrOnScan(THREAD_LIMIT_KEY));
         if (totalCount > 6) {
             return true;
         }

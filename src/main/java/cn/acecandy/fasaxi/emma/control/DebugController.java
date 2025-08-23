@@ -65,13 +65,9 @@ public class DebugController {
         return Rsres.success(cloudUtil.getFileMatch(cloudStorage, filePath, size));
     }
 
-    @GetMapping("/123/getDownloadUrl")
-    public Rsres<Object> getDownloadUrl123(Long fileId) {
-        return Rsres.success(r123Proxy.getDownloadUrl(fileId));
-    }
-
-    @GetMapping("/123-zong/getDownloadUrl")
-    public Rsres<Object> getDownloadUrl123zong(Long fileId) {
-        return Rsres.success(r123ZongProxy.getDownloadUrl(fileId));
+    @GetMapping("/cloud/getDownloadUrl")
+    public Rsres<Object> getDownloadUrl123(String cloud, String filePath, long size) {
+        CloudStorageType cloudStorage = EnumUtil.likeValueOf(CloudStorageType.class, cloud);
+        return Rsres.success(cloudUtil.getDownloadUrl(cloudStorage, filePath, size));
     }
 }

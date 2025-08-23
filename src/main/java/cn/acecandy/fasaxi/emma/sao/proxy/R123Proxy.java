@@ -216,9 +216,9 @@ public class R123Proxy {
      * @param fileId 文件id
      * @return {@link R123FileListResp }
      */
-    public String getDownloadUrl(Long fileId) {
+    public String getDownloadUrl(String ua, Long fileId) {
         String auth = getAccessTokenByCache(false);
-        R123<R123DownloadUrlResp> result = r123Client.getDownloadUrl(auth, fileId);
+        R123<R123DownloadUrlResp> result = r123Client.getDownloadUrl(auth, ua, fileId);
         if (result == null) {
             log.warn("getDownloadUrl,resp为空,fileId:{}", fileId);
             return null;

@@ -6,17 +6,7 @@ import cn.acecandy.fasaxi.emma.sao.client.R115AuthClient;
 import cn.acecandy.fasaxi.emma.sao.client.R115Client;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.dto.Rile;
-import cn.acecandy.fasaxi.emma.sao.out.R115Auth;
-import cn.acecandy.fasaxi.emma.sao.out.R115File;
-import cn.acecandy.fasaxi.emma.sao.out.R115FileListReq;
-import cn.acecandy.fasaxi.emma.sao.out.R115FileListResp;
-import cn.acecandy.fasaxi.emma.sao.out.R115RefreshTokenReq;
-import cn.acecandy.fasaxi.emma.sao.out.R115RefreshTokenResp;
-import cn.acecandy.fasaxi.emma.sao.out.R115Search;
-import cn.acecandy.fasaxi.emma.sao.out.R115SearchFileReq;
-import cn.acecandy.fasaxi.emma.sao.out.R115SearchFileResp;
-import cn.acecandy.fasaxi.emma.sao.out.R123FileListResp;
-import cn.acecandy.fasaxi.emma.sao.out.R123TokenResp;
+import cn.acecandy.fasaxi.emma.sao.out.*;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
@@ -27,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 import static cn.acecandy.fasaxi.emma.common.enums.ErrCode.ERRCODE_1101;
 import static cn.acecandy.fasaxi.emma.common.enums.ErrCode.ERRCODE_1102;
@@ -162,6 +153,29 @@ public class R115Proxy {
         return null;
     }
 
+    /**
+     * 获取文件信息
+     *
+     * @param req 请求入参
+     * @return {@link R123FileListResp }
+     */
+    public R115FileInfoResp getFileInfo(Long fileId, R115FileInfoReq req) {
+        String auth = getAccessTokenByCache(false);
+        R115<R115FileInfoResp> result = r115Client.getFileInfo(auth, fileId, req);
+        if (result == null) {
+            log.warn("getFileInfo,resp为空,req:{}", req);
+            return null;
+        }
+        if (result.isOk()) {
+            return result.getData();
+        }
+        if (isTokenError(result.getCode())) {
+            redisClient.del(getCacheTokenKey());
+        }
+        log.warn("getFileInfo,resp异常:{},req:{}", result, req);
+        return null;
+    }
+
     public List<Rile> listRiles(Long parentId, CharSequence filterFileName) {
         List<Rile> resultList = ListUtil.of();
         int offset = 0;
@@ -227,6 +241,22 @@ public class R115Proxy {
     }
 
     /**
+     * 获取Rile信息(精准获取)
+     *
+     * @param filterFileName 筛选器文件名
+     * @return {@link List }<{@link Rile }>
+     */
+    public List<Rile> getRiles(CharSequence filterFileName) {
+        List<Rile> resultList = ListUtil.of();
+        R115FileInfoResp resp = getFileInfo(null, R115FileInfoReq.builder().path(filterFileName.toString()).build());
+        if (null == resp) {
+            return resultList;
+        }
+        resultList.add(convertInfoToRile(resp));
+        return resultList;
+    }
+
+    /**
      * 令牌错误判断辅助方法
      *
      * @param code 代码
@@ -274,25 +304,44 @@ public class R115Proxy {
 
 
     /**
+     * 转化为Rile
+     *
+     * @param file 文件
+     * @return {@link List }<{@link Rile }>
+     */
+    private Rile convertInfoToRile(R115FileInfoResp file) {
+        return Rile.builder().fileId(file.getFile_id())
+                .fileName(file.getFile_name())
+                .fileSize(file.getSize_byte())
+                .pickCode(file.getPick_code())
+                .build();
+    }
+
+
+    /**
      * 获取文件列表
      *
-     * @param fileId 文件id
+     * @param pickCode 选择代码
      * @return {@link R123FileListResp }
      */
-    /*public String getDownloadUrl(Long fileId) {
+    public String getDownloadUrl(String ua, String pickCode) {
+        if (StrUtil.isBlank(pickCode)) {
+            return null;
+        }
         String auth = getAccessTokenByCache(false);
-        R123<R123DownloadUrlResp> result = r123Client.getDownloadUrl(auth, fileId);
+        R115<Map<Long, R115DownloadUrlResp>> result = r115Client.getDownloadUrl(auth, ua,
+                R115DownloadUrlReq.builder().pick_code(pickCode).build());
         if (result == null) {
-            log.warn("getDownloadUrl,resp为空,fileId:{}", fileId);
+            log.warn("getDownloadUrl,resp为空,pickCode:{}", pickCode);
             return null;
         }
         if (result.isOk()) {
-            return result.getData().getDownloadUrl();
+            return CollUtil.getFirst(result.getData().values()).getUrl().getUrl();
         }
-        if (ObjUtil.equals(result.getCode(), 401)) {
+        if (isTokenError(result.getCode())) {
             redisClient.del(getCacheTokenKey());
         }
-        log.warn("getDownloadUrl,resp异常:{},fileId:{}", result, fileId);
+        log.warn("getDownloadUrl,resp异常:{},pickCode:{}", result, pickCode);
         return null;
-    }*/
+    }
 }

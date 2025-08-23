@@ -72,13 +72,17 @@ public final class CloudUtil {
             } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
                 findFileList = r123ZongProxy.listRiles(parentId, segment);
             } else if (cloudStorage.equals(CloudStorageType.R_115)) {
-                findFileList = r115Proxy.listRiles(parentId, segment);
+                // findFileList = r115Proxy.listRiles(parentId, segment);
+                findFileList = r115Proxy.getRiles(filePath);
+                file = CollUtil.getFirst(findFileList);
+                return file;
             }
             if (CollUtil.isEmpty(findFileList)) {
+                file = null;
                 log.warn("[{}云盘]未能查找到[{}]，完整文件路径:{}", cloudStorage, segment, filePath);
                 break;
             }
-            file = findFileList.getFirst();
+            file = CollUtil.getFirst(findFileList);
             // 直接使用已获取的file对象，减少重复获取
             parentId = file.getFileId();
         }
@@ -103,7 +107,8 @@ public final class CloudUtil {
         } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
             findFileList = r123ZongProxy.listRiles(segment);
         } else if (cloudStorage.equals(CloudStorageType.R_115)) {
-            findFileList = r115Proxy.listRiles(segment);
+            // findFileList = r115Proxy.listRiles(segment);
+            findFileList = r115Proxy.getRiles(filePath);
         }
         findFileList = findFileList.stream().filter(item -> item.getFileSize() == size).toList();
         if (CollUtil.isEmpty(findFileList)) {
@@ -120,7 +125,7 @@ public final class CloudUtil {
      * @param filePath     文件路径
      * @return {@link Rile }
      */
-    public String getDownloadUrl(CloudStorageType cloudStorage, String filePath, long size) {
+    public String getDownloadUrl(CloudStorageType cloudStorage, String ua, String filePath, long size) {
         Rile rile = null;
         if (size < 1000) {
             rile = getFile(cloudStorage, filePath);
@@ -133,12 +138,11 @@ public final class CloudUtil {
         Long rileId = rile.getFileId();
         String downloadUrl = null;
         if (cloudStorage.equals(CloudStorageType.R_123)) {
-            downloadUrl = r123Proxy.getDownloadUrl(rileId);
+            downloadUrl = r123Proxy.getDownloadUrl(ua, rileId);
         } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
-            downloadUrl = r123ZongProxy.getDownloadUrl(rileId);
+            downloadUrl = r123ZongProxy.getDownloadUrl(ua, rileId);
         } else if (cloudStorage.equals(CloudStorageType.R_115)) {
-            // TODO
-            // findFileList = r115Proxy.listFiles(parentId, segment);
+            downloadUrl = r115Proxy.getDownloadUrl(ua, rile.getPickCode());
         }
         return downloadUrl;
     }

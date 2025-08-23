@@ -55,12 +55,14 @@ public interface R123Client {
     /**
      * 获取下载信息
      *
-     * @param auth   auth
-     * @param fileId 文件id
+     * @param auth      auth
+     * @param userAgent 用户代理
+     * @param fileId    文件id
      * @return {@link R123 }<{@link R123DownloadUrlResp }>
      */
     @GetMapping(path = "/api/v1/file/download_info", headers = {"Platform=open_platform"})
     R123<R123DownloadUrlResp> getDownloadUrl(@RequestHeader("Authorization") String auth,
+                                             @RequestHeader("User-Agent") String userAgent,
                                              @RequestParam("fileId") Long fileId);
 
 }

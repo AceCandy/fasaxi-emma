@@ -58,21 +58,22 @@ tmdb:
   image-static-url: https://image.tmdb.org/t/p/original
   image-cdn-url:
     - http://pic.acecandy.cn/t/p/w{}
-#    - http://pic1.acecandy.cn/t/p/w{}
-    - http://pic.worldline.space/t/p/w{}
+    - http://pic1.acecandy.cn/t/p/w{}
+#    - http://pic.worldline.space/t/p/w{}
 #    - https://wsrv.nl/?url=http://image.tmdb.org/t/p/w{}
 
 douban:
   image-static-url: doubanio.com
   image-cdn-url:
-    - http://db-pic.worldline.space
+    #    - http://db-pic.worldline.space
     - http://db-pic.acecandy.cn
-#    - https://wsrv.nl/?url=http://img3.doubanio.com
-#    - https://wsrv.nl/?url=http://img1.doubanio.com
-#    - https://wsrv.nl/?url=http://img2.doubanio.com
-#    - https://img1.doubanio.com
-#    - https://img2.doubanio.com
-#    - https://img3.doubanio.com
+    - http://db-pic1.acecandy.cn
+  #    - https://wsrv.nl/?url=http://img3.doubanio.com
+  #    - https://wsrv.nl/?url=http://img1.doubanio.com
+  #    - https://wsrv.nl/?url=http://img2.doubanio.com
+  #    - https://img1.doubanio.com
+  #    - https://img2.doubanio.com
+  #    - https://img3.doubanio.com
   app:
     host: https://api.douban.com
     apikey:
