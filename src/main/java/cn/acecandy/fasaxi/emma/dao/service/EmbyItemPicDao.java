@@ -24,6 +24,24 @@ import static cn.acecandy.fasaxi.emma.dao.entity.table.EmbyItemPicTableDef.EMBY_
 @Component
 public class EmbyItemPicDao extends ServiceImpl<EmbyItemPicMapper, EmbyItemPic> {
 
+    /**
+     * 插入或更新
+     * <p>
+     * 自带的saveOrUpdate好像对非自增id有问题 所以重写了个
+     *
+     * @param dto 到
+     * @return boolean
+     */
+    public boolean insertOrUpdate(EmbyItemPic dto) {
+        if (dto == null) {
+            return false;
+        }
+        if (null != dto.getItemId()) {
+            return mapper.update(dto) > 0;
+        }
+        return mapper.insert(dto) > 0;
+    }
+
     public List<Integer> findAllItemId() {
         QueryWrapper wrapper = QueryWrapper.create()
                 .select(EMBY_ITEM_PIC.ITEM_ID)

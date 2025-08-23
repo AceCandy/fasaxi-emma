@@ -197,7 +197,7 @@ public class PicRedirectService {
         asyncWriteItemPic(NumberUtil.parseInt(itemId), uri, picType);
     }
 
-    private void return308(HttpServletResponse response,String url){
+    private void return308(HttpServletResponse response, String url) {
         response.setStatus(CODE_308);
         response.setHeader("Location", url);
         response.setHeader("Referer", UrlUtil.url(url).getHost());
@@ -214,9 +214,10 @@ public class PicRedirectService {
         ThreadUtil.execVirtual(() -> {
             try {
                 switch (picType) {
-                    case 封面 -> embyItemPicDao.saveOrUpdate(EmbyItemPic.x().setItemId(itemId).setPosterPath(url));
-                    case 背景图 -> embyItemPicDao.saveOrUpdate(EmbyItemPic.x().setItemId(itemId).setBackdropPath(url));
-                    case Logo -> embyItemPicDao.saveOrUpdate(EmbyItemPic.x().setItemId(itemId).setLogoPath(url));
+                    case 封面 -> embyItemPicDao.insertOrUpdate(EmbyItemPic.x().setItemId(itemId).setPosterPath(url));
+                    case 背景图 ->
+                            embyItemPicDao.insertOrUpdate(EmbyItemPic.x().setItemId(itemId).setBackdropPath(url));
+                    case Logo -> embyItemPicDao.insertOrUpdate(EmbyItemPic.x().setItemId(itemId).setLogoPath(url));
                     default -> throw new BaseException("图片类型异常: " + picType);
                 }
             } finally {
