@@ -1,8 +1,10 @@
 package cn.acecandy.fasaxi.emma.sao.dto;
 
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123;
@@ -15,6 +17,8 @@ import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123_ZONG;
  * @since 2025/8/19
  */
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 @Data
 public class Rile {
     /**
