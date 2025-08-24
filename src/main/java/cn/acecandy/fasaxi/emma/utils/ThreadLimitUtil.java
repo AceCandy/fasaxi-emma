@@ -1,15 +1,23 @@
 package cn.acecandy.fasaxi.emma.utils;
 
+import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
+import org.dromara.hutool.core.lang.mutable.MutablePair;
+import org.dromara.hutool.core.map.MapUtil;
+import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.core.text.split.SplitUtil;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_NC2O;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123_ZONG;
 import static cn.acecandy.fasaxi.emma.utils.CacheUtil.THREAD_LIMIT_KEY;
 
 /**
@@ -31,13 +39,14 @@ public class ThreadLimitUtil {
     /**
      * 设置线程缓存
      *
-     * @param type     云盘类型 115/123
-     * @param deviceId 设备ID
+     * @param cloudStorageType 云盘类型 115/123
+     * @param deviceId         设备ID
      */
-    public synchronized void setThreadCache(Integer type, String deviceId) {
-        redisClient.set(CacheUtil.buildThreadLimitKey(deviceId), type, EXP_TIME);
-        // 将设备ID添加到集合中，用于统计总数
-        // redisClient.sadd(THREAD_LIMIT_KEY, deviceId);
+    public synchronized void setThreadCache(CloudStorageType cloudStorageType, String deviceId) {
+        if (cloudStorageType == null) {
+            return;
+        }
+        redisClient.set(CacheUtil.buildThreadLimitKey(cloudStorageType, deviceId), 1, EXP_TIME);
     }
 
     /**
@@ -45,61 +54,75 @@ public class ThreadLimitUtil {
      *
      * @param deviceId 设备ID
      */
-    public synchronized void removeThreadCache(String deviceId) {
-        // 删除设备ID与类型的映射
-        redisClient.del(CacheUtil.buildThreadLimitKey(deviceId));
-        // 从集合中移除设备ID
-        // redisClient.srem(THREAD_LIMIT_KEY, deviceId);
+    public void removeThreadCache(String deviceId) {
+        redisClient.delByPrefix(CacheUtil.buildThreadLimitKey(deviceId));
     }
 
     /**
-     * 检查线程是否超限
+     * 线程超限检测
      *
-     * @return 是否超限
+     * @return 返回输出类型 CloudStorageType
      */
-    public synchronized boolean limitThreadCache() {
-        // 检查总数量是否超过6
-        // int totalCount = redisClient.getscard(THREAD_LIMIT_KEY);
-        int totalCount = CollUtil.size(redisClient.getStrOnScan(THREAD_LIMIT_KEY));
-        if (totalCount > 6) {
-            return true;
-        }
+    public synchronized MutablePair<CloudStorageType, String> limitThreadCache(String mediaPath) {
+        if (StrUtil.containsAny(mediaPath, "/d/new115/emby2/", "/d/new115/embybt/", "/d/new115/other/")) {
+            Set<String> deviceIds = redisClient.scanKeysByPrefix(THREAD_LIMIT_KEY);
+            Map<CloudStorageType, Integer> typeCountMap = MapUtil.newHashMap();
+            for (String deviceId : deviceIds) {
+                CloudStorageType cloudStorageType = CloudStorageType.of(
+                        CollUtil.getLast(SplitUtil.splitTrim(deviceId, "|")));
+                typeCountMap.put(cloudStorageType, typeCountMap.getOrDefault(cloudStorageType, 0) + 1);
+            }
 
-        // 检查115类型是否超过4
-        int type115Count = countByType(115);
-        if (type115Count > 4) {
-            return true;
-        }
+            if (MapUtil.getInt(typeCountMap, R_115, 0) <= 4) {
+                return MutablePair.of(R_115, StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/new115"));
+            }
 
-        // 检查123类型是否超过4
-        int type123Count = countByType(123);
-        return type123Count > 4;
+            if (MapUtil.getInt(typeCountMap, R_123_ZONG, 0) <= 4) {
+                return MutablePair.of(R_123_ZONG, StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/new115"));
+            }
+            return MutablePair.of(L_NC2O, "");
+        }
+        if (StrUtil.contains(mediaPath, "/d/new115/emby/")) {
+            Set<String> deviceIds = redisClient.scanKeysByPrefix(THREAD_LIMIT_KEY);
+            Map<CloudStorageType, Integer> typeCountMap = MapUtil.newHashMap();
+            for (String deviceId : deviceIds) {
+                CloudStorageType cloudStorageType = CloudStorageType.of(
+                        CollUtil.getLast(SplitUtil.splitTrim(deviceId, "|")));
+                typeCountMap.put(cloudStorageType, typeCountMap.getOrDefault(cloudStorageType, 0) + 1);
+            }
+
+            if (MapUtil.getInt(typeCountMap, R_115, 0) <= 4) {
+                return MutablePair.of(R_115, StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/new115"));
+            }
+            return MutablePair.of(L_NC2O, "");
+        }
+        if (StrUtil.contains(mediaPath, "/d/123/")) {
+            Set<String> deviceIds = redisClient.scanKeysByPrefix(THREAD_LIMIT_KEY);
+            Map<CloudStorageType, Integer> typeCountMap = MapUtil.newHashMap();
+            for (String deviceId : deviceIds) {
+                CloudStorageType cloudStorageType = CloudStorageType.of(
+                        CollUtil.getLast(SplitUtil.splitTrim(deviceId, "|")));
+                typeCountMap.put(cloudStorageType, typeCountMap.getOrDefault(cloudStorageType, 0) + 1);
+            }
+            if (MapUtil.getInt(typeCountMap, R_123, 0) <= 4) {
+                return MutablePair.of(R_123, StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/123"));
+            }
+            return MutablePair.of(L_NC2O, "");
+        }
+        if (StrUtil.contains(mediaPath, "/d/zong123/emby/")) {
+            Set<String> deviceIds = redisClient.scanKeysByPrefix(THREAD_LIMIT_KEY);
+            Map<CloudStorageType, Integer> typeCountMap = MapUtil.newHashMap();
+            for (String deviceId : deviceIds) {
+                CloudStorageType cloudStorageType = CloudStorageType.of(
+                        CollUtil.getLast(SplitUtil.splitTrim(deviceId, "|")));
+                typeCountMap.put(cloudStorageType, typeCountMap.getOrDefault(cloudStorageType, 0) + 1);
+            }
+            if (MapUtil.getInt(typeCountMap, R_123_ZONG, 0) <= 4) {
+                return MutablePair.of(R_123_ZONG, StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/zong123"));
+            }
+            return MutablePair.of(L_NC2O, "");
+        }
+        return MutablePair.of(L_NC2O, "");
     }
-
-    /**
-     * 统计指定类型的设备数量
-     *
-     * @param type 设备类型
-     * @return 数量
-     */
-    private int countByType(Integer type) {
-        // 获取所有设备ID
-        Set<Object> deviceIds = redisClient.smembers(THREAD_LIMIT_KEY);
-        if (CollUtil.isEmpty(deviceIds)) {
-            return 0;
-        }
-
-        // 构建所有设备ID对应的key
-        List<String> keys = deviceIds.stream()
-                .map(id -> CacheUtil.buildThreadLimitKey(id.toString()))
-                .collect(Collectors.toList());
-
-        // 批量获取设备类型
-        List<Object> types = redisClient.get(keys);
-
-        // 统计指定类型的数量
-        return CollUtil.count(types, type::equals);
-    }
-
 
 }

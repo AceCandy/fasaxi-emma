@@ -1,11 +1,13 @@
 package cn.acecandy.fasaxi.emma.service;
 
+import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
+import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
@@ -19,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.lang.Console;
+import org.dromara.hutool.core.lang.mutable.MutablePair;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.net.url.UrlDecoder;
 import org.dromara.hutool.core.net.url.UrlEncoder;
@@ -26,6 +29,7 @@ import org.dromara.hutool.core.net.url.UrlQueryUtil;
 import org.dromara.hutool.core.net.url.UrlUtil;
 import org.dromara.hutool.core.text.StrPool;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.core.text.split.SplitUtil;
 import org.dromara.hutool.http.client.Request;
 import org.dromara.hutool.http.client.Response;
 import org.dromara.hutool.http.client.engine.ClientEngine;
@@ -40,12 +44,14 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.Charset;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_404;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_416;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_NC2O;
 
 /**
  * 视频重定向服务
@@ -77,6 +83,9 @@ public class VideoRedirectService {
 
     @Resource
     private FileCacheUtil fileCacheUtil;
+
+    @Resource
+    private CloudUtil cloudUtil;
 
     @SneakyThrows
     public void processVideo(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
@@ -138,12 +147,11 @@ public class VideoRedirectService {
                                String mediaSourceId, String ua) {
         String cacheUrl = redisClient.getStrFindOne(CacheUtil.buildVideoCacheKeyList(mediaSourceId, ua));
         if (StrUtil.isNotBlank(cacheUrl)) {
+            List<String> urlSeg = SplitUtil.splitTrim(cacheUrl, "|");
+            CloudStorageType cloudStorageType = CloudStorageType.of(CollUtil.getFirst(urlSeg));
+            cacheUrl = CollUtil.getLast(urlSeg);
             cacheUrl = getPtUrl(cacheUrl);
-            if (StrUtil.containsIgnoreCase(cacheUrl, "download-cdn")) {
-                threadLimitUtil.setThreadCache(123, request.getDeviceId());
-            } else if (StrUtil.containsIgnoreCase(cacheUrl, "115cdn")) {
-                threadLimitUtil.setThreadCache(115, request.getDeviceId());
-            }
+            threadLimitUtil.setThreadCache(cloudStorageType, request.getDeviceId());
 
             response.setStatus(HttpServletResponse.SC_FOUND);
             response.setHeader("Location", cacheUrl);
@@ -188,11 +196,12 @@ public class VideoRedirectService {
             return;
         }
         String mediaPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
-        mediaPath = UrlDecoder.decode(mediaPath);
+        mediaPath = StrUtil.replace(UrlDecoder.decode(mediaPath), "(?<!http:|https:)/+", s -> "/");
         int exTime = 24 * 60 * 60;
         String realUrl = mediaPath;
         if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
             // 1. 处理pt/Emby的特殊情况 直接替换为168路径
+            String cloudTypeStr = "micu";
             if (StrUtil.containsIgnoreCase(mediaPath, "pt/Emby")) {
                 for (String strmPath : embyConfig.getStrmPaths()) {
                     realUrl = StrUtil.replaceIgnoreCase(mediaPath, strmPath, embyConfig.getOriginPt());
@@ -200,16 +209,31 @@ public class VideoRedirectService {
                 realUrl = UrlEncoder.encodeQuery(realUrl);
             } else {
                 // 2. head获取处理其他网盘直链远程路径
+                // 默认替换路径为nc2o路径
                 realUrl = UrlEncoder.encodeQuery(StrUtil.replace(mediaPath,
                         "http://192.168.1.249:5244/d", "http://195.128.102.208:5244/p"));
-                String path115 = mediaPath;
+                MutablePair<CloudStorageType, String> cloudTypePair = threadLimitUtil.limitThreadCache(mediaPath);
+                CloudStorageType cloudType = cloudTypePair.getLeft();
+                if (!cloudType.equals(L_NC2O)) {
+                    String real302Url = cloudUtil.getDownloadUrl(cloudType, request.getUa(), cloudTypePair.getRight(), itemInfo.getSize());
+                    if (StrUtil.isNotBlank(real302Url)) {
+                        exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(real302Url, Charset.defaultCharset()),
+                                "t") - DateUtil.currentSeconds() - 5 * 60);
+                        if (StrUtil.containsAny(mediaPath,
+                                "/d/new115/emby2/", "/d/new115/embybt/", "/d/new115/other/")) {
+                            embyProxy.trans115To123(mediaPath);
+                        }
+                        threadLimitUtil.setThreadCache(cloudType, request.getDeviceId());
+                        cloudTypeStr = cloudType.getValue();
+                        realUrl = real302Url;
+                    }
+                }
+
+                /*
                 String path123 = mediaPath;
                 String real123 = "";
                 String real115 = "";
-                if (StrUtil.contains(mediaPath, "/d/new115/emby2/")) {
-                    path123 = StrUtil.replace(mediaPath, "new115/emby2/", "zong123/emby2/");
-                }
-                if (!threadLimitUtil.limitThreadCache()) {
+                if (!) {
                     Map<String, String> header302 = MapUtil.<String, String>builder()
                             .put("User-Agent", request.getUa()).put("Range", request.getRange()).build();
                     real123 = embyProxy.fetch302Path(path123, header302);
@@ -226,40 +250,38 @@ public class VideoRedirectService {
                     realUrl = StrUtil.isBlank(real123) ? real115 : real123;
                     exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(realUrl, Charset.defaultCharset()),
                             "t") - DateUtil.currentSeconds() - 5 * 60);
-                }
+                }*/
             }
             // 4. 统一缓存和重定向逻辑
-            String cacheKey = StrUtil.containsAnyIgnoreCase(mediaPath, "pt/Emby")
-                    ? CacheUtil.buildVideoCacheKey(mediaSourceId)
-                    : CacheUtil.buildVideoCacheKey(mediaSourceId, request.getUa());
-            redisClient.set(cacheKey, realUrl, exTime);
-            realUrl = getPtUrl(realUrl);
-            if (StrUtil.containsIgnoreCase(realUrl, "download-cdn")) {
-                threadLimitUtil.setThreadCache(123, request.getDeviceId());
-            } else if (StrUtil.containsIgnoreCase(realUrl, "115cdn")) {
-                threadLimitUtil.setThreadCache(115, request.getDeviceId());
+            String cacheKey = "";
+            if (StrUtil.containsAnyIgnoreCase(mediaPath, "pt/Emby")) {
+                cacheKey = CacheUtil.buildVideoCacheKey(mediaSourceId);
+            } else {
+                cacheKey = CacheUtil.buildVideoCacheKey(mediaSourceId, request.getUa());
             }
+            redisClient.set(cacheKey, cloudTypeStr + "|" + realUrl, exTime);
+            realUrl = getPtUrl(realUrl);
             doRedirect(response, realUrl, exTime, mediaPath);
 
             return;
         }
-        // 5. 需要302的本地路径
+        // 5. 本地路径通过alist进行302 音乐/里番
         Map<String, String> pathMap = embyConfig.getLocalPathMap();
         String[] localPaths = pathMap.keySet().toArray(new String[0]);
         if (StrUtil.startWithAnyIgnoreCase(mediaPath, localPaths)) {
             // 6. 找到最长匹配前缀的路径映射，避免部分匹配导致的错误替换
-            String localMediaPath = mediaPath;
+            String finalMediaPath = mediaPath;
             String bestMatchKey = pathMap.keySet().stream()
-                    .filter(prefix -> StrUtil.startWithIgnoreCase(localMediaPath, prefix))
+                    .filter(prefix -> StrUtil.startWithIgnoreCase(finalMediaPath, prefix))
                     .max(Comparator.comparingInt(String::length))
                     .orElse(null);
 
             if (bestMatchKey != null) {
-                exTime = 30 * 60;
+                exTime = 15 * 24 * 60 * 60;
                 realUrl = StrUtil.replaceIgnoreCase(mediaPath, bestMatchKey, pathMap.get(bestMatchKey));
                 realUrl = UrlEncoder.encodeQuery(realUrl);
                 doRedirect(response, realUrl, exTime, mediaPath);
-                redisClient.set(CacheUtil.buildVideoCacheKey(mediaSourceId), realUrl, exTime);
+                redisClient.set(CacheUtil.buildVideoCacheKey(mediaSourceId), "local|" + realUrl, exTime);
                 return;
             }
         }
@@ -384,6 +406,13 @@ public class VideoRedirectService {
     }
 
     public static void main(String[] args) {
-        Console.log(UrlEncoder.encodeQuery("http://alist.netcup-2o.worldline.space/d/123/整理/短剧3/食尽人间烟火色/S01E02.mp4"));
+        Console.log(UrlEncoder.encodeQuery("http://192.168.1.249:5244/d//123/整理/bili/电影解说/927587_木鱼水心/【木鱼微剧场】《加勒比海盗3》/(BV1ox411k7HZ).mp4"));
+        Console.log(UrlUtil.normalize("http://192.168.1.249:5244/d//123/整理/bili/电影解说/927587_木鱼水心/【木鱼微剧场】《加勒比海盗3》/(BV1ox411k7HZ).mp4"));
+        Console.log(StrUtil.replace("http://192.168.1.249:5244/d//123/整理/bili/电影解说/927587_木鱼水心/【木鱼微剧场】《加勒比海盗3》/(BV1ox411k7HZ).mp4", "//", "/"));
+        Console.log(StrUtil.replace("http://192.168.1.249:5244/d//123/整理/bili/电影解说/927587_木鱼水心/【木鱼微剧场】《加勒比海盗3》/(BV1ox411k7HZ).mp4", "(?<!http:|https:)/+", s -> "/"));
+        String s = "https://download-cdn.cjjd19.com/123-620/88022c7e/1821373880-0/88022c7eedc34e98b7a1c422d573866c/c-m74?v=5\u0026t=1756143652\u0026s=1756143652c1e20c8f3bedc789620854d253d8535a\u0026r=RAZMEH\u0026bzc=1\u0026bzs=1821373880\u0026bzp=0\u0026bi=2551510957\u0026filename=%2528BV12x411Y7z4%2529.mp4\u0026x-mf-biz-cid=8adede81-475f-43df-92cf-9c0588867fd4-584000\u0026ndcp=1\u0026cache_type=1";
+        Console.log(UrlQueryUtil.decodeQuery(s, Charset.defaultCharset()));
+        Console.log(MapUtil.getLong(UrlQueryUtil.decodeQuery(s, Charset.defaultCharset()),
+                "t"));
     }
 }

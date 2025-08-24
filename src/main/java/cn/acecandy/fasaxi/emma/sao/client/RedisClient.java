@@ -155,7 +155,12 @@ public class RedisClient {
         if (CollUtil.isEmpty(value)) {
             return ListUtil.of();
         }
-        return value.stream().map(Object::toString).collect(Collectors.toList());
+        return value.stream().map(v -> {
+            if (v instanceof String vStr) {
+                return vStr;
+            }
+            return null;
+        }).filter(StrUtil::isNotBlank).collect(Collectors.toList());
     }
 
     /**
@@ -225,6 +230,25 @@ public class RedisClient {
     /**
      * 通过前缀批量删除
      *
+     * @param prefix 前缀
+     */
+    public void delByPrefix(String prefix) {
+        if (StrUtil.isBlank(prefix)) {
+            return;
+        }
+        ThreadUtil.execVirtual(() -> {
+            Set<String> keysToDelete = scanKeysByPrefix(prefix);
+            if (CollUtil.isEmpty(keysToDelete)) {
+                return;
+            }
+            // 统一序列化方式后删除
+            redisTemplate.unlink(keysToDelete);
+        });
+    }
+
+    /**
+     * 通过前缀批量删除
+     *
      * @param prefixes 前缀
      */
     public void delByPrefix(List<String> prefixes) {
@@ -276,7 +300,7 @@ public class RedisClient {
      * @param prefix 单个前缀（如 "user:100:"）
      * @return 匹配该前缀的所有key
      */
-    private Set<String> scanKeysByPrefix(String prefix) {
+    public Set<String> scanKeysByPrefix(String prefix) {
         Set<String> keys = SetUtil.of();
         // 每次扫描100个key（可根据Redis性能调整，不宜过大）
         try (Cursor<String> cursor = redisTemplate.scan(

@@ -8,7 +8,6 @@ import cn.acecandy.fasaxi.emma.sao.proxy.R123ZongProxy;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.util.EnumUtil;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -55,19 +54,19 @@ public class DebugController {
 
     @GetMapping("/cloud/getFile")
     public Rsres<Object> getFile(String cloud, String filePath) {
-        CloudStorageType cloudStorage = EnumUtil.likeValueOf(CloudStorageType.class, cloud);
+        CloudStorageType cloudStorage = CloudStorageType.of(cloud);
         return Rsres.success(cloudUtil.getFile(cloudStorage, filePath));
     }
 
     @GetMapping("/cloud/getFileMatch")
     public Rsres<Object> getFileMatch(String cloud, String filePath, long size) {
-        CloudStorageType cloudStorage = EnumUtil.likeValueOf(CloudStorageType.class, cloud);
+        CloudStorageType cloudStorage = CloudStorageType.of(cloud);
         return Rsres.success(cloudUtil.getFileMatch(cloudStorage, filePath, size));
     }
 
     @GetMapping("/cloud/getDownloadUrl")
     public Rsres<Object> getDownloadUrl123(String cloud, String ua, String filePath, long size) {
-        CloudStorageType cloudStorage = EnumUtil.likeValueOf(CloudStorageType.class, cloud);
+        CloudStorageType cloudStorage = CloudStorageType.of(cloud);
         return Rsres.success(cloudUtil.getDownloadUrl(cloudStorage, ua, filePath, size));
     }
 }

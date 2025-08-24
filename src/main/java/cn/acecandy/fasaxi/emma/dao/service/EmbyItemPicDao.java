@@ -32,14 +32,16 @@ public class EmbyItemPicDao extends ServiceImpl<EmbyItemPicMapper, EmbyItemPic> 
      * @param dto 到
      * @return boolean
      */
-    public boolean insertOrUpdate(EmbyItemPic dto) {
+    public synchronized boolean insertOrUpdate(EmbyItemPic dto) {
         if (dto == null) {
             return false;
         }
-        if (null != dto.getItemId()) {
-            return mapper.update(dto) > 0;
+        Integer itemId = dto.getItemId();
+        EmbyItemPic embyItemPic = findByItemId(itemId);
+        if (embyItemPic == null) {
+            return mapper.insertSelective(dto) > 0;
         }
-        return mapper.insert(dto) > 0;
+        return mapper.update(dto) > 0;
     }
 
     public List<Integer> findAllItemId() {

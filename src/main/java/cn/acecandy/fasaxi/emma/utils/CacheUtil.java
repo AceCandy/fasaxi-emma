@@ -1,6 +1,7 @@
 package cn.acecandy.fasaxi.emma.utils;
 
 
+import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import org.dromara.hutool.core.cache.impl.FIFOCache;
@@ -32,13 +33,18 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     public static final String R_123_TOKEN = "cache:a-123-token";
     public static final String R_123_ZONG_TOKEN = "cache:a-123-zong-token";
 
+    public static String buildThreadLimitKey(CloudStorageType cloudStorageType, String deviceId) {
+        return THREAD_LIMIT_KEY + ":" + deviceId + "|" + cloudStorageType.getValue();
+    }
+
     public static String buildThreadLimitKey(String deviceId) {
         return THREAD_LIMIT_KEY + ":" + deviceId;
     }
 
+    private static final String CLOUD_SEARCH_CACHE_KEY = "cache:search:{}|{}|{}";
 
-    private static final String VIDEO_CACHE_KEY = "cache:video:{}";
-    private static final String VIDEO_UA_CACHE_KEY = "cache:video:{}|{}";
+    private static final String VIDEO_CACHE_KEY = "cache:302video:{}";
+    private static final String VIDEO_UA_CACHE_KEY = "cache:302video:{}|{}";
     private static final String PIC_CACHE_KEY = "cache:pic:{}|{}";
     private static final String ORIGIN_CACHE_KEY = "cache:req:{}|{}";
 
@@ -51,6 +57,16 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     private static final String ORIGIN_CACHE_REFRESH_KEY1_ALL = "cache:req:/emby/Users/";
     private static final String ORIGIN_CACHE_REFRESH_KEY2_ALL = "cache:req:/Users/";
 
+
+    /**
+     * 云盘搜索缓存key
+     *
+     * @param param 参数字符串
+     * @return {@link String }
+     */
+    public static String buildCloudSearchKey(CloudStorageType cloudStorage, String filePath, long size) {
+        return StrUtil.format(CLOUD_SEARCH_CACHE_KEY, cloudStorage.getValue(), filePath, size);
+    }
 
     /**
      * 通过上一个方法名+参数构建 请求第三方的缓存key
@@ -89,7 +105,8 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     }
 
     public static List<String> buildVideoCacheKeyList(String mediaSourceId, String ua) {
-        return ListUtil.of(buildVideoCacheKey(mediaSourceId, ua), buildVideoCacheKey(mediaSourceId));
+        return ListUtil.of(buildVideoCacheKey(mediaSourceId, ua),
+                buildVideoCacheKey(mediaSourceId));
     }
 
     public static String buildPicCacheKey(String itemId, EmbyPicType picType) {

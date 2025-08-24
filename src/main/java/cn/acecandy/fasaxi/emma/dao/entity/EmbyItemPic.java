@@ -3,9 +3,9 @@ package cn.acecandy.fasaxi.emma.dao.entity;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.Table;
 import com.mybatisflex.core.activerecord.Model;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.experimental.Accessors;
 
 import java.util.Date;
 
@@ -17,8 +17,10 @@ import java.util.Date;
  */
 @Table("emby_item_pic")
 @EqualsAndHashCode(callSuper = false)
-@Accessors(chain = true)
-@Data(staticConstructor = "x")
+// @Accessors(chain = true)
+// @Data(staticConstructor = "x")
+@Data
+@Builder
 public class EmbyItemPic extends Model<EmbyItemPic> {
 
     /**

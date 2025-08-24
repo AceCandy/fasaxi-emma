@@ -214,10 +214,12 @@ public class PicRedirectService {
         ThreadUtil.execVirtual(() -> {
             try {
                 switch (picType) {
-                    case 封面 -> embyItemPicDao.insertOrUpdate(EmbyItemPic.x().setItemId(itemId).setPosterPath(url));
+                    case 封面 ->
+                            embyItemPicDao.insertOrUpdate(EmbyItemPic.builder().itemId(itemId).posterPath(url).build());
                     case 背景图 ->
-                            embyItemPicDao.insertOrUpdate(EmbyItemPic.x().setItemId(itemId).setBackdropPath(url));
-                    case Logo -> embyItemPicDao.insertOrUpdate(EmbyItemPic.x().setItemId(itemId).setLogoPath(url));
+                            embyItemPicDao.insertOrUpdate(EmbyItemPic.builder().itemId(itemId).backdropPath(url).build());
+                    case Logo ->
+                            embyItemPicDao.insertOrUpdate(EmbyItemPic.builder().itemId(itemId).logoPath(url).build());
                     default -> throw new BaseException("图片类型异常: " + picType);
                 }
             } finally {

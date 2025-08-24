@@ -1,6 +1,7 @@
 package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
+import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.dto.Rile;
 import cn.acecandy.fasaxi.emma.sao.proxy.R115Proxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123Proxy;
@@ -38,6 +39,9 @@ public final class CloudUtil {
 
     @Resource
     private R123ZongProxy r123ZongProxy;
+
+    @Resource
+    private RedisClient redisClient;
 
     /**
      * 获取文件
@@ -118,6 +122,21 @@ public final class CloudUtil {
         return CollUtil.getFirst(findFileList);
     }
 
+    public Rile getFileByCache(CloudStorageType cloudStorage, String filePath, long size) {
+        String cacheKey = CacheUtil.buildCloudSearchKey(cloudStorage, filePath, size);
+        Rile rile = redisClient.getBean(cacheKey);
+        if (null != rile) {
+            return rile;
+        }
+        if (size < 1000) {
+            rile = getFile(cloudStorage, filePath);
+        } else {
+            rile = getFileMatch(cloudStorage, filePath, size);
+        }
+        redisClient.setBean(cacheKey, rile, 60 * 60 * 6);
+        return rile;
+    }
+
     /**
      * 获取下载链接
      *
@@ -126,12 +145,7 @@ public final class CloudUtil {
      * @return {@link Rile }
      */
     public String getDownloadUrl(CloudStorageType cloudStorage, String ua, String filePath, long size) {
-        Rile rile = null;
-        if (size < 1000) {
-            rile = getFile(cloudStorage, filePath);
-        } else {
-            rile = getFileMatch(cloudStorage, filePath, size);
-        }
+        Rile rile = getFileByCache(cloudStorage, filePath, size);
         if (null == rile) {
             return null;
         }

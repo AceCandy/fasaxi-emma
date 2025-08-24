@@ -170,7 +170,7 @@ public class OriginReqService {
 
         if (StrUtil.containsIgnoreCase(request.getRequestURI(), "/Views")) {
             try (Response toolkitResp = httpClient.send(Request.of(embyConfig.getEmbyToolkitHost()
-                    + request.getParamUri()).method(Method.valueOf(request.getMethod())))) {
+                    + request.getParamUri() + "&api_key=" + embyConfig.getApiKey()).method(Method.valueOf(request.getMethod())))) {
                 request.buildToolKit(toolkitResp.bodyStr());
             } catch (Throwable e) {
                 log.warn("toolkit异常，请检查, e:", e);
