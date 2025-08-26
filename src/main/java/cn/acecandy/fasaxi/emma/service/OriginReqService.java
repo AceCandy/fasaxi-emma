@@ -37,6 +37,7 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_599;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_DELETE;
+import static cn.acecandy.fasaxi.emma.utils.CacheUtil.CACHE_VIEW_KEY;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheLongTimeReq;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheStaticReq;
 
@@ -169,12 +170,17 @@ public class OriginReqService {
         }
 
         if (StrUtil.containsIgnoreCase(request.getRequestURI(), "/Views")) {
-            try (Response toolkitResp = httpClient.send(Request.of(embyConfig.getEmbyToolkitHost()
-                    + request.getParamUri() + "&api_key=" + embyConfig.getApiKey()).method(Method.valueOf(request.getMethod())))) {
-                request.buildToolKit(toolkitResp.bodyStr());
-            } catch (Throwable e) {
-                log.warn("toolkit异常，请检查, e:", e);
+            String toolkitStr = redisClient.getStr(CACHE_VIEW_KEY);
+            if (StrUtil.isBlank(toolkitStr)) {
+                try (Response toolkitResp = httpClient.send(Request.of(embyConfig.getEmbyToolkitHost()
+                        + request.getParamUri() + "&api_key=" + embyConfig.getApiKey()).method(Method.valueOf(request.getMethod())))) {
+                    toolkitStr = toolkitResp.bodyStr();
+                    redisClient.set(CACHE_VIEW_KEY, toolkitStr, 60 * 60);
+                } catch (Throwable e) {
+                    log.warn("toolkit异常，请检查, e:", e);
+                }
             }
+            request.buildToolKit(toolkitStr);
         }
 
         StopWatch stopWatch = StopWatch.of("原始请求");

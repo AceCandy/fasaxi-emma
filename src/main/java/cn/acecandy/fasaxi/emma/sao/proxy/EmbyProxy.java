@@ -25,6 +25,7 @@ import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
+import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.date.DateTime;
 import org.dromara.hutool.core.exception.ExceptionUtil;
 import org.dromara.hutool.core.map.MapUtil;
@@ -526,6 +527,15 @@ public class EmbyProxy {
         }
         JSONObject viewJn = JSONUtil.parseObj(bodyStr);
         JSONArray items = viewJn.getJSONArray("Items");
+        request.getToolkitView().forEach(v -> {
+            v.asJSONObject().putValue("Type", "CollectionFolder")
+                    .putValue("PresentationUniqueKey", v.asJSONObject().getStr("Guid"))
+                    .putValue("DisplayPreferencesId", v.asJSONObject().getStr("Guid"))
+                    .putValue("ForcedSortName", v.asJSONObject().getStr("SortName"))
+                    .putValue("Taglines", ListUtil.of())
+                    .putValue("RemoteTrailers", ListUtil.of())
+            ;
+        });
         items.addAll(0, request.getToolkitView());
         return viewJn.toString();
     }

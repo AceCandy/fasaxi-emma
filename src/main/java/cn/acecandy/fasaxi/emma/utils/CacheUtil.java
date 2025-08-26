@@ -51,6 +51,8 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
 
     private static final String THIRD_CACHE_KEY = "cache:third:{}|{}";
 
+    public static final String CACHE_VIEW_KEY = "cache:view";
+
     private static final String ORIGIN_CACHE_REFRESH_KEY1 = "cache:req:/emby/Users/{}/Items";
     private static final String ORIGIN_CACHE_REFRESH_KEY2 = "cache:req:/emby/Shows/{}";
     private static final String ORIGIN_CACHE_REFRESH_KEY3 = "cache:req:/Users/{}/Items";
