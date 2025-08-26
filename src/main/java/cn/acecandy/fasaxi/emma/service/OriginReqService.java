@@ -241,10 +241,14 @@ public class OriginReqService {
      * @return {@link Response }
      */
     public Response sendOriginReq(EmbyContentCacheReqWrapper request) {
-        String host = (NumberUtil.parseInt(request.getMediaSourceId(), 1) < 0 ||
-                NumberUtil.parseInt(request.getParentId(), 1) < 0) ?
-                embyConfig.getEmbyToolkitHost() : embyConfig.getHost();
-        Request originalRequest = Request.of(host + request.getParamUri())
+        String host = embyConfig.getHost();
+        String uri = request.getParamUri();
+        if (NumberUtil.parseInt(request.getMediaSourceId(), 1) < 0 ||
+                NumberUtil.parseInt(request.getParentId(), 1) < 0) {
+            host = embyConfig.getEmbyToolkitHost();
+            uri = StrUtil.replace(uri, "&MediaTypes=Video", "");
+        }
+        Request originalRequest = Request.of(host + uri)
                 .method(Method.valueOf(request.getMethod()))
                 .body(request.getCachedBody());
         request.getCachedHeader().forEach((k, v) -> originalRequest.header(k, v, true));
