@@ -42,6 +42,7 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     }
 
     private static final String CLOUD_SEARCH_CACHE_KEY = "cache:search:{}|{}|{}";
+    private static final String CLOUD_SEARCH_DEVICE_CACHE_KEY = "cache:search:{}|{}-{}|{}";
 
     private static final String VIDEO_CACHE_KEY = "cache:302video:{}";
     private static final String VIDEO_UA_CACHE_KEY = "cache:302video:{}|{}";
@@ -66,6 +67,17 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
      */
     public static String buildCloudSearchKey(CloudStorageType cloudStorage, String filePath, long size) {
         return StrUtil.format(CLOUD_SEARCH_CACHE_KEY, cloudStorage.getValue(), filePath, size);
+    }
+
+    /**
+     * 云盘搜索缓存key
+     *
+     * @param param 参数字符串
+     * @return {@link String }
+     */
+    public static String buildCloudSearchKey(CloudStorageType cloudStorage, String deviceId,
+                                             String filePath, long size) {
+        return StrUtil.format(CLOUD_SEARCH_DEVICE_CACHE_KEY, cloudStorage.getValue(), deviceId, filePath, size);
     }
 
     /**
@@ -100,12 +112,13 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
         return StrUtil.format(VIDEO_CACHE_KEY, mediaSourceId);
     }
 
-    public static String buildVideoCacheKey(String mediaSourceId, String ua) {
-        return StrUtil.format(VIDEO_UA_CACHE_KEY, mediaSourceId, ua);
+    public static String buildVideoCacheKey(String mediaSourceId, String deviceId) {
+        return StrUtil.format(VIDEO_UA_CACHE_KEY, mediaSourceId, deviceId);
     }
 
-    public static List<String> buildVideoCacheKeyList(String mediaSourceId, String ua) {
-        return ListUtil.of(buildVideoCacheKey(mediaSourceId, ua),
+    public static List<String> buildVideoCacheKeyList(String mediaSourceId,
+                                                      String deviceId) {
+        return ListUtil.of(buildVideoCacheKey(mediaSourceId, deviceId),
                 buildVideoCacheKey(mediaSourceId));
     }
 

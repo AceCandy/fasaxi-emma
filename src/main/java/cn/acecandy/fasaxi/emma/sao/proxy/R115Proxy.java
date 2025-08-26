@@ -13,6 +13,7 @@ import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.UnicodeUtil;
+import org.dromara.hutool.json.JSONUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -42,6 +43,9 @@ public class R115Proxy {
 
     @Value("${cloud.r115.default.refresh-token}")
     private String refreshToken;
+
+    @Value("${cloud.r115.default.copy-folder}")
+    private Long copyFolder;
 
     public String getRefreshToken() {
         String result = redisClient.getStr(R_115_REFRESH_TOKEN);
@@ -161,13 +165,17 @@ public class R115Proxy {
      */
     public R115FileInfoResp getFileInfo(Long fileId, R115FileInfoReq req) {
         String auth = getAccessTokenByCache(false);
-        R115<R115FileInfoResp> result = r115Client.getFileInfo(auth, fileId, req);
+        R115<Object> result = r115Client.getFileInfo(auth, fileId, req);
         if (result == null) {
             log.warn("getFileInfo,resp为空,req:{}", req);
             return null;
         }
         if (result.isOk()) {
-            return result.getData();
+            try {
+                return JSONUtil.toBean(result.getData(), R115FileInfoResp.class);
+            } catch (Exception e) {
+                return null;
+            }
         }
         if (isTokenError(result.getCode())) {
             redisClient.del(getCacheTokenKey());
@@ -248,7 +256,8 @@ public class R115Proxy {
      */
     public List<Rile> getRiles(CharSequence filterFileName) {
         List<Rile> resultList = ListUtil.of();
-        R115FileInfoResp resp = getFileInfo(null, R115FileInfoReq.builder().path(filterFileName.toString()).build());
+        R115FileInfoResp resp = getFileInfo(null,
+                R115FileInfoReq.builder().path(filterFileName.toString()).build());
         if (null == resp) {
             return resultList;
         }
@@ -275,7 +284,7 @@ public class R115Proxy {
     private List<Rile> convertSearchToRile(List<R115SearchFileResp> files) {
         return files.stream().map(f -> {
             Rile rile = Rile.builder().fileId(f.getFile_id())
-                    .fileName(f.getFile_name())
+                    .fileName(UnicodeUtil.toString(f.getFile_name()))
                     .fileSize(f.getFile_size())
                     .pickCode(f.getPick_code())
                     .build();
@@ -293,7 +302,7 @@ public class R115Proxy {
     private List<Rile> convertToRile(List<R115FileListResp> files) {
         return files.stream().map(f -> {
             Rile rile = Rile.builder().fileId(f.getFid())
-                    .fileName(f.getFn())
+                    .fileName(UnicodeUtil.toString(f.getFn()))
                     .fileSize(f.getFs())
                     .pickCode(f.getPc())
                     .build();
@@ -311,12 +320,11 @@ public class R115Proxy {
      */
     private Rile convertInfoToRile(R115FileInfoResp file) {
         return Rile.builder().fileId(file.getFile_id())
-                .fileName(file.getFile_name())
+                .fileName(UnicodeUtil.toString(file.getFile_name()))
                 .fileSize(file.getSize_byte())
                 .pickCode(file.getPick_code())
                 .build();
     }
-
 
     /**
      * 获取文件列表
@@ -342,6 +350,75 @@ public class R115Proxy {
             redisClient.del(getCacheTokenKey());
         }
         log.warn("getDownloadUrl,resp异常:{},pickCode:{}", result, pickCode);
+        return null;
+    }
+
+    /**
+     * 复制文件
+     *
+     * @param source     来源
+     * @param destFolder dest文件夹
+     * @return {@link R123FileListResp }
+     */
+    public boolean copyFile(Long source, Long destFolder) {
+        if (null == source || null == destFolder) {
+            return false;
+        }
+        String auth = getAccessTokenByCache(false);
+        R115<Object> result = r115Client.copyFile(auth,
+                R115CopyReq.builder().pid(destFolder).file_id(source).nodupli(1).build());
+        if (result == null) {
+            log.warn("copyFile,resp为空,source:{},destFolder:{}", source, destFolder);
+            return false;
+        }
+        if (result.isOk()) {
+            return true;
+        }
+        if (isTokenError(result.getCode())) {
+            redisClient.del(getCacheTokenKey());
+        }
+        log.warn("copyFile,resp异常:{},source:{},destFolder:{}", result, source, destFolder);
+        return false;
+    }
+
+    /**
+     * 复制文件 返回文件夹id
+     *
+     * @param folderName 文件夹名称
+     * @return {@link R123FileListResp }
+     */
+    public Long addFolder(String folderName) {
+        if (StrUtil.isBlank(folderName)) {
+            return null;
+        }
+        String auth = getAccessTokenByCache(false);
+        R115<Object> result = r115Client.addFolder(auth,
+                R115AddFolderReq.builder().pid(copyFolder).file_name(folderName).build());
+        if (result == null) {
+            log.warn("addFolder,resp为空,folderName:{}", folderName);
+            return null;
+        }
+        if (result.isOk()) {
+            return JSONUtil.toBean(result.getData(), R115FileInfoResp.class).getFile_id();
+        }
+        if (isTokenError(result.getCode())) {
+            redisClient.del(getCacheTokenKey());
+        }
+        if (result.getCode().equals(20004)) {
+            // 已存在就直接返回
+            R115Search<List<R115SearchFileResp>> searchResp = searchFile(R115SearchFileReq.builder()
+                    .search_value(folderName).cid(copyFolder).fc(1).build());
+            if (null == searchResp) {
+                log.warn("copyFile,返回已存在但是未搜索到:{}", folderName);
+                return null;
+            }
+            return searchResp.getData().stream()
+                    .filter(file -> StrUtil.equals(
+                            UnicodeUtil.toString(file.getFile_name()), folderName))
+                    .map(R115SearchFileResp::getFile_id)
+                    .findFirst().orElse(null);
+        }
+        log.warn("copyFile,resp异常:{},folderName:{}", result, folderName);
         return null;
     }
 }

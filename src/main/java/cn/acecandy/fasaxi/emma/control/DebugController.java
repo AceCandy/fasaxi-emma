@@ -3,6 +3,7 @@ package cn.acecandy.fasaxi.emma.control;
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.common.resp.Rsres;
 import cn.acecandy.fasaxi.emma.sao.out.R123FileListReq;
+import cn.acecandy.fasaxi.emma.sao.proxy.R115Proxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123Proxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123ZongProxy;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
@@ -22,6 +23,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/debug")
 public class DebugController {
+
+    @Resource
+    private R115Proxy r115Proxy;
 
     @Resource
     private R123Proxy r123Proxy;
@@ -65,8 +69,20 @@ public class DebugController {
     }
 
     @GetMapping("/cloud/getDownloadUrl")
-    public Rsres<Object> getDownloadUrl123(String cloud, String ua, String filePath, long size) {
+    public Rsres<Object> getDownloadUrl(String cloud, String ua, String filePath, long size) {
         CloudStorageType cloudStorage = CloudStorageType.of(cloud);
         return Rsres.success(cloudUtil.getDownloadUrl(cloudStorage, ua, filePath, size));
+    }
+
+    @GetMapping("/cloud/getDownloadUrlOnCopy")
+    public Rsres<Object> getDownloadUrlOnCopy(String cloud, String ua, String deviceId,
+                                              String filePath, long size) {
+        CloudStorageType cloudStorage = CloudStorageType.of(cloud);
+        return Rsres.success(cloudUtil.getDownloadUrlOnCopy(cloudStorage, ua, deviceId, filePath, size));
+    }
+
+    @GetMapping("/115/addFolder")
+    public Rsres<Object> addFolder(String fileName) {
+        return Rsres.success(r115Proxy.addFolder(fileName));
     }
 }

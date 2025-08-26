@@ -1,19 +1,7 @@
 package cn.acecandy.fasaxi.emma.sao.client;
 
 import cn.acecandy.fasaxi.emma.sao.config.LogFeignConfig;
-import cn.acecandy.fasaxi.emma.sao.out.R115;
-import cn.acecandy.fasaxi.emma.sao.out.R115DownloadUrlReq;
-import cn.acecandy.fasaxi.emma.sao.out.R115DownloadUrlResp;
-import cn.acecandy.fasaxi.emma.sao.out.R115File;
-import cn.acecandy.fasaxi.emma.sao.out.R115FileInfoReq;
-import cn.acecandy.fasaxi.emma.sao.out.R115FileInfoResp;
-import cn.acecandy.fasaxi.emma.sao.out.R115FileListReq;
-import cn.acecandy.fasaxi.emma.sao.out.R115FileListResp;
-import cn.acecandy.fasaxi.emma.sao.out.R115Search;
-import cn.acecandy.fasaxi.emma.sao.out.R115SearchFileReq;
-import cn.acecandy.fasaxi.emma.sao.out.R115SearchFileResp;
-import cn.acecandy.fasaxi.emma.sao.out.R123;
-import cn.acecandy.fasaxi.emma.sao.out.R123FileListResp;
+import cn.acecandy.fasaxi.emma.sao.out.*;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.cloud.openfeign.SpringQueryMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -65,7 +53,7 @@ public interface R115Client {
      * @return {@link R115File }<{@link R115FileInfoResp }>
      */
     @GetMapping(path = "/open/folder/get_info")
-    R115<R115FileInfoResp> getFileInfo(@RequestHeader("Authorization") String auth,
+    R115<Object> getFileInfo(@RequestHeader("Authorization") String auth,
                                        @RequestParam("file_id") Long fileId,
                                        @SpringQueryMap R115FileInfoReq req);
 
@@ -81,4 +69,26 @@ public interface R115Client {
     R115<Map<Long, R115DownloadUrlResp>> getDownloadUrl(@RequestHeader("Authorization") String auth,
                                                         @RequestHeader("User-Agent") String userAgent,
                                                         R115DownloadUrlReq req);
+
+    /**
+     * 批量复制文件
+     *
+     * @param auth auth
+     * @param req  雷克
+     * @return {@link R115File }<{@link R115FileInfoResp }>
+     */
+    @PostMapping(path = "/open/ufile/copy", consumes = "application/x-www-form-urlencoded")
+    R115<Object> copyFile(@RequestHeader("Authorization") String auth,
+                          R115CopyReq req);
+
+    /**
+     * 新建文件夹
+     *
+     * @param auth auth
+     * @param req  雷克
+     * @return {@link R115File }<{@link R115FileInfoResp }> 出参报错的时候是个list
+     */
+    @PostMapping(path = "/open/folder/add", consumes = "application/x-www-form-urlencoded")
+    R115<Object> addFolder(@RequestHeader("Authorization") String auth,
+                           R115AddFolderReq req);
 }

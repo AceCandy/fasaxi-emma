@@ -18,6 +18,7 @@ import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.core.text.UnicodeUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -201,7 +202,7 @@ public class R123Proxy {
     private List<Rile> convertToRile(List<R123FileListResp.FileInfo> files) {
         return files.stream().map(f -> {
             Rile rile = Rile.builder().fileId(f.getFileId())
-                    .fileName(f.getFilename())
+                    .fileName(UnicodeUtil.toString(f.getFilename()))
                     .fileSize(f.getSize())
                     .build();
             rile.setFileType(CloudStorageType.R_123, f.getType());

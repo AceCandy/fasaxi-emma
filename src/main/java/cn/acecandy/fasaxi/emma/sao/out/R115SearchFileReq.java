@@ -40,7 +40,7 @@ public class R115SearchFileReq {
      * 目标目录cid
      * 非必填参数，cid=-1时，表示不返回列表任何内容
      */
-    private Integer cid;
+    private Long cid;
 
     /**
      * 搜索结果匹配的开始时间

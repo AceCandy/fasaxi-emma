@@ -193,11 +193,9 @@ public class RedisClient {
 
     public boolean setBean(String key, Object value, Integer time) {
         try {
-            /*ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            try (ObjectOutputStream oos = new ObjectOutputStream(bos)) {
-                oos.writeObject(value);
+            if (null == value) {
+                return false;
             }
-            String base64 = Base64.encode(bos.toByteArray());*/
             if (time > 0) {
                 return set(key, value, time);
             } else {

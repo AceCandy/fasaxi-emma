@@ -3,6 +3,9 @@ package cn.acecandy.fasaxi.emma.utils;
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.dto.Rile;
+import cn.acecandy.fasaxi.emma.sao.out.R115Search;
+import cn.acecandy.fasaxi.emma.sao.out.R115SearchFileReq;
+import cn.acecandy.fasaxi.emma.sao.out.R115SearchFileResp;
 import cn.acecandy.fasaxi.emma.sao.proxy.R115Proxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123Proxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123ZongProxy;
@@ -10,6 +13,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
+import org.dromara.hutool.core.io.file.FileNameUtil;
 import org.dromara.hutool.core.io.file.FileUtil;
 import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.net.url.UrlDecoder;
@@ -21,6 +25,8 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
+
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
 
 /**
  * 云盘工具类
@@ -75,7 +81,7 @@ public final class CloudUtil {
                 findFileList = r123Proxy.listRiles(parentId, segment);
             } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
                 findFileList = r123ZongProxy.listRiles(parentId, segment);
-            } else if (cloudStorage.equals(CloudStorageType.R_115)) {
+            } else if (cloudStorage.equals(R_115)) {
                 // findFileList = r115Proxy.listRiles(parentId, segment);
                 findFileList = r115Proxy.getRiles(filePath);
                 file = CollUtil.getFirst(findFileList);
@@ -108,13 +114,14 @@ public final class CloudUtil {
         List<Rile> findFileList = ListUtil.of();
         if (cloudStorage.equals(CloudStorageType.R_123)) {
             findFileList = r123Proxy.listRiles(segment);
+            findFileList = findFileList.stream().filter(item -> item.getFileSize() == size).toList();
         } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
             findFileList = r123ZongProxy.listRiles(segment);
-        } else if (cloudStorage.equals(CloudStorageType.R_115)) {
+            findFileList = findFileList.stream().filter(item -> item.getFileSize() == size).toList();
+        } else if (cloudStorage.equals(R_115)) {
             // findFileList = r115Proxy.listRiles(segment);
             findFileList = r115Proxy.getRiles(filePath);
         }
-        findFileList = findFileList.stream().filter(item -> item.getFileSize() == size).toList();
         if (CollUtil.isEmpty(findFileList)) {
             log.warn("[{}云盘]未能查找到[{}]，完整文件路径:{}", cloudStorage, segment, filePath);
             return null;
@@ -128,10 +135,43 @@ public final class CloudUtil {
         if (null != rile) {
             return rile;
         }
+
         if (size < 1000) {
             rile = getFile(cloudStorage, filePath);
         } else {
             rile = getFileMatch(cloudStorage, filePath, size);
+        }
+        redisClient.setBean(cacheKey, rile, 60 * 60 * 6);
+        return rile;
+    }
+
+    public Rile getFileByCacheOnDevice(CloudStorageType cloudStorage, String deviceId,
+                                       String filePath, long size) {
+        String cacheKey = CacheUtil.buildCloudSearchKey(cloudStorage, deviceId, filePath, size);
+        Rile rile = redisClient.getBean(cacheKey);
+        if (null != rile) {
+            return rile;
+        }
+        if (size < 1000) {
+            rile = getFile(cloudStorage, filePath);
+        } else {
+            rile = getFileMatch(cloudStorage, filePath, size);
+        }
+        redisClient.setBean(cacheKey, rile, 60 * 60 * 6);
+        return rile;
+    }
+
+    public Rile getFileByCopyCacheOnDevice(CloudStorageType cloudStorage, String deviceId,
+                                           String filePath, long size) {
+        String cacheKey = CacheUtil.buildCloudSearchKey(cloudStorage, deviceId, filePath, size);
+        Rile rile = redisClient.getBean(cacheKey);
+        if (null != rile) {
+            return rile;
+        }
+        if (R_115.equals(cloudStorage)) {
+            String copyPath = FileUtil.normalize(UrlDecoder.decode(filePath));
+            copyPath = StrUtil.format("/0-临时/{}/{}", deviceId, FileNameUtil.getName(copyPath));
+            rile = getFile(cloudStorage, copyPath);
         }
         redisClient.setBean(cacheKey, rile, 60 * 60 * 6);
         return rile;
@@ -155,8 +195,58 @@ public final class CloudUtil {
             downloadUrl = r123Proxy.getDownloadUrl(ua, rileId);
         } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
             downloadUrl = r123ZongProxy.getDownloadUrl(ua, rileId);
-        } else if (cloudStorage.equals(CloudStorageType.R_115)) {
+        } else if (cloudStorage.equals(R_115)) {
             downloadUrl = r115Proxy.getDownloadUrl(ua, rile.getPickCode());
+        }
+        return downloadUrl;
+    }
+
+    /**
+     * 获取下载链接
+     *
+     * @param cloudStorage 云存储
+     * @param filePath     文件路径
+     * @return {@link Rile }
+     */
+    public String getDownloadUrlOnCopy(CloudStorageType cloudStorage,
+                                       String ua, String deviceId, String filePath, long size) {
+        Rile rile = getFileByCopyCacheOnDevice(cloudStorage, deviceId, filePath, size);
+        if (null != rile) {
+            Long rileId = rile.getFileId();
+            String downloadUrl = null;
+            if (cloudStorage.equals(CloudStorageType.R_123)) {
+                downloadUrl = r123Proxy.getDownloadUrl(ua, rileId);
+            } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
+                downloadUrl = r123ZongProxy.getDownloadUrl(ua, rileId);
+            } else if (cloudStorage.equals(R_115)) {
+                downloadUrl = r115Proxy.getDownloadUrl(ua, rile.getPickCode());
+            }
+            return downloadUrl;
+        }
+        rile = getFileByCacheOnDevice(cloudStorage, deviceId, filePath, size);
+        if (null == rile) {
+            return null;
+        }
+        Long rileId = rile.getFileId();
+        String downloadUrl = null;
+        if (cloudStorage.equals(CloudStorageType.R_123)) {
+            downloadUrl = r123Proxy.getDownloadUrl(ua, rileId);
+        } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
+            downloadUrl = r123ZongProxy.getDownloadUrl(ua, rileId);
+        } else if (cloudStorage.equals(R_115)) {
+            Long copyToDir = r115Proxy.addFolder(deviceId);
+            if (!r115Proxy.copyFile(rileId, copyToDir)) {
+                return null;
+            }
+            R115Search<List<R115SearchFileResp>> searchFile = null;
+            do {
+                searchFile = r115Proxy.searchFile(
+                        R115SearchFileReq.builder().search_value(rile.getFileName())
+                                .cid(copyToDir).limit(1).fc(2).type(4)
+                                .suffix(FileNameUtil.getSuffix(rile.getFileName())).build());
+                ThreadUtil.safeSleep(50);
+            } while (CollUtil.isEmpty(searchFile.getData()));
+            downloadUrl = r115Proxy.getDownloadUrl(ua, CollUtil.getFirst(searchFile.getData()).getPick_code());
         }
         return downloadUrl;
     }

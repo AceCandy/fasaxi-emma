@@ -24,26 +24,26 @@ public class Rile {
     /**
      * 文件id
      */
-    public Long fileId;
+    private Long fileId;
     /**
      * 文件名
      */
-    public String fileName;
+    private String fileName;
     /**
      * 文件大小
      */
-    public Long fileSize;
+    private Long fileSize;
     /**
      * 115 pikcode
      */
-    public String pickCode;
+    private String pickCode;
     /**
      * 文件类型
      * <p>
      * 0-文件夹 1-文件
      * 115 和123该值不同 需要手动匹配
      */
-    public Integer fileType;
+    private Integer fileType;
 
     public void setFileType(CloudStorageType cloudStorage, Integer cloudFileType) {
         if (R_115.equals(cloudStorage)) {

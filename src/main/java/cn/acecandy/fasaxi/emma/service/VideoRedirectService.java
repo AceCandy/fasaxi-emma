@@ -121,9 +121,8 @@ public class VideoRedirectService {
                 fileCacheUtil.cacheNextEpisode(embyItem);
             });
         }*/
-
-        String ua = request.getUa();
-        if (getByCache(request, response, mediaSourceId, ua)) {
+        String deviceId = request.getDeviceId();
+        if (getByCache(request, response, mediaSourceId, deviceId)) {
             return;
         }
 
@@ -134,7 +133,7 @@ public class VideoRedirectService {
             return;
         }
         try {
-            if (getByCache(request, response, mediaSourceId, ua)) {
+            if (getByCache(request, response, mediaSourceId, deviceId)) {
                 return;
             }
             exec302(request, response, mediaSourceId);
@@ -143,19 +142,20 @@ public class VideoRedirectService {
         }
     }
 
-    private boolean getByCache(EmbyContentCacheReqWrapper request, HttpServletResponse response,
-                               String mediaSourceId, String ua) {
-        String cacheUrl = redisClient.getStrFindOne(CacheUtil.buildVideoCacheKeyList(mediaSourceId, ua));
+    private boolean getByCache(EmbyContentCacheReqWrapper request,
+                               HttpServletResponse response,
+                               String mediaSourceId, String deviceId) {
+        String cacheUrl = redisClient.getStrFindOne(CacheUtil.buildVideoCacheKeyList(mediaSourceId, deviceId));
         if (StrUtil.isNotBlank(cacheUrl)) {
             List<String> urlSeg = SplitUtil.splitTrim(cacheUrl, "|");
             CloudStorageType cloudStorageType = CloudStorageType.of(CollUtil.getFirst(urlSeg));
             cacheUrl = CollUtil.getLast(urlSeg);
             cacheUrl = getPtUrl(cacheUrl);
-            threadLimitUtil.setThreadCache(cloudStorageType, request.getDeviceId());
+            threadLimitUtil.setThreadCache(cloudStorageType, deviceId);
 
             response.setStatus(HttpServletResponse.SC_FOUND);
             response.setHeader("Location", cacheUrl);
-            log.warn("视频重定向(缓存):[{}|{}] => {}", mediaSourceId, ua, UrlDecoder.decode(cacheUrl));
+            log.warn("视频重定向(缓存):[{}|{}] => {}", mediaSourceId, deviceId, UrlDecoder.decode(cacheUrl));
             return true;
         }
         return false;
@@ -215,9 +215,12 @@ public class VideoRedirectService {
                 MutablePair<CloudStorageType, String> cloudTypePair = threadLimitUtil.limitThreadCache(mediaPath);
                 CloudStorageType cloudType = cloudTypePair.getLeft();
                 if (!cloudType.equals(L_NC2O)) {
-                    String real302Url = cloudUtil.getDownloadUrl(cloudType, request.getUa(), cloudTypePair.getRight(), itemInfo.getSize());
+                    // String real302Url = cloudUtil.getDownloadUrl(cloudType, request.getUa(), cloudTypePair.getRight(), itemInfo.getSize());
+                    String real302Url = cloudUtil.getDownloadUrlOnCopy(cloudType, request.getUa(),
+                            request.getDeviceId(), cloudTypePair.getRight(), itemInfo.getSize());
                     if (StrUtil.isNotBlank(real302Url)) {
-                        exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(real302Url, Charset.defaultCharset()),
+                        exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(real302Url,
+                                        Charset.defaultCharset()),
                                 "t") - DateUtil.currentSeconds() - 5 * 60);
                         if (StrUtil.containsAny(mediaPath,
                                 "/d/new115/emby2/", "/d/new115/embybt/", "/d/new115/other/")) {
@@ -257,7 +260,7 @@ public class VideoRedirectService {
             if (StrUtil.containsAnyIgnoreCase(mediaPath, "pt/Emby")) {
                 cacheKey = CacheUtil.buildVideoCacheKey(mediaSourceId);
             } else {
-                cacheKey = CacheUtil.buildVideoCacheKey(mediaSourceId, request.getUa());
+                cacheKey = CacheUtil.buildVideoCacheKey(mediaSourceId, request.getDeviceId());
             }
             redisClient.set(cacheKey, cloudTypeStr + "|" + realUrl, exTime);
             realUrl = getPtUrl(realUrl);
@@ -336,7 +339,7 @@ public class VideoRedirectService {
             if (StrUtil.containsAny(mediaPath, "pt/Emby", "bt/Emby")) {
                 // mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
             } else {
-                mediaPath = get302RealUrl(mediaSourceId, ua, mediaPath, headerMap);
+                mediaPath = get302RealUrl(mediaSourceId, request.getDeviceId(), mediaPath, headerMap);
             }
             log.warn("原始range:{} total:{}", request.getRange(), embyItem.getSize());
             log.warn("视频拉取(远程):[{}-({})] => {}", mediaSourceId, rangeHeader, mediaPath);
@@ -388,16 +391,16 @@ public class VideoRedirectService {
         }
     }
 
-    private String get302RealUrl(String mediaSourceId, String ua,
+    private String get302RealUrl(String mediaSourceId, String deviceId,
                                  String mediaPath, Map<String, String> headerMap) {
-        String cacheUrl = redisClient.getStr(CacheUtil.buildVideoCacheKey(mediaSourceId, ua));
+        String cacheUrl = redisClient.getStr(CacheUtil.buildVideoCacheKey(mediaSourceId, deviceId));
         if (StrUtil.isBlank(cacheUrl)) {
             // mediaPath = StrUtil.replace(mediaPath, embyConfig.getAlistPublic(), embyConfig.getAlistInner());
             mediaPath = embyProxy.fetch302Path(mediaPath, headerMap);
             if (StrUtil.isNotBlank(mediaPath)) {
                 int exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(
                         mediaPath, Charset.defaultCharset()), "t") - DateUtil.currentSeconds() - 5 * 60);
-                redisClient.set(CacheUtil.buildVideoCacheKey(mediaSourceId, ua), mediaPath, exTime);
+                redisClient.set(CacheUtil.buildVideoCacheKey(mediaSourceId, deviceId), mediaPath, exTime);
             }
         } else {
             mediaPath = cacheUrl;
