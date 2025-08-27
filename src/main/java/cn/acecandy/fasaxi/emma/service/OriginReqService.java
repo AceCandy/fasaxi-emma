@@ -247,6 +247,7 @@ public class OriginReqService {
                 NumberUtil.parseInt(request.getParentId(), 1) < 0) {
             host = embyConfig.getEmbyToolkitHost();
             uri = StrUtil.replace(uri, "&MediaTypes=Video", "");
+            uri = StrUtil.replace(uri, "ParentId=-", "parentId=-");
         }
         Request originalRequest = Request.of(host + uri)
                 .method(Method.valueOf(request.getMethod()))
