@@ -75,8 +75,8 @@ public class PicRedirectService {
 
     /**
      * 处理图片重定向请求
-     * // https://api.themoviedb.org/3/tv/1399/images?api_key=950257e1e6e1b7e0daf665312d82e922
-     * // https://static-mdb.v.geilijiasu.com/t/p/w400//9RO2vbQ67otPrBLXCaC8UMp3Qat.png
+     * // https://api.themoviedb.org/3/tv/1399/images?api_key=xxx
+     * // https://static-mdb.v.geilijiasu.com/t/p/w400/xxx.png
      *
      * @param request  要求
      * @param response 响应
