@@ -73,13 +73,15 @@ public class ThreadLimitUtil {
                 typeCountMap.put(cloudStorageType, typeCountMap.getOrDefault(cloudStorageType, 0) + 1);
             }
 
+            if (MapUtil.getInt(typeCountMap, R_123_ZONG, 0) <= 4) {
+                return MutablePair.of(R_123_ZONG, StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/new115"));
+            }
+
             if (MapUtil.getInt(typeCountMap, R_115, 0) <= 4) {
                 return MutablePair.of(R_115, StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/new115"));
             }
 
-            if (MapUtil.getInt(typeCountMap, R_123_ZONG, 0) <= 4) {
-                return MutablePair.of(R_123_ZONG, StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/new115"));
-            }
+
             return MutablePair.of(L_NC2O, "");
         }
         if (StrUtil.contains(mediaPath, "/d/new115/emby/")) {

@@ -52,6 +52,7 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_404;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_416;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_NC2O;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
 
 /**
  * 视频重定向服务
@@ -218,6 +219,10 @@ public class VideoRedirectService {
                     // String real302Url = cloudUtil.getDownloadUrl(cloudType, request.getUa(), cloudTypePair.getRight(), itemInfo.getSize());
                     String real302Url = cloudUtil.getDownloadUrlOnCopy(cloudType, request.getUa(),
                             request.getDeviceId(), cloudTypePair.getRight(), itemInfo.getSize());
+                    if (StrUtil.isBlank(real302Url) && !cloudType.equals(R_115)) {
+                        real302Url = cloudUtil.getDownloadUrlOnCopy(R_115, request.getUa(),
+                                request.getDeviceId(), cloudTypePair.getRight(), itemInfo.getSize());
+                    }
                     if (StrUtil.isNotBlank(real302Url)) {
                         exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(real302Url,
                                         Charset.defaultCharset()),

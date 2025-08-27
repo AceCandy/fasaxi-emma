@@ -243,11 +243,12 @@ public class OriginReqService {
     public Response sendOriginReq(EmbyContentCacheReqWrapper request) {
         String host = embyConfig.getHost();
         String uri = request.getParamUri();
-        if (NumberUtil.parseInt(request.getMediaSourceId(), 1) < 0 ||
-                NumberUtil.parseInt(request.getParentId(), 1) < 0) {
+        boolean isVirtual = (NumberUtil.parseInt(request.getMediaSourceId(), 1) < 0 ||
+                NumberUtil.parseInt(request.getParentId(), 1) < 0);
+        if (isVirtual) {
             host = embyConfig.getEmbyToolkitHost();
             uri = StrUtil.replace(uri, "&MediaTypes=Video", "");
-            uri = StrUtil.replace(uri, "ParentId=-", "parentId=-");
+            uri = StrUtil.replace(uri, "&limit=", "&Limit=");
         }
         Request originalRequest = Request.of(host + uri)
                 .method(Method.valueOf(request.getMethod()))
