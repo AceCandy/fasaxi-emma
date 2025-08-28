@@ -125,6 +125,9 @@ public class R115Proxy {
             return null;
         }
         if (result.isOk()) {
+            List<R115SearchFileResp> data = result.getData().stream().filter(
+                    d -> StrUtil.equals(req.getSearch_value(), d.getFile_name())).toList();
+            result.setData(data);
             return result;
         }
         if (isTokenError(result.getCode())) {
