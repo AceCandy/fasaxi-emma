@@ -28,6 +28,7 @@ import org.dromara.hutool.http.client.Response;
 import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.dromara.hutool.http.meta.Method;
 import org.dromara.hutool.http.server.servlet.ServletUtil;
+import org.dromara.hutool.json.JSONUtil;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -171,11 +172,15 @@ public class OriginReqService {
 
         if (StrUtil.containsIgnoreCase(request.getRequestURI(), "/Views")) {
             String toolkitStr = redisClient.getStr(CACHE_VIEW_KEY);
-            if (StrUtil.isBlank(toolkitStr)) {
+            if (JSONUtil.isTypeJSON(toolkitStr)) {
                 try (Response toolkitResp = httpClient.send(Request.of(embyConfig.getEmbyToolkitHost()
-                        + request.getParamUri() + "&api_key=" + embyConfig.getApiKey()).method(Method.valueOf(request.getMethod())))) {
+                                + request.getParamUri() + "&api_key=" + embyConfig.getApiKey())
+                        .method(Method.valueOf(request.getMethod())))) {
                     toolkitStr = toolkitResp.bodyStr();
-                    redisClient.set(CACHE_VIEW_KEY, toolkitStr, 60 * 60);
+
+                    if (JSONUtil.isTypeJSON(toolkitStr)) {
+                        redisClient.set(CACHE_VIEW_KEY, toolkitStr, 60 * 60);
+                    }
                 } catch (Throwable e) {
                     log.warn("toolkit异常，请检查, e:", e);
                 }
