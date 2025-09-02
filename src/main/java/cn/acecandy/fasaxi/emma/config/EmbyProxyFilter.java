@@ -97,16 +97,8 @@ public class EmbyProxyFilter implements Filter {
             if (originReqService.notGetReq(res, reqWrapper)) {
                 return;
             }
-
-            /*if (!StrUtil.containsAny(reqWrapper.getUa(), "okhttp", "EmbyTheater", "libmpv",
-                    "Yamby", "Hills", "AfuseKt",
-                    "SenPlayer", "VidHub", "Forward")) {
-                log.error("非法UA已被禁止: {}", reqWrapper.getUa());
-                res.setStatus(CODE_416);
-                return;
-            }*/
             EmbyPicType picType = getPicType(req);
-            if (!非图片.equals(picType)) {
+            if (非图片 != picType) {
                 picRedirectService.processPic(reqWrapper, res, picType);
             } else {
                 String mediaSourceId = ReUtil.isVideoUrl(req.getRequestURI());
