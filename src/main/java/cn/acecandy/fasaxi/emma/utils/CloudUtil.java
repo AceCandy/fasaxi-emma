@@ -25,8 +25,10 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
 
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
+import static cn.acecandy.fasaxi.emma.utils.CacheUtil.buildDeviceFileId115Key;
 
 /**
  * 云盘工具类
@@ -234,21 +236,60 @@ public final class CloudUtil {
         } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
             downloadUrl = r123ZongProxy.getDownloadUrl(ua, rileId);
         } else if (cloudStorage.equals(R_115)) {
-            Long copyToDir = r115Proxy.addFolder(deviceId);
-            if (!r115Proxy.copyFile(rileId, copyToDir)) {
-                return null;
-            }
+            Long copyToDir = getDeviceTmpDir(deviceId);
+            ThreadUtil.execVirtual(() -> r115Proxy.copyFile(rileId, copyToDir));
+
             R115Search<List<R115SearchFileResp>> searchFile = null;
             do {
                 searchFile = r115Proxy.searchFile(
                         R115SearchFileReq.builder().search_value(rile.getFileName())
                                 .cid(copyToDir).limit(1).fc(2).type(4)
                                 .suffix(FileNameUtil.getSuffix(rile.getFileName())).build());
-                ThreadUtil.safeSleep(50);
+                ThreadUtil.safeSleep(80);
             } while (CollUtil.isEmpty(searchFile.getData()));
             downloadUrl = r115Proxy.getDownloadUrl(ua, CollUtil.getFirst(searchFile.getData()).getPick_code());
         }
         return downloadUrl;
+    }
+
+    /**
+     * 生成临时文件夹
+     *
+     * @param deviceId 设备标识符
+     */
+    public void mkdirDeviceTmpDir(String deviceId) {
+        if (StrUtil.isBlank(deviceId)) {
+            return;
+        }
+        Lock lock = LockUtil.lockDeviceLock(deviceId);
+        if (LockUtil.isLock(lock)) {
+            return;
+        }
+        try {
+            getDeviceTmpDir(deviceId);
+        } finally {
+            LockUtil.unlockDevice(lock, deviceId);
+        }
+    }
+
+    /**
+     * 生成临时文件夹
+     *
+     * @param deviceId 设备标识符
+     */
+    private Long getDeviceTmpDir(String deviceId) {
+        if (StrUtil.isBlank(deviceId)) {
+            return null;
+        }
+        String cacheKey = buildDeviceFileId115Key(deviceId);
+        Object fileId = redisClient.get(cacheKey);
+        if (fileId != null) {
+            return (Long) fileId;
+        }
+
+        Long copyToDir = r115Proxy.addFolder(deviceId);
+        redisClient.set(cacheKey, copyToDir, 60 * 60 * 24 * 7);
+        return copyToDir;
     }
 
 

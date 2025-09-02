@@ -6,12 +6,14 @@ import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
+import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
+import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
@@ -65,6 +67,9 @@ public class OriginReqService {
     private EmbyProxy embyProxy;
 
     @Resource
+    private CloudUtil cloudUtil;
+
+    @Resource
     private FileCacheUtil fileCacheUtil;
     @Resource
     private ThreadLimitUtil threadLimitUtil;
@@ -83,6 +88,7 @@ public class OriginReqService {
             writeCacheResponse(response, cached);
             return;
         }
+        ThreadUtil.execVirtual(() -> cloudUtil.mkdirDeviceTmpDir(request.getDeviceId()));
 
         // 获取或创建对应的锁
         Lock lock = LockUtil.lockOrigin(request);
@@ -172,7 +178,7 @@ public class OriginReqService {
 
         if (StrUtil.containsIgnoreCase(request.getRequestURI(), "/Views")) {
             String toolkitStr = redisClient.getStr(CACHE_VIEW_KEY);
-            if (JSONUtil.isTypeJSON(toolkitStr)) {
+            if (!JSONUtil.isTypeJSON(toolkitStr)) {
                 try (Response toolkitResp = httpClient.send(Request.of(embyConfig.getEmbyToolkitHost()
                                 + request.getParamUri() + "&api_key=" + embyConfig.getApiKey())
                         .method(Method.valueOf(request.getMethod())))) {

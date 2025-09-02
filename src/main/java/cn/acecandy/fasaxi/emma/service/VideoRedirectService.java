@@ -167,17 +167,6 @@ public class VideoRedirectService {
             return cacheUrl;
         }
         int minute = DateUtil.thisMinute();
-        /*if (minute == 0) {
-            // 使用原始路径
-        } else */
-        /*if (minute % 10 == 0) {
-            cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
-                    embyConfig.getOriginPt(), embyConfig.getTransPt1());
-        } else {*/
-        /*if (minute % 3 == 0) {
-            cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
-                    embyConfig.getOriginPt(), embyConfig.getTransPt2());
-        } else*/
         if (minute % 2 == 0) {
             cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
                     embyConfig.getOriginPt(), embyConfig.getTransPt3());
@@ -185,7 +174,6 @@ public class VideoRedirectService {
             cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
                     embyConfig.getOriginPt(), embyConfig.getTransPt4());
         }
-        // }
         return cacheUrl;
     }
 
@@ -236,29 +224,6 @@ public class VideoRedirectService {
                         realUrl = real302Url;
                     }
                 }
-
-                /*
-                String path123 = mediaPath;
-                String real123 = "";
-                String real115 = "";
-                if (!) {
-                    Map<String, String> header302 = MapUtil.<String, String>builder()
-                            .put("User-Agent", request.getUa()).put("Range", request.getRange()).build();
-                    real123 = embyProxy.fetch302Path(path123, header302);
-                    if (StrUtil.isBlank(real123)) {
-                        // 离线到123
-                        embyProxy.trans115To123(path115);
-                        real115 = embyProxy.fetch302Path(path115, header302);
-                        if (StrUtil.isBlank(real115)) {
-                            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                            return;
-                        }
-                    }
-                    // 3. 动态计算过期时间
-                    realUrl = StrUtil.isBlank(real123) ? real115 : real123;
-                    exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(realUrl, Charset.defaultCharset()),
-                            "t") - DateUtil.currentSeconds() - 5 * 60);
-                }*/
             }
             // 4. 统一缓存和重定向逻辑
             String cacheKey = "";

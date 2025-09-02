@@ -61,13 +61,27 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     private static final String ORIGIN_CACHE_REFRESH_KEY2_ALL = "cache:req:/Users/";
 
 
+    private static final String DEVICE_CACHE_FILEID115_KEY = "cache:device-115:{}";
+
+
+    /**
+     * 设备115文件id缓存key
+     *
+     * @param deviceId 设备标识符
+     * @return {@link String }
+     */
+    public static String buildDeviceFileId115Key(String deviceId) {
+        return StrUtil.format(DEVICE_CACHE_FILEID115_KEY, deviceId);
+    }
+
     /**
      * 云盘搜索缓存key
      *
      * @param param 参数字符串
      * @return {@link String }
      */
-    public static String buildCloudSearchKey(CloudStorageType cloudStorage, String filePath, long size) {
+    public static String buildCloudSearchKey(CloudStorageType cloudStorage,
+                                             String filePath, long size) {
         return StrUtil.format(CLOUD_SEARCH_CACHE_KEY, cloudStorage.getValue(), filePath, size);
     }
 
