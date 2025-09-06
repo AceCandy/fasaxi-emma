@@ -154,7 +154,7 @@ public final class CloudUtil {
         if (null != rile) {
             return rile;
         }
-        if (size < 1000) {
+        if (size < 1000 || StrUtil.startWith(FileNameUtil.mainName(filePath), "S0")) {
             rile = getFile(cloudStorage, filePath);
         } else {
             rile = getFileMatch(cloudStorage, filePath, size);

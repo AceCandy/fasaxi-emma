@@ -177,7 +177,7 @@ public class R123Proxy {
         do {
             R123FileListResp resp = getFileList(R123FileListReq.builder()
                     .parentFileId(0L).searchData(filterFileName.toString()).searchMode(1)
-                    .limit(10).lastFileId(lastFileId).build());
+                    .limit(100).lastFileId(lastFileId).build());
             lastFileId = resp.getLastFileId();
             // 过滤非回收站文件，传入文件名则根据文件名筛选
             List<R123FileListResp.FileInfo> fileList = resp.getFileList().stream()
