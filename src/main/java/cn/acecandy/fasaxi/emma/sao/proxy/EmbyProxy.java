@@ -526,16 +526,12 @@ public class EmbyProxy {
         }
         JSONObject viewJn = JSONUtil.parseObj(bodyStr);
         JSONArray items = viewJn.getJSONArray("Items");
-        /*request.getToolkitView().forEach(v -> {
-            v.asJSONObject().putValue("Type", "CollectionFolder")
-                    .putValue("PresentationUniqueKey", v.asJSONObject().getStr("Guid"))
-                    .putValue("DisplayPreferencesId", v.asJSONObject().getStr("Guid"))
-                    .putValue("ForcedSortName", v.asJSONObject().getStr("SortName"))
-                    .putValue("Taglines", ListUtil.of())
-                    .putValue("RemoteTrailers", ListUtil.of())
-            ;
-        });*/
         items.addAll(0, request.getToolkitView());
+        items.removeIf(item -> {
+            JSONObject jn = item.asJSONObject();
+            return StrUtil.equalsAny(jn.getStr("Name"), "🎬 华语电影", "🎬 外语电影", "🐦 动画电影",
+                    "🐧 动漫", "🐧 国漫", "📺 国产剧", "📺 欧美剧", "📺 日韩剧", "🎭 综艺", "🦉 记录电影", "🦉 纪录片");
+        });
         return viewJn.toString();
     }
 
