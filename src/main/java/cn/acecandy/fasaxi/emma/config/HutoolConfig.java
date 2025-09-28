@@ -20,6 +20,6 @@ public class HutoolConfig {
         // return ClientEngineFactory.createEngine(ApacheHttpClientConfig.of()
         //         .setMaxTotal(200).setMaxPerRoute(20).setConnectionTimeout(10_000).setReadTimeout(60_000));
         return ClientEngineFactory.createEngine(OkHttpClientConfig.of()
-                .setMaxIdle(200).setConnectionTimeout(10_000).setReadTimeout(60_000));
+                .setMaxIdle(200).setConnectionTimeout(3_000).setReadTimeout(10_000));
     }
 }

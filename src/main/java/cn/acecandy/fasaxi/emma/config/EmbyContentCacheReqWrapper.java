@@ -65,7 +65,7 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     private JSONArray toolkitView;
 
     public void buildToolKit(String toolkitView) {
-        if (!JSONUtil.isTypeJSON(toolkitView)) {
+        if (!JSONUtil.isTypeJSON(toolkitView) || StrUtil.equals(toolkitView, "{}")) {
             return;
         }
         JSONObject viewJn = JSONUtil.parseObj(toolkitView);

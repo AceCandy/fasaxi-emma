@@ -210,8 +210,8 @@ public class EmbyProxy {
             return result;
         }
         result = getItemInfo(mediaSourceId);
-        if (null != result) {
-            redisClient.setBean(cacheKey, result, 5 * 60);
+        if (null != result && result.getSize() > 1024 * 1024L) {
+            redisClient.setBean(cacheKey, result, 2 * 60);
         }
         return result;
     }

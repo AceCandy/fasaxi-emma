@@ -11,6 +11,7 @@ import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
+import cn.acecandy.fasaxi.emma.utils.PathUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
 import cn.acecandy.fasaxi.emma.utils.VideoUtil;
 import jakarta.annotation.Resource;
@@ -95,33 +96,6 @@ public class VideoRedirectService {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
-        /*EmbyItem embyItem = embyProxy.getItemInfoByCache(mediaSourceId);
-        ThreadUtil.execVirtual(() -> {
-            embyProxy.expertTmdbProvider(embyItem);
-        });*/
-        // if (!StrUtil.containsIgnoreCase(request.getRequestURI(), "download")
-        //         && IpUtil.isInnerIp(request.getIp())) {
-        //     if (null == embyItem) {
-        //         response.setStatus(CODE_404);
-        //         return;
-        //     }
-        //
-        //     EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
-        //     if (null == range) {
-        //         response.setHeader("Content-Range", "bytes */" + embyItem.getSize());
-        //         response.setStatus(CODE_416);
-        //         return;
-        //     }
-        //     if (fileCacheUtil.readFile(response, embyItem, range)) {
-        //         return;
-        //     }
-        // }
-        /*if (StrUtil.containsIgnoreCase(embyItem.getPath(), "strm-micu")) {
-            ThreadUtil.execVirtual(() -> {
-                fileCacheUtil.writeCacheAndMoov(embyItem);
-                fileCacheUtil.cacheNextEpisode(embyItem);
-            });
-        }*/
         String deviceId = request.getDeviceId();
         if (getByCache(request, response, mediaSourceId, deviceId)) {
             return;
@@ -179,87 +153,184 @@ public class VideoRedirectService {
 
     private void exec302(EmbyContentCacheReqWrapper request,
                          HttpServletResponse response, String mediaSourceId) {
-        EmbyItem itemInfo = embyProxy.getItemInfoByCache(mediaSourceId);
-        if (null == itemInfo) {
-            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+        MediaInfo mediaInfo = getMediaInfo(mediaSourceId);
+        if (mediaInfo == null) {
+            response.setStatus(CODE_404);
             return;
         }
+        // 3. 根据路径类型分发处理
+        RedirectResult result = processMediaPath(mediaInfo, request);
+        // 4. 执行重定向和缓存
+        executeRedirect(response, result, mediaSourceId, request.getDeviceId());
+    }
+
+    private RedirectResult processMediaPath(MediaInfo mediaInfo, EmbyContentCacheReqWrapper request) {
+        String mediaPath = mediaInfo.path;
+
+        if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
+            return processHttpPath(mediaInfo, request);
+        }
+
+        // 本地视频转alist
+        if (embyConfig.isLocalPath(mediaPath)) {
+            return processLocalPath(mediaInfo);
+        }
+
+        // 默认处理：本地路径直接返回
+        return new RedirectResult(mediaPath, "local", getDefaultExpireTime(), mediaInfo.path);
+    }
+
+    private RedirectResult processHttpPath(MediaInfo mediaInfo, EmbyContentCacheReqWrapper request) {
+        String mediaPath = mediaInfo.path;
+
+        // 处理pt/Emby特殊情况
+        if (StrUtil.containsIgnoreCase(mediaPath, "pt/Emby")) {
+            // 替换strm路径为originPt路径
+            mediaPath = PathUtil.replaceAfterUrlPath(mediaPath, "pt/Emby", embyConfig.getOriginPt());
+            mediaPath = UrlEncoder.encodeQuery(mediaPath);
+            return new RedirectResult(mediaPath, "micu", 24 * 60 * 60, mediaInfo.path);
+        }
+
+        // 处理其他网盘路径
+        return processCloudStoragePath(mediaInfo, request);
+    }
+
+    private RedirectResult processCloudStoragePath(MediaInfo mediaInfo,
+                                                   EmbyContentCacheReqWrapper request) {
+        String mediaPath = mediaInfo.path;
+
+        // 默认替换为nc2o路径
+        String realUrl = UrlEncoder.encodeQuery(StrUtil.replace(mediaPath,
+                "http://192.168.1.249:5244/d", "http://195.128.102.208:5244/p"));
+
+        MutablePair<CloudStorageType, String> cloudTypePair = threadLimitUtil.limitThreadCache(mediaPath);
+        CloudStorageType cloudType = cloudTypePair.getLeft();
+
+        if (cloudType.equals(L_NC2O)) {
+            return new RedirectResult(realUrl, "nc2o", 24 * 60 * 60, mediaInfo.path);
+        }
+
+        // 获取下载URL 如果是115先获取复制的 没有的话复制并查询获取；如果是123的直接获取
+        String real302Url = cloudUtil.getDownloadUrlOnCopy(cloudType, request.getUa(),
+                request.getDeviceId(), cloudTypePair.getRight(), mediaInfo.size);
+
+        // 如果获取失败且不是115网盘，尝试使用115网盘
+        if (StrUtil.isBlank(real302Url) && !cloudType.equals(R_115)) {
+            real302Url = cloudUtil.getDownloadUrlOnCopy(R_115, request.getUa(),
+                    request.getDeviceId(), cloudTypePair.getRight(), mediaInfo.size);
+        }
+
+        if (StrUtil.isNotBlank(real302Url)) {
+            int exTime = calculateExpireTime(real302Url);
+
+            // 特殊路径处理：115转123
+            if (StrUtil.contains(mediaPath, "/d/new115/")) {
+                embyProxy.trans115To123(mediaPath);
+            }
+
+            threadLimitUtil.setThreadCache(cloudType, request.getDeviceId());
+            return new RedirectResult(real302Url, cloudType.getValue(), exTime, mediaInfo.path);
+        }
+
+        return new RedirectResult(realUrl, "nc2o", 2 * 60 * 60, mediaInfo.path);
+    }
+
+    private RedirectResult processLocalPath(MediaInfo mediaInfo) {
+        String mediaPath = mediaInfo.path();
+        Map<String, String> pathMap = embyConfig.getLocalPathMap();
+
+        // 找到最长匹配前缀的路径映射
+        String bestMatchKey = pathMap.keySet().stream()
+                .filter(prefix -> StrUtil.startWithIgnoreCase(mediaPath, prefix))
+                .max(Comparator.comparingInt(String::length))
+                .orElse(null);
+
+        if (bestMatchKey != null) {
+            String realUrl = StrUtil.replaceIgnoreCase(mediaPath, bestMatchKey, pathMap.get(bestMatchKey));
+            realUrl = UrlEncoder.encodeQuery(realUrl);
+            return new RedirectResult(realUrl, "local", 15 * 24 * 60 * 60, mediaInfo.path);
+        }
+
+        return new RedirectResult(mediaPath, "local", getDefaultExpireTime(), mediaInfo.path);
+    }
+
+    private void executeRedirect(HttpServletResponse response, RedirectResult result,
+                                 String mediaSourceId, String deviceId) {
+        if (result == null) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            return;
+        }
+
+        // 构建缓存key
+        String cacheKey = buildCacheKey(result.storageType(), mediaSourceId, deviceId, result.url());
+
+        // 设置Redis缓存
+        String cacheValue = result.storageType() + "|" + result.url();
+        redisClient.set(cacheKey, cacheValue, result.expireTime());
+
+        // 处理pt URL
+        String redirectUrl = getPtUrl(result.url());
+
+        // 执行重定向
+        doRedirect(response, redirectUrl, result.expireTime(), result.originalPath());
+    }
+
+    private String buildCacheKey(String storageType, String mediaSourceId,
+                                 String deviceId, String url) {
+        if (StrUtil.equalsAnyIgnoreCase(storageType, "local", "micu")) {
+            return CacheUtil.buildVideoCacheKey(mediaSourceId);
+        } else {
+            return CacheUtil.buildVideoCacheKey(mediaSourceId, deviceId);
+        }
+    }
+
+    private int calculateExpireTime(String real302Url) {
+        try {
+            long expireTime = MapUtil.getLong(UrlQueryUtil.decodeQuery(real302Url,
+                    Charset.defaultCharset()), "t") - DateUtil.currentSeconds() - 5 * 60;
+            // 最少保留60秒
+            return Math.max((int) expireTime, 10 * 60);
+        } catch (Exception e) {
+            // 默认2小时
+            return 2 * 60 * 60;
+        }
+    }
+
+
+    private int getDefaultExpireTime() {
+        return 24 * 60 * 60;
+    }
+
+
+    /**
+     * 临时存放mediaPath和size的实体
+     *
+     * @author AceCandy
+     * @since 2025/09/28
+     */
+    record MediaInfo(String path, long size) {
+
+    }
+
+    record RedirectResult(String url, String storageType, int expireTime, String originalPath) {
+    }
+
+    /**
+     * 通过id获取媒体路径和大小
+     *
+     * @param mediaSourceId 媒体源id
+     * @return {@link MediaInfo }
+     */
+    private MediaInfo getMediaInfo(String mediaSourceId) {
+        EmbyItem itemInfo = embyProxy.getItemInfoByCache(mediaSourceId);
+        if (itemInfo == null || CollUtil.isEmpty(itemInfo.getMediaSources())) {
+            return null;
+        }
+
         String mediaPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
         mediaPath = StrUtil.replace(UrlDecoder.decode(mediaPath), "(?<!http:|https:)/+", s -> "/");
-        int exTime = 24 * 60 * 60;
-        String realUrl = mediaPath;
-        if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
-            // 1. 处理pt/Emby的特殊情况 直接替换为168路径
-            String cloudTypeStr = "micu";
-            if (StrUtil.containsIgnoreCase(mediaPath, "pt/Emby")) {
-                for (String strmPath : embyConfig.getStrmPaths()) {
-                    realUrl = StrUtil.replaceIgnoreCase(mediaPath, strmPath, embyConfig.getOriginPt());
-                }
-                realUrl = UrlEncoder.encodeQuery(realUrl);
-            } else {
-                // 2. head获取处理其他网盘直链远程路径
-                // 默认替换路径为nc2o路径
-                realUrl = UrlEncoder.encodeQuery(StrUtil.replace(mediaPath,
-                        "http://192.168.1.249:5244/d", "http://195.128.102.208:5244/p"));
-                MutablePair<CloudStorageType, String> cloudTypePair = threadLimitUtil.limitThreadCache(mediaPath);
-                CloudStorageType cloudType = cloudTypePair.getLeft();
-                if (!cloudType.equals(L_NC2O)) {
-                    // String real302Url = cloudUtil.getDownloadUrl(cloudType, request.getUa(), cloudTypePair.getRight(), itemInfo.getSize());
-                    String real302Url = cloudUtil.getDownloadUrlOnCopy(cloudType, request.getUa(),
-                            request.getDeviceId(), cloudTypePair.getRight(), itemInfo.getSize());
-                    if (StrUtil.isBlank(real302Url) && !cloudType.equals(R_115)) {
-                        real302Url = cloudUtil.getDownloadUrlOnCopy(R_115, request.getUa(),
-                                request.getDeviceId(), cloudTypePair.getRight(), itemInfo.getSize());
-                    }
-                    if (StrUtil.isNotBlank(real302Url)) {
-                        exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(real302Url,
-                                        Charset.defaultCharset()),
-                                "t") - DateUtil.currentSeconds() - 5 * 60);
-                        if (StrUtil.containsAny(mediaPath,
-                                "/d/new115/emby2/", "/d/new115/embybt/", "/d/new115/other/")) {
-                            embyProxy.trans115To123(mediaPath);
-                        }
-                        threadLimitUtil.setThreadCache(cloudType, request.getDeviceId());
-                        cloudTypeStr = cloudType.getValue();
-                        realUrl = real302Url;
-                    }
-                }
-            }
-            // 4. 统一缓存和重定向逻辑
-            String cacheKey = "";
-            if (StrUtil.containsAnyIgnoreCase(mediaPath, "pt/Emby")) {
-                cacheKey = CacheUtil.buildVideoCacheKey(mediaSourceId);
-            } else {
-                cacheKey = CacheUtil.buildVideoCacheKey(mediaSourceId, request.getDeviceId());
-            }
-            redisClient.set(cacheKey, cloudTypeStr + "|" + realUrl, exTime);
-            realUrl = getPtUrl(realUrl);
-            doRedirect(response, realUrl, exTime, mediaPath);
 
-            return;
-        }
-        // 5. 本地路径通过alist进行302 音乐/里番
-        Map<String, String> pathMap = embyConfig.getLocalPathMap();
-        String[] localPaths = pathMap.keySet().toArray(new String[0]);
-        if (StrUtil.startWithAnyIgnoreCase(mediaPath, localPaths)) {
-            // 6. 找到最长匹配前缀的路径映射，避免部分匹配导致的错误替换
-            String finalMediaPath = mediaPath;
-            String bestMatchKey = pathMap.keySet().stream()
-                    .filter(prefix -> StrUtil.startWithIgnoreCase(finalMediaPath, prefix))
-                    .max(Comparator.comparingInt(String::length))
-                    .orElse(null);
-
-            if (bestMatchKey != null) {
-                exTime = 15 * 24 * 60 * 60;
-                realUrl = StrUtil.replaceIgnoreCase(mediaPath, bestMatchKey, pathMap.get(bestMatchKey));
-                realUrl = UrlEncoder.encodeQuery(realUrl);
-                doRedirect(response, realUrl, exTime, mediaPath);
-                redisClient.set(CacheUtil.buildVideoCacheKey(mediaSourceId), "local|" + realUrl, exTime);
-                return;
-            }
-        }
-        // 不需要302的本地路径
-        originalVideoStream(request, response);
+        return new MediaInfo(mediaPath, itemInfo.getSize());
     }
 
     /**

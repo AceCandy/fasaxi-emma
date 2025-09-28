@@ -7,6 +7,7 @@ import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import org.dromara.hutool.core.cache.impl.FIFOCache;
 import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.crypto.SecureUtil;
 import org.dromara.hutool.crypto.digest.DigestUtil;
 import org.dromara.hutool.json.JSONUtil;
 
@@ -82,7 +83,7 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
      */
     public static String buildCloudSearchKey(CloudStorageType cloudStorage,
                                              String filePath, long size) {
-        return StrUtil.format(CLOUD_SEARCH_CACHE_KEY, cloudStorage.getValue(), filePath, size);
+        return StrUtil.format(CLOUD_SEARCH_CACHE_KEY, cloudStorage.getValue(), SecureUtil.md5(filePath), size);
     }
 
     /**
@@ -93,7 +94,8 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
      */
     public static String buildCloudSearchKey(CloudStorageType cloudStorage, String deviceId,
                                              String filePath, long size) {
-        return StrUtil.format(CLOUD_SEARCH_DEVICE_CACHE_KEY, cloudStorage.getValue(), deviceId, filePath, size);
+        return StrUtil.format(CLOUD_SEARCH_DEVICE_CACHE_KEY, cloudStorage.getValue(),
+                deviceId, SecureUtil.md5(filePath), size);
     }
 
     /**

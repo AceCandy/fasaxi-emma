@@ -245,7 +245,7 @@ public final class CloudUtil {
                         R115SearchFileReq.builder().search_value(rile.getFileName())
                                 .cid(copyToDir).limit(1).fc(2).type(4)
                                 .suffix(FileNameUtil.getSuffix(rile.getFileName())).build());
-                ThreadUtil.safeSleep(80);
+                ThreadUtil.safeSleep(120);
             } while (CollUtil.isEmpty(searchFile.getData()));
             downloadUrl = r115Proxy.getDownloadUrl(ua, CollUtil.getFirst(searchFile.getData()).getPick_code());
         }

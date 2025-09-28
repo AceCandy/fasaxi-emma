@@ -132,6 +132,12 @@ public class EmbyConfig {
                 ));
     }
 
+    public boolean isLocalPath(String mediaPath) {
+        Map<String, String> pathMap = getLocalPathMap();
+        return pathMap.keySet().stream()
+                .anyMatch(prefix -> StrUtil.startWithIgnoreCase(mediaPath, prefix));
+    }
+
     public static void main(String[] args) {
         String s = "^/emby/Users/[a-zA-Z0-9]+/Items/[0-9]+$";
         String s1 = "/Items/([0-9]+)$";

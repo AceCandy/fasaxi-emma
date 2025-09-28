@@ -189,6 +189,7 @@ public class OriginReqService {
                     }
                 } catch (Throwable e) {
                     log.warn("toolkit异常，请检查, e:", e);
+                    redisClient.set(CACHE_VIEW_KEY, "{}", 3 * 60);
                 }
             }
             request.buildToolKit(toolkitStr);
