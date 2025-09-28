@@ -186,7 +186,7 @@ public class VideoRedirectService {
         // 处理pt/Emby特殊情况
         if (StrUtil.containsIgnoreCase(mediaPath, "pt/Emby")) {
             // 替换strm路径为originPt路径
-            mediaPath = PathUtil.replaceAfterUrlPath(mediaPath, "pt/Emby", embyConfig.getOriginPt());
+            mediaPath = PathUtil.replaceAfterUrlPath(mediaPath, "/p/pt", embyConfig.getOriginPt());
             mediaPath = UrlEncoder.encodeQuery(mediaPath);
             return new RedirectResult(mediaPath, "micu", 24 * 60 * 60, mediaInfo.path);
         }
