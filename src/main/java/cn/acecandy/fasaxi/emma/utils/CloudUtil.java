@@ -238,6 +238,7 @@ public final class CloudUtil {
         } else if (cloudStorage.equals(R_115)) {
             Long copyToDir = getDeviceTmpDir(deviceId);
             ThreadUtil.execVirtual(() -> r115Proxy.copyFile(rileId, copyToDir));
+            ThreadUtil.safeSleep(80);
 
             R115Search<List<R115SearchFileResp>> searchFile = null;
             do {
