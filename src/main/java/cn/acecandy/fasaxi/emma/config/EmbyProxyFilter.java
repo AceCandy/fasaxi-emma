@@ -4,6 +4,7 @@ import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.service.OriginReqService;
 import cn.acecandy.fasaxi.emma.service.PicRedirectService;
 import cn.acecandy.fasaxi.emma.service.VideoRedirectService;
+import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import jakarta.annotation.Resource;
@@ -22,6 +23,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.text.StrUtil;
+import org.dromara.hutool.http.server.servlet.ServletUtil;
 import org.springframework.core.annotation.Order;
 
 import java.io.ByteArrayOutputStream;
@@ -115,9 +117,15 @@ public class EmbyProxyFilter implements Filter {
                 }
             }
         } catch (Exception e) {
-            log.warn("转发请求失败[{}]: {}?{}", req.getMethod(),
-                    reqWrapper.getRequestURI(), reqWrapper.getQueryString(), e);
-            originReqService.forwardOriReq(reqWrapper, res);
+            log.warn("转发请求失败[{}]: {}?{},e:{}", req.getMethod(),
+                    reqWrapper.getRequestURI(), reqWrapper.getQueryString(), ExceptUtil.getSimpleMessage(e));
+            if (ServletUtil.isGetMethod(req)) {
+                res.setStatus(HttpServletResponse.SC_FOUND);
+                String url302 = embyConfig.getOuterHost() + reqWrapper.getParamUri();
+                res.setHeader("Location", url302);
+                log.info("302原始转发->[{}]", url302);
+            }
+            // originReqService.forwardOriReq(reqWrapper, res);
         } finally {
             accessLog.log(reqWrapper.getMethod(), reqWrapper.getRequestURI(), reqWrapper.getIp(),
                     req.getQueryString(), reqWrapper.getCachedHeader(), reqWrapper.getApikey(),

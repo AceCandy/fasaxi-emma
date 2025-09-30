@@ -38,6 +38,7 @@ import java.util.concurrent.locks.Lock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_408;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_599;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_DELETE;
 import static cn.acecandy.fasaxi.emma.utils.CacheUtil.CACHE_VIEW_KEY;
@@ -234,11 +235,15 @@ public class OriginReqService {
     private void httpClient5WarningCatch(EmbyContentCacheReqWrapper request,
                                          HttpServletResponse response,
                                          Throwable e, EmbyCachedResp cached) throws Throwable {
-        if (StrUtil.contains(ExceptionUtil.getSimpleMessage(e), "Cannot invoke " +
+        String exception = ExceptionUtil.getSimpleMessage(e);
+        if (StrUtil.contains(exception, "Cannot invoke " +
                 "\"org.apache.hc.core5.http.HttpEntity.getContent()\" because \"this.entity\" is null")) {
             log.error("204还是有报错:{}", ExceptionUtil.getSimpleMessage(e));
             cached.setStatusCode(CODE_204);
             writeCacheResponse(response, cached);
+        } else if (StrUtil.contains(exception, "SocketTimeoutException: Read timed out")) {
+            cached.setStatusCode(CODE_408);
+            throw e;
         } else {
             cached.setStatusCode(CODE_599);
             log.error("请求599[{}]: {}&api_key={}, e:{}", request.getMethod(), request.getParamUri(), embyConfig.getApiKey(), ExceptionUtil.stacktraceToString(e));

@@ -19,6 +19,10 @@ public interface CacheConstant {
     Integer CODE_308 = 308;
     Integer CODE_400 = 400;
     Integer CODE_404 = 404;
+    /**
+     * 请求超时
+     */
+    Integer CODE_408 = 408;
     Integer CODE_416 = 416;
     Integer CODE_429 = 429;
     Integer CODE_500 = 500;
