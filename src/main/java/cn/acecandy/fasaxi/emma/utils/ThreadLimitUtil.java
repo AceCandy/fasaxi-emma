@@ -70,6 +70,9 @@ public class ThreadLimitUtil {
         if (StrUtil.contains(mediaPath, "/d/123/")) {
             return handle123Path(mediaPath);
         }
+        if (StrUtil.contains(mediaPath, "/d/zong123/")) {
+            return handleZong123Path(mediaPath);
+        }
         return MutablePair.of(L_NC2O, "");
     }
 
@@ -89,8 +92,18 @@ public class ThreadLimitUtil {
     private MutablePair<CloudStorageType, String> handle123Path(String mediaPath) {
         Map<CloudStorageType, Integer> typeCountMap = getCloudStorageTypeCount();
 
-        if (MapUtil.getInt(typeCountMap, R_123, 0) <= 4) {
+        if (MapUtil.getInt(typeCountMap, R_123, 0) <= 5) {
             return MutablePair.of(R_123, StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/123"));
+        }
+        return MutablePair.of(L_NC2O, "");
+    }
+
+    private MutablePair<CloudStorageType, String> handleZong123Path(String mediaPath) {
+        Map<CloudStorageType, Integer> typeCountMap = getCloudStorageTypeCount();
+
+        if (MapUtil.getInt(typeCountMap, R_123_ZONG, 0) <= 5) {
+            return MutablePair.of(R_123_ZONG, StrUtil.removePrefix(mediaPath,
+                    "http://192.168.1.249:5244/d/zong123"));
         }
         return MutablePair.of(L_NC2O, "");
     }
