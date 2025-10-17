@@ -84,7 +84,7 @@ public class ThreadLimitUtil {
         }
         if (MapUtil.getInt(typeCountMap, R_123_ZONG, 0) <= 4) {
             return MutablePair.of(R_123_ZONG,
-                    StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/new115"));
+                    StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/zong123"));
         }
         return MutablePair.of(L_NC2O, "");
     }

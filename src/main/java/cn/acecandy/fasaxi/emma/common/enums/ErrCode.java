@@ -14,6 +14,7 @@ import lombok.Getter;
 public enum ErrCode {
     // 默认成功码
     DEFAULT_CODE(0, "ok"),
+    DEFAULT_CODE2(200, "ok"),
     // 通用错误码,
     FAIL(-1, "fail"),
     ERRCODE_400(400, "参数校验不通过!"),
@@ -24,6 +25,8 @@ public enum ErrCode {
     ERRCODE_1002(1002, "123服务接口异常"),
     ERRCODE_1101(1101, "115配置有误"),
     ERRCODE_1102(1102, "115服务接口异常"),
+    ERRCODE_1501(1501, "openList配置有误"),
+    ERRCODE_1502(1502, "openList服务接口异常"),
 
     ;
 

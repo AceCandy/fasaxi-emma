@@ -1,11 +1,14 @@
 package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
+import cn.acecandy.fasaxi.emma.config.EmbyConfig;
+import cn.acecandy.fasaxi.emma.config.OpConfig;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.dto.Rile;
 import cn.acecandy.fasaxi.emma.sao.out.R115Search;
 import cn.acecandy.fasaxi.emma.sao.out.R115SearchFileReq;
 import cn.acecandy.fasaxi.emma.sao.out.R115SearchFileResp;
+import cn.acecandy.fasaxi.emma.sao.proxy.OpProxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R115Proxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123Proxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123ZongProxy;
@@ -13,6 +16,7 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
+import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.io.file.FileNameUtil;
 import org.dromara.hutool.core.io.file.FileUtil;
 import org.dromara.hutool.core.lang.Console;
@@ -20,9 +24,13 @@ import org.dromara.hutool.core.net.url.UrlDecoder;
 import org.dromara.hutool.core.net.url.UrlPath;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.util.CharsetUtil;
+import org.dromara.hutool.http.client.Request;
+import org.dromara.hutool.http.client.Response;
+import org.dromara.hutool.http.meta.Method;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.Charset;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
@@ -50,6 +58,15 @@ public final class CloudUtil {
 
     @Resource
     private RedisClient redisClient;
+
+    @Resource
+    private OpProxy opProxy;
+
+    @Resource
+    private OpConfig opConfig;
+
+    @Resource
+    private EmbyConfig embyConfig;
 
     /**
      * 获取文件
@@ -254,6 +271,59 @@ public final class CloudUtil {
     }
 
     /**
+     * 获取下载链接(通过openlist)
+     *
+     * @param cloudStorage 云存储
+     * @param filePath     文件路径
+     * @return {@link Rile }
+     */
+    public String getDownloadUrlOnCopyByOpenlist(CloudStorageType cloudStorage,
+                                                 String ua, String deviceId, String filePath) {
+        String newMediaPath;
+        String real302Url;
+        if (cloudStorage.equals(R_115)) {
+            filePath = FileUtil.normalize(UrlDecoder.decode(filePath));
+            String copyPath = StrUtil.format("/0-临时/{}/{}{}", DateUtil.formatToday(),
+                    deviceId, filePath);
+
+            newMediaPath = cloudStorage.getPrefix() + copyPath;
+            String fileName = FileNameUtil.getName(copyPath);
+            copyPath = StrUtil.removeSuffix(copyPath, fileName);
+
+            real302Url = redirect302ByOpenlist(cloudStorage, newMediaPath, ua);
+            if (StrUtil.isBlank(real302Url)) {
+                if (opProxy.mkdir(copyPath)) {
+                    opProxy.copy(StrUtil.removeSuffix(filePath, fileName), copyPath,
+                            Collections.singletonList(fileName));
+                }
+            }
+            return real302Url;
+        }
+        newMediaPath = cloudStorage.getPrefix() + filePath;
+        return redirect302ByOpenlist(cloudStorage, newMediaPath, ua);
+    }
+
+    /**
+     * 通过openlist重定向
+     *
+     * @param cloudStorage 云存储
+     * @param newMediaPath 新媒体之路
+     * @return {@link String }
+     */
+    private String redirect302ByOpenlist(CloudStorageType cloudStorage,
+                                         String newMediaPath, String ua) {
+        newMediaPath = StrUtil.replace(newMediaPath, "http://192.168.1.249:5244", opConfig.getHost());
+        String real302Url = "";
+        try (Response resp = Request.of(newMediaPath).method(Method.HEAD)
+                .header("User-Agent", ua).send()) {
+            real302Url = resp.header("Location");
+        } catch (Exception e) {
+            log.warn("获取<{}>重定向URL失败: {}", cloudStorage.getValue(), newMediaPath, e);
+        }
+        return real302Url;
+    }
+
+    /**
      * 生成临时文件夹
      *
      * @param deviceId 设备标识符
@@ -267,7 +337,7 @@ public final class CloudUtil {
             return;
         }
         try {
-            getDeviceTmpDir(deviceId);
+            getDeviceTmpDirByOpenlist(deviceId);
         } finally {
             LockUtil.unlockDevice(lock, deviceId);
         }
@@ -291,6 +361,26 @@ public final class CloudUtil {
         Long copyToDir = r115Proxy.addFolder(deviceId);
         redisClient.set(cacheKey, copyToDir, 60 * 60 * 24 * 7);
         return copyToDir;
+    }
+
+    /**
+     * 生成临时文件夹
+     *
+     * @param deviceId 设备标识符
+     */
+    private void getDeviceTmpDirByOpenlist(String deviceId) {
+        if (StrUtil.isBlank(deviceId)) {
+            return;
+        }
+        String cacheKey = buildDeviceFileId115Key(deviceId);
+        Object fileId = redisClient.get(cacheKey);
+        if (fileId != null) {
+            return;
+        }
+        if (opProxy.mkdir(StrUtil.format("/new115/0-临时/{}/{}",
+                DateUtil.formatToday(), deviceId))) {
+            redisClient.set(cacheKey, 1, 60 * 60 * 24 * 2);
+        }
     }
 
 

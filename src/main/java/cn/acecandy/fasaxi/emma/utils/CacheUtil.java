@@ -6,6 +6,7 @@ import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import org.dromara.hutool.core.cache.impl.FIFOCache;
 import org.dromara.hutool.core.collection.ListUtil;
+import org.dromara.hutool.core.date.DateUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.crypto.SecureUtil;
 import org.dromara.hutool.crypto.digest.DigestUtil;
@@ -33,6 +34,8 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     public static final String R_115_REFRESH_TOKEN = "cache:a-115-token-refresh";
     public static final String R_123_TOKEN = "cache:a-123-token";
     public static final String R_123_ZONG_TOKEN = "cache:a-123-zong-token";
+
+    public static final String OPENLIST_TOKEN = "cache:openlist-token";
 
     public static String buildThreadLimitKey(CloudStorageType cloudStorageType, String deviceId) {
         return THREAD_LIMIT_KEY + ":" + deviceId + "|" + cloudStorageType.getValue();
@@ -72,7 +75,7 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
      * @return {@link String }
      */
     public static String buildDeviceFileId115Key(String deviceId) {
-        return StrUtil.format(DEVICE_CACHE_FILEID115_KEY, deviceId);
+        return StrUtil.format(DEVICE_CACHE_FILEID115_KEY, deviceId + "_" + DateUtil.formatToday());
     }
 
     /**

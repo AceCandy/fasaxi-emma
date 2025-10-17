@@ -47,14 +47,6 @@ public class R115Proxy {
     @Value("${cloud.r115.default.copy-folder}")
     private Long copyFolder;
 
-    public String getRefreshToken() {
-        String result = redisClient.getStr(R_115_REFRESH_TOKEN);
-        if (StrUtil.isNotBlank(result)) {
-            return result;
-        }
-        return refreshToken;
-    }
-
     @Resource
     private RedisClient redisClient;
 
@@ -66,6 +58,14 @@ public class R115Proxy {
      * 页数限制
      */
     private static final Integer PAGE_LIMIT = 1150;
+
+    private String getRefreshToken() {
+        String result = redisClient.getStr(R_115_REFRESH_TOKEN);
+        if (StrUtil.isNotBlank(result)) {
+            return result;
+        }
+        return refreshToken;
+    }
 
     /**
      * 获取访问令牌

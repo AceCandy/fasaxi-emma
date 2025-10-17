@@ -13,6 +13,7 @@ import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.PathUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
+import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.acecandy.fasaxi.emma.utils.VideoUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
@@ -54,6 +55,7 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_404;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_416;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_NC2O;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123_ZONG;
 
 /**
  * 视频重定向服务
@@ -211,23 +213,24 @@ public class VideoRedirectService {
         }
 
         // 获取下载URL 如果是115先获取复制的 没有的话复制并查询获取；如果是123的直接获取
-        String real302Url = cloudUtil.getDownloadUrlOnCopy(cloudType, request.getUa(),
-                request.getDeviceId(), cloudTypePair.getRight(), mediaInfo.size);
+        String real302Url = cloudUtil.getDownloadUrlOnCopyByOpenlist(cloudType, request.getUa(),
+                request.getDeviceId(), cloudTypePair.getRight());
 
         // 如果获取失败且不是115网盘，尝试使用115网盘
-        if (StrUtil.isBlank(real302Url) && !cloudType.equals(R_115)) {
-            real302Url = cloudUtil.getDownloadUrlOnCopy(R_115, request.getUa(),
-                    request.getDeviceId(), cloudTypePair.getRight(), mediaInfo.size);
+        if (StrUtil.isBlank(real302Url) && cloudType.equals(R_123_ZONG)) {
+            real302Url = cloudUtil.getDownloadUrlOnCopyByOpenlist(R_115, request.getUa(),
+                    request.getDeviceId(), cloudTypePair.getRight());
         }
 
         if (StrUtil.isNotBlank(real302Url)) {
             int exTime = calculateExpireTime(real302Url);
 
             // 特殊路径处理：115转123
-            if (StrUtil.contains(mediaPath, "/d/new115/")) {
-                embyProxy.trans115To123(mediaPath);
-            }
-
+            ThreadUtil.execute(() -> {
+                if (StrUtil.contains(mediaPath, "/d/new115/")) {
+                    embyProxy.trans115To123(mediaPath);
+                }
+            });
             threadLimitUtil.setThreadCache(cloudType, request.getDeviceId());
             return new RedirectResult(real302Url, cloudType.getValue(), exTime, mediaInfo.path);
         }
@@ -450,13 +453,14 @@ public class VideoRedirectService {
     }
 
     public static void main(String[] args) {
-        Console.log(UrlEncoder.encodeQuery("http://192.168.1.249:5244/d//123/整理/bili/电影解说/927587_木鱼水心/【木鱼微剧场】《加勒比海盗3》/(BV1ox411k7HZ).mp4"));
-        Console.log(UrlUtil.normalize("http://192.168.1.249:5244/d//123/整理/bili/电影解说/927587_木鱼水心/【木鱼微剧场】《加勒比海盗3》/(BV1ox411k7HZ).mp4"));
-        Console.log(StrUtil.replace("http://192.168.1.249:5244/d//123/整理/bili/电影解说/927587_木鱼水心/【木鱼微剧场】《加勒比海盗3》/(BV1ox411k7HZ).mp4", "//", "/"));
-        Console.log(StrUtil.replace("http://192.168.1.249:5244/d//123/整理/bili/电影解说/927587_木鱼水心/【木鱼微剧场】《加勒比海盗3》/(BV1ox411k7HZ).mp4", "(?<!http:|https:)/+", s -> "/"));
-        String s = "https://download-cdn.cjjd19.com/123-620/88022c7e/1821373880-0/88022c7eedc34e98b7a1c422d573866c/c-m74?v=5\u0026t=1756143652\u0026s=1756143652c1e20c8f3bedc789620854d253d8535a\u0026r=RAZMEH\u0026bzc=1\u0026bzs=1821373880\u0026bzp=0\u0026bi=2551510957\u0026filename=%2528BV12x411Y7z4%2529.mp4\u0026x-mf-biz-cid=8adede81-475f-43df-92cf-9c0588867fd4-584000\u0026ndcp=1\u0026cache_type=1";
-        Console.log(UrlQueryUtil.decodeQuery(s, Charset.defaultCharset()));
-        Console.log(MapUtil.getLong(UrlQueryUtil.decodeQuery(s, Charset.defaultCharset()),
-                "t"));
+        // String mediaPath = "http://192.168.1.249:5244/d/123/整理/短剧3/龙游沧海逸云间/S01E002.mp4";
+        String mediaPath = "https://alist2.acecandy.cn:880/d/123/整理/短剧3/龙游沧海逸云间/S01E0021.mp4";
+        try (Response resp = Request.of(mediaPath).method(Method.HEAD).send()) {
+            Console.log(resp.headers());
+            Console.log(resp.header("Location"));
+            Console.log(CollUtil.getFirst(resp.headerList("Location")));
+        } catch (IOException e) {
+            Console.log(e);
+        }
     }
 }
