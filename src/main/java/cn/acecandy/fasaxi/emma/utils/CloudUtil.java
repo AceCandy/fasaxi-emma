@@ -68,6 +68,8 @@ public final class CloudUtil {
     @Resource
     private EmbyConfig embyConfig;
 
+    final String TEMP_DIR = "0-临时";
+
     /**
      * 获取文件
      *
@@ -279,28 +281,55 @@ public final class CloudUtil {
      */
     public String getDownloadUrlOnCopyByOpenlist(CloudStorageType cloudStorage,
                                                  String ua, String deviceId, String filePath) {
-        String newMediaPath;
-        String real302Url;
+        // 1. 解码并规范化原始文件路径（处理URL编码和路径格式）
+        String decodedNormalizedPath = FileUtil.normalize(UrlDecoder.decode(filePath));
+
+        // 单独处理 R_115 类型的云存储
         if (cloudStorage.equals(R_115)) {
-            filePath = FileUtil.normalize(UrlDecoder.decode(filePath));
-            String copyPath = StrUtil.format("/0-临时/{}/{}{}", DateUtil.formatToday(),
-                    deviceId, filePath);
-
-            newMediaPath = cloudStorage.getPrefix() + copyPath;
-            String fileName = FileNameUtil.getName(copyPath);
-            copyPath = StrUtil.removeSuffix(copyPath, fileName);
-
-            real302Url = redirect302ByOpenlist(cloudStorage, newMediaPath, ua);
-            if (StrUtil.isBlank(real302Url)) {
-                if (opProxy.mkdir(copyPath)) {
-                    opProxy.copy(StrUtil.removeSuffix(filePath, fileName), copyPath,
-                            Collections.singletonList(fileName));
-                }
+            String real302Url = processR115Storage(cloudStorage, ua, deviceId, decodedNormalizedPath);
+            if (StrUtil.isNotBlank(real302Url)) {
+                return real302Url;
             }
+        }
+
+        // 构建默认的媒体路径（适用于所有类型，R_115已通过processedFilePath处理）
+        String defaultMediaPath = cloudStorage.getPrefix() + decodedNormalizedPath;
+        return redirect302ByOpenlist(cloudStorage, defaultMediaPath, ua);
+    }
+
+    /**
+     * 处理 R_115 类型云存储的路径构建和文件复制逻辑
+     */
+    private String processR115Storage(CloudStorageType cloudStorage, String ua, String deviceId,
+                                      String decodedNormalizedPath) {
+        // 2. 构建包含文件名的完整复制路径（格式：主路径/临时目录/日期/设备ID/文件路径）
+        String copyFullPath = StrUtil.format("{}/{}/{}/{}{}",
+                cloudStorage.getMain(), TEMP_DIR, DateUtil.formatToday(), deviceId, decodedNormalizedPath);
+
+        // 3. 拆分复制路径为目录和文件名（用于创建目录和复制文件）
+        String fileName = FileNameUtil.getName(copyFullPath);
+        // 仅目录部分
+        String copyDirectoryPath = StrUtil.removeSuffix(copyFullPath, fileName);
+
+        // 4. 尝试获取重定向URL，如果存在则直接返回
+        String r115MediaPath = opConfig.getDHost() + copyFullPath;
+        String real302Url = redirect302ByOpenlist(cloudStorage, r115MediaPath, ua);
+        if (StrUtil.isNotBlank(real302Url)) {
             return real302Url;
         }
-        newMediaPath = cloudStorage.getPrefix() + filePath;
-        return redirect302ByOpenlist(cloudStorage, newMediaPath, ua);
+
+        // 5. 若重定向URL不存在，异步创建目录并复制文件（确保后续可访问）
+        ThreadUtil.execute(() -> {
+            if (opProxy.mkdir(copyDirectoryPath)) { // 先创建目录
+                // 源文件目录（从原始路径中移除文件名）
+                String sourceDirectory = StrUtil.removeSuffix(
+                        cloudStorage.getMain() + decodedNormalizedPath, fileName);
+                opProxy.copy(sourceDirectory, copyDirectoryPath, Collections.singletonList(fileName));
+            }
+        });
+
+        // 6. 返回处理后的文件路径（供默认路径使用）
+        return real302Url;
     }
 
     /**

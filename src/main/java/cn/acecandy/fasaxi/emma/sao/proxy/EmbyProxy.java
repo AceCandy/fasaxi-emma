@@ -562,7 +562,7 @@ public class EmbyProxy {
         if (CollUtil.isEmpty(ReUtil.isItemUrl(request.getRequestURI().toLowerCase()))) {
             return;
         }
-        ThreadUtil.execVirtual(() -> {
+        /*ThreadUtil.execVirtual(() -> {
             EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
             if (item.getIsFolder() || !StrUtil.equalsAnyIgnoreCase(item.getType(), 电影.getEmbyName(),
                     电视剧_集.getEmbyName(), 电视剧_季.getEmbyName(), 电视剧.getEmbyName())) {
@@ -584,7 +584,7 @@ public class EmbyProxy {
             } finally {
                 redisClient.set(lockKey, "1", 2 * 60 * 60);
             }
-        });
+        });*/
         ThreadUtil.execVirtual(() -> {
             EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
             if (item.getIsFolder() || !StrUtil.equalsAnyIgnoreCase(item.getType(), 电影.getEmbyName(),

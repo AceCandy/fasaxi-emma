@@ -177,7 +177,7 @@ public class OriginReqService {
             return;
         }
 
-        if (StrUtil.containsIgnoreCase(request.getRequestURI(), "/Views")) {
+        /*if (StrUtil.containsIgnoreCase(request.getRequestURI(), "/Views")) {
             String toolkitStr = redisClient.getStr(CACHE_VIEW_KEY);
             if (!JSONUtil.isTypeJSON(toolkitStr)) {
                 try (Response toolkitResp = httpClient.send(Request.of(embyConfig.getEmbyToolkitHost()
@@ -194,7 +194,7 @@ public class OriginReqService {
                 }
             }
             request.buildToolKit(toolkitStr);
-        }
+        }*/
 
         StopWatch stopWatch = StopWatch.of("原始请求");
         stopWatch.start("转发");

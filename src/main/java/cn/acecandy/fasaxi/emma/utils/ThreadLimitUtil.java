@@ -80,11 +80,11 @@ public class ThreadLimitUtil {
         Map<CloudStorageType, Integer> typeCountMap = getCloudStorageTypeCount();
 
         if (MapUtil.getInt(typeCountMap, R_115, 0) <= 3) {
-            return MutablePair.of(R_115, StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/new115"));
+            return MutablePair.of(R_115, StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d" + R_115.getMain()));
         }
         if (MapUtil.getInt(typeCountMap, R_123_ZONG, 0) <= 4) {
             return MutablePair.of(R_123_ZONG,
-                    StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/zong123"));
+                    StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d" + R_123_ZONG.getMain()));
         }
         return MutablePair.of(L_NC2O, "");
     }
@@ -93,7 +93,7 @@ public class ThreadLimitUtil {
         Map<CloudStorageType, Integer> typeCountMap = getCloudStorageTypeCount();
 
         if (MapUtil.getInt(typeCountMap, R_123, 0) <= 5) {
-            return MutablePair.of(R_123, StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d/123"));
+            return MutablePair.of(R_123, StrUtil.removePrefix(mediaPath, "http://192.168.1.249:5244/d" + R_123.getMain()));
         }
         return MutablePair.of(L_NC2O, "");
     }
@@ -103,7 +103,7 @@ public class ThreadLimitUtil {
 
         if (MapUtil.getInt(typeCountMap, R_123_ZONG, 0) <= 5) {
             return MutablePair.of(R_123_ZONG, StrUtil.removePrefix(mediaPath,
-                    "http://192.168.1.249:5244/d/zong123"));
+                    "http://192.168.1.249:5244/d" + R_123_ZONG.getMain()));
         }
         return MutablePair.of(L_NC2O, "");
     }

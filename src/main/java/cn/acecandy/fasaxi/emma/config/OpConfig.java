@@ -18,6 +18,11 @@ public class OpConfig {
     private String host;
 
     /**
+     * 下载路径
+     */
+    private String dHost;
+
+    /**
      * 用户名
      */
     private String username;
