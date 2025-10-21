@@ -1,5 +1,6 @@
 package cn.acecandy.fasaxi.emma.config;
 
+import org.dromara.hutool.http.client.ApacheHttpClientConfig;
 import org.dromara.hutool.http.client.engine.ClientEngine;
 import org.dromara.hutool.http.client.engine.ClientEngineFactory;
 import org.dromara.hutool.http.client.engine.okhttp.OkHttpClientConfig;
@@ -17,9 +18,9 @@ public class HutoolConfig {
 
     @Bean
     public ClientEngine httpClient() {
-        // return ClientEngineFactory.createEngine(ApacheHttpClientConfig.of()
-        //         .setMaxTotal(200).setMaxPerRoute(20).setConnectionTimeout(10_000).setReadTimeout(60_000));
-        return ClientEngineFactory.createEngine(OkHttpClientConfig.of()
-                .setMaxIdle(200).setConnectionTimeout(6_000).setReadTimeout(20_000));
+        return ClientEngineFactory.createEngine(ApacheHttpClientConfig.of()
+                .setMaxTotal(200).setMaxPerRoute(20).setTimeout(20_000));
+        // return ClientEngineFactory.createEngine(OkHttpClientConfig.of()
+        //         .setMaxIdle(200).setConnectionTimeout(6_000).setReadTimeout(20_000));
     }
 }

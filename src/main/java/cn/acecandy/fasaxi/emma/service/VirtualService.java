@@ -24,6 +24,7 @@ import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.data.id.IdUtil;
 import org.dromara.hutool.core.date.DateUtil;
+import org.dromara.hutool.core.lang.Console;
 import org.dromara.hutool.core.map.MapUtil;
 import org.dromara.hutool.core.text.StrUtil;
 import org.dromara.hutool.core.text.split.SplitUtil;
@@ -79,7 +80,7 @@ public class VirtualService {
      * 支持原生emby本地排序字段
      */
     private static final List<String> NATIVE_SORT_FIELDS = ListUtil.of("PremiereDate",
-            "DateCreated", "CommunityRating", "ProductionYear", "SortName", "original");
+            "DateCreated", "CommunityRating", "ProductionYear", "SortName", "original", "DateLastContentAdded");
 
     /**
      * 元数据 排序字段映射
@@ -217,7 +218,6 @@ public class VirtualService {
         return fakeViewsItems;
     }
 
-
     @SneakyThrows
     public void handleLatest(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
         String userId = ReUtil.isLatestUrl(request.getRequestURI());
@@ -226,41 +226,33 @@ public class VirtualService {
             return;
         }
         String parentId = request.getParentId();
-        List<EmbyItem> embyItems = buildLatest(request.getCachedParam(), userId, parentId);
-        EmbyItemsInfoOut finalItems = EmbyItemsInfoOut.builder()
-                .items(embyItems)
-                .totalRecordCount(embyItems.size())
-                .build();
+        EmbyItemsInfoOut embyItems = buildLatest(request.getCachedParam(), userId, parentId);
         response.setStatus(CODE_200);
-        ServletUtil.write(response, JSONUtil.toJsonStr(finalItems),
+        ServletUtil.write(response, JSONUtil.toJsonStr(embyItems.getItems()),
                 "application/json;charset=UTF-8");
     }
 
-    private List<EmbyItem> buildLatest(Map<String, Object> cachedParam,
-                                       String userId, String parentId) {
-        if (!StrUtil.startWith(parentId, "-")) {
-            // 正常emby逻辑 走nginx转发
-            return ListUtil.of();
-        }
+    private EmbyItemsInfoOut buildLatest(Map<String, Object> cachedParam,
+                                         String userId, String parentId) {
         Long realId = fromMimickedId(parentId);
         CustomCollections coll = customCollectionsDao.getById(realId);
         if (coll == null) {
-            return ListUtil.of();
+            return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
         }
         JSONArray generatedMediaInfoJson = JSONUtil.parseArray(coll.getGeneratedMediaInfoJson());
         List<String> embyIds = generatedMediaInfoJson.stream().filter(g ->
                         ObjUtil.isNotEmpty(g.getObjByPath("emby_id")))
                 .map(g -> g.getByPath("emby_id", String.class).toString()).toList();
         if (CollUtil.isEmpty(embyIds)) {
-            return ListUtil.of();
+            return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
         }
         JSONObject definition = JSONUtil.parseObj(coll.getDefinitionJson());
         if (definition.getBool("enforce_emby_permissions", false)) {
             // 强制emby原生权限验证(默认只展示未观看完的)
             List<String> allItemIds = getUserAccessIdsByCache(userId);
-            embyIds = CollUtil.subtractToList(embyIds, allItemIds);
+            embyIds = CollUtil.intersection(embyIds, allItemIds).stream().toList();
             if (CollUtil.isEmpty(embyIds)) {
-                return ListUtil.of();
+                return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
             }
         }
         // 判断库类型
@@ -268,7 +260,7 @@ public class VirtualService {
         boolean isSeriesFocused = itemTypeFromDb.contains("Series");
         // 对于任何包含剧集的库（纯剧集或混合库），使用“综合排名”；对于纯电影库，简单按入库时间即可
         List<String> sortStr = isSeriesFocused ?
-                ListUtil.of("DateLastContentAdded", "DateCreated") : ListUtil.of("DateCreated");
+                ListUtil.of("DateLastContentAdded", "SortName") : ListUtil.of("DateCreated", "SortName");
         // 最新是降序
         String sortOrder = "Descending";
 
@@ -278,24 +270,28 @@ public class VirtualService {
                 StrUtil.equals(definition.getStr("default_sort_by"), "none")) {
             useNativeSort = true;
         }
+        int start = MapUtil.getInt(cachedParam, "StartIndex", 0);
         int showLimit = MapUtil.getInt(cachedParam, "Limit", 24);
         String fields = MapUtil.getStr(cachedParam, "Fields",
-                "PrimaryImageAspectRatio,BasicSyncInfo,DateCreated,UserData");
+                "PrimaryImageAspectRatio,BasicSyncInfo,UserData,ProductionYear");
 
         if (useNativeSort) {
             // Emby原生排序
             EmbyItemsInfoOut itemsInfoOut = embyProxy.getUserItems(userId, embyIds, sortStr, sortOrder,
-                    showLimit, fields, MapUtil.getStr(cachedParam, "IncludeItemTypes"));
-            return itemsInfoOut.getItems();
+                    start, showLimit, fields, MapUtil.getStr(cachedParam, "IncludeItemTypes"));
+            itemsInfoOut.setTotalRecordCount(embyIds.size());
+            return itemsInfoOut;
         } else {
+            log.warn("非原生排序---->这里按理说不能进入");
             List<QueryColumn> dbSortStr = sortStr.stream().map(SORT_ORDER_MAP::get).toList();
             boolean dbSortOrder = !StrUtil.equals(sortOrder, "Descending");
             List<MediaMetadata> metadataList = mediaMetadataDao.findByEmbyIdOrder(
                     embyIds, dbSortStr, dbSortOrder, showLimit);
             List<String> sortEmbyIds = metadataList.stream().map(MediaMetadata::getEmbyItemId).toList();
             EmbyItemsInfoOut itemsInfoOut = embyProxy.getUserItems(userId, sortEmbyIds, null, null,
-                    null, fields, null);
-            return itemsInfoOut.getItems();
+                    null, null, fields, null);
+            itemsInfoOut.setTotalRecordCount(embyIds.size());
+            return itemsInfoOut;
         }
     }
 
@@ -312,7 +308,7 @@ public class VirtualService {
                         List<String> itemIds = embyProxy.getUserPermsEmbyIdOnLock(userId);
                         if (CollUtil.isNotEmpty(itemIds)) {
                             redisClient.set(cacheKey, StrUtil.format("{}||{}",
-                                    DateUtil.currentSeconds(), JSONUtil.toJsonStr(itemIds)), DAY_7_S);
+                                    DateUtil.currentSeconds(), StrUtil.join(",", itemIds)), DAY_7_S);
                         }
                     });
                 }
@@ -321,9 +317,24 @@ public class VirtualService {
         List<String> itemIds = embyProxy.getUserPermsEmbyIdOnLock(userId);
         if (CollUtil.isNotEmpty(itemIds)) {
             redisClient.set(cacheKey, StrUtil.format("{}||{}",
-                    DateUtil.currentSeconds(), JSONUtil.toJsonStr(itemIds)), DAY_7_S);
+                    DateUtil.currentSeconds(), StrUtil.join(",", itemIds)), DAY_7_S);
         }
         return itemIds;
+    }
+
+
+    @SneakyThrows
+    public void handleItems(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
+        String userId = ReUtil.getUserByItemsUrl(request.getRequestURI());
+        if (StrUtil.isBlank(userId)) {
+            response.setStatus(CODE_401);
+            return;
+        }
+        String parentId = request.getParentId();
+        EmbyItemsInfoOut embyItems = buildLatest(request.getCachedParam(), userId, parentId);
+        response.setStatus(CODE_200);
+        ServletUtil.write(response, JSONUtil.toJsonStr(embyItems),
+                "application/json;charset=UTF-8");
     }
 
     /**

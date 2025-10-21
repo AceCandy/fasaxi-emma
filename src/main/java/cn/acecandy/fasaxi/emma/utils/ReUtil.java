@@ -156,6 +156,14 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
         return isMatch(REGEX_ITEMS, url.toLowerCase());
     }
 
+    public static String getUserByItemsUrl(String url) {
+        List<String> groups = getAllGroups(REGEX_ITEMS, url.toLowerCase());
+        if (groups == null || groups.size() < 3) {
+            return null;
+        }
+        return CollUtil.get(groups, 2);
+    }
+
 
     /**
      * 将连接符号两边的单词首字母转为大写

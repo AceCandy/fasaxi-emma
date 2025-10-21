@@ -118,7 +118,7 @@ public class EmbyProxy {
      */
     public EmbyItemsInfoOut getUserItems(String userId, List<String> itemIds,
                                          List<String> sortBy, String sortOrder,
-                                         Integer limit, String fields, String itemTypes) {
+                                         Integer startIndex, Integer limit, String fields, String itemTypes) {
         String url = embyConfig.getHost() + StrUtil.format(embyConfig.getUserItemUrl(), userId);
         Map<String, Object> paramMap = MapUtil.<String, Object>builder("api_key", embyConfig.getApiKey())
                 .put("Ids", StrUtil.join(COMMA, itemIds)).put("Fields", fields)
@@ -132,7 +132,9 @@ public class EmbyProxy {
         }
         if (null != limit) {
             paramMap.put("Limit", limit);
-            paramMap.put("StartIndex", 0);
+        }
+        if (null != startIndex) {
+            paramMap.put("StartIndex", startIndex);
         }
 
         try (Response res = httpClient.send(Request.of(url).method(Method.GET).form(paramMap))) {
@@ -164,7 +166,7 @@ public class EmbyProxy {
         String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
 
         int start = 0;
-        int batchSize = 2000;
+        int batchSize = 5000;
 
         List<String> embyIds = ListUtil.of();
         try {

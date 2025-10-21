@@ -117,8 +117,12 @@ public class EmbyProxyFilter implements Filter {
                         videoRedirectService.processVideo(reqWrapper, res);
                     } else if (StrUtil.endWithIgnoreCase(reqWrapper.getRequestURI(), "/Views")) {
                         virtualService.handleViews(reqWrapper, res);
-                    } else if (StrUtil.endWithIgnoreCase(reqWrapper.getRequestURI(), "/Items/Latest")) {
-                        virtualService.handleLatest(reqWrapper, res);
+                    } else if (StrUtil.startWith(reqWrapper.getParentId(), "-")) {
+                        if (StrUtil.endWithIgnoreCase(reqWrapper.getRequestURI(), "/Items/Latest")) {
+                            virtualService.handleLatest(reqWrapper, res);
+                        } else if (ReUtil.isItemsUrl(reqWrapper.getRequestURI())) {
+                            virtualService.handleItems(reqWrapper, res);
+                        }
                     } else {
                         originReqService.forwardOriReq(reqWrapper, res);
                     }
