@@ -1,4 +1,4 @@
-package cn.acecandy.fasaxi.emma.dao.entity;
+package cn.acecandy.fasaxi.emma.dao.embyboss.entity;
 
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.Table;
@@ -15,7 +15,7 @@ import java.util.Date;
  * @author AceCandy
  * @since 2025/5/3
  */
-@Table("emby_item_pic")
+@Table(value = "emby_item_pic", dataSource = "embyboss")
 @EqualsAndHashCode(callSuper = false)
 // @Accessors(chain = true)
 // @Data(staticConstructor = "x")

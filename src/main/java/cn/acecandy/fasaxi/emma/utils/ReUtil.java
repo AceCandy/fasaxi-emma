@@ -51,6 +51,12 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
     private static final Pattern REGEX_ITEM = PatternPool.get(
             "(/emby)?/users/([a-z0-9]+)/items/([0-9]+)$", Pattern.DOTALL);
 
+    private static final Pattern REGEX_VIEW = PatternPool.get(
+            "(/emby)?/users/([a-z0-9]+)/views$", Pattern.DOTALL);
+
+    private static final Pattern REGEX_LATEST = PatternPool.get(
+            "(/emby)?/users/([a-z0-9]+)/items/latest$", Pattern.DOTALL);
+
     private static final Pattern REGEX_ITEMS = PatternPool.get(
             "(/emby)?/users/([a-z0-9]+)/items$", Pattern.DOTALL);
 
@@ -130,6 +136,22 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
         return ListUtil.of(CollUtil.get(groups, 2), CollUtil.get(groups, 3));
     }
 
+    public static String isViewUrl(String url) {
+        List<String> groups = getAllGroups(REGEX_VIEW, url.toLowerCase());
+        if (groups == null || groups.size() < 3) {
+            return null;
+        }
+        return CollUtil.get(groups, 2);
+    }
+
+    public static String isLatestUrl(String url) {
+        List<String> groups = getAllGroups(REGEX_LATEST, url.toLowerCase());
+        if (groups == null || groups.size() < 3) {
+            return null;
+        }
+        return CollUtil.get(groups, 2);
+    }
+
     public static boolean isItemsUrl(String url) {
         return isMatch(REGEX_ITEMS, url.toLowerCase());
     }
@@ -154,8 +176,8 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
 
     public static void main(String[] args) {
         // String url = "/items/123123/playbackinfo".toLowerCase();
-        String url = "/emby/Users/656fcefa283149708880b416786e5fde/Items/1417552/Delete".toLowerCase();
-        Console.log(isSimilarItemUrl(url));
+        String url = "/emby/Users/656fcefa283149708880b416786e5fde/Views".toLowerCase();
+        Console.log(isViewUrl(url));
         /*Console.log(url);
         System.out.println(isSimilarItemUrl(url));
         System.out.println(isItemUrl(url));

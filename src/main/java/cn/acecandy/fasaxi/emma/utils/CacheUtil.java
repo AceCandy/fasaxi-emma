@@ -51,7 +51,10 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     private static final String VIDEO_CACHE_KEY = "cache:302video:{}";
     private static final String VIDEO_UA_CACHE_KEY = "cache:302video:{}|{}";
     private static final String PIC_CACHE_KEY = "cache:pic:{}|{}";
+    private static final String USER_PERMS_CACHE_KEY = "cache:user-perms:{}";
     private static final String ORIGIN_CACHE_KEY = "cache:req:{}|{}";
+    private static final String ORIGIN_VIEW_CACHE_KEY = "cache:req-view:{}";
+    private static final String ORIGIN_LATEST_CACHE_KEY = "cache:req-latest:{}|{}";
 
     private static final String THIRD_CACHE_KEY = "cache:third:{}|{}";
 
@@ -116,6 +119,18 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
                 DigestUtil.md5Hex16(JSONUtil.toJsonStr(req.getCachedParam())));
     }
 
+    public static String buildOriginViewCacheKey(EmbyContentCacheReqWrapper req) {
+        return StrUtil.format(ORIGIN_VIEW_CACHE_KEY, req.getRequestURI(), req.getUserId());
+    }
+
+    public static String buildOriginViewCacheKey(String userId) {
+        return StrUtil.format(ORIGIN_VIEW_CACHE_KEY, userId);
+    }
+
+    public static String buildOriginLatestCacheKey(String userId, String parentId) {
+        return StrUtil.format(ORIGIN_LATEST_CACHE_KEY, userId, parentId);
+    }
+
     public static List<String> buildOriginRefreshCacheKey(EmbyContentCacheReqWrapper req) {
         List<String> cacheKeys = ListUtil.of();
         if (StrUtil.isNotBlank(req.getUserId())) {
@@ -145,6 +160,10 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
 
     public static String buildPicCacheKey(String itemId, EmbyPicType picType) {
         return StrUtil.format(PIC_CACHE_KEY, itemId, picType.getValue());
+    }
+
+    public static String buildUserPermsCacheKey(String userId) {
+        return StrUtil.format(USER_PERMS_CACHE_KEY, userId);
     }
 
     /**

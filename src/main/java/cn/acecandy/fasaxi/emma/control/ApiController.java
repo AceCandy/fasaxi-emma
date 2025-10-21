@@ -2,10 +2,10 @@ package cn.acecandy.fasaxi.emma.control;
 
 import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
 import cn.acecandy.fasaxi.emma.common.resp.Rsres;
-import cn.acecandy.fasaxi.emma.dao.entity.EmbyItemPic;
-import cn.acecandy.fasaxi.emma.dao.entity.TmdbProvider;
-import cn.acecandy.fasaxi.emma.dao.service.EmbyItemPicDao;
-import cn.acecandy.fasaxi.emma.dao.service.TmdbProviderDao;
+import cn.acecandy.fasaxi.emma.dao.embyboss.entity.EmbyItemPic;
+import cn.acecandy.fasaxi.emma.dao.embyboss.entity.TmdbProvider;
+import cn.acecandy.fasaxi.emma.dao.embyboss.service.EmbyItemPicDao;
+import cn.acecandy.fasaxi.emma.dao.embyboss.service.TmdbProviderDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItemsInfoOut;

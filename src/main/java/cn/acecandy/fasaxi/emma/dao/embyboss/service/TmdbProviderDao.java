@@ -1,7 +1,8 @@
-package cn.acecandy.fasaxi.emma.dao.service;
+package cn.acecandy.fasaxi.emma.dao.embyboss.service;
 
-import cn.acecandy.fasaxi.emma.dao.entity.TmdbProvider;
-import cn.acecandy.fasaxi.emma.dao.mapper.TmdbProviderMapper;
+import cn.acecandy.fasaxi.emma.dao.embyboss.entity.TmdbProvider;
+import cn.acecandy.fasaxi.emma.dao.embyboss.mapper.TmdbProviderMapper;
+import com.mybatisflex.annotation.UseDataSource;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-import static cn.acecandy.fasaxi.emma.dao.entity.table.TmdbProviderTableDef.TMDB_PROVIDER;
+import static cn.acecandy.fasaxi.emma.dao.embyboss.entity.table.TmdbProviderTableDef.TMDB_PROVIDER;
 
 /**
  * tmdb外部信息 dao
@@ -19,6 +20,7 @@ import static cn.acecandy.fasaxi.emma.dao.entity.table.TmdbProviderTableDef.TMDB
  * @since 2024/10/29
  */
 @Slf4j
+@UseDataSource("embyboss")
 @Component
 public class TmdbProviderDao extends ServiceImpl<TmdbProviderMapper, TmdbProvider> {
 

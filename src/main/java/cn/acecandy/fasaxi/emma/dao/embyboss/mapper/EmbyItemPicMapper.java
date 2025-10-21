@@ -1,6 +1,7 @@
-package cn.acecandy.fasaxi.emma.dao.mapper;
+package cn.acecandy.fasaxi.emma.dao.embyboss.mapper;
 
-import cn.acecandy.fasaxi.emma.dao.entity.EmbyItemPic;
+import cn.acecandy.fasaxi.emma.dao.embyboss.entity.EmbyItemPic;
+import com.mybatisflex.annotation.UseDataSource;
 import com.mybatisflex.core.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -10,6 +11,7 @@ import org.apache.ibatis.annotations.Mapper;
  * @author AceCandy
  * @since 2024/10/29
  */
+@UseDataSource("embyboss")
 @Mapper
 public interface EmbyItemPicMapper extends BaseMapper<EmbyItemPic> {
 }

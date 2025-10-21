@@ -6,14 +6,15 @@ import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
-import cn.acecandy.fasaxi.emma.dao.entity.TmdbProvider;
-import cn.acecandy.fasaxi.emma.dao.service.TmdbProviderDao;
+import cn.acecandy.fasaxi.emma.dao.embyboss.entity.TmdbProvider;
+import cn.acecandy.fasaxi.emma.dao.embyboss.service.TmdbProviderDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItemsInfoOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyMediaSource;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyPlaybackOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
+import cn.acecandy.fasaxi.emma.sao.out.EmbyViewOut;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
@@ -25,6 +26,7 @@ import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.hutool.core.collection.CollUtil;
+import org.dromara.hutool.core.collection.ListUtil;
 import org.dromara.hutool.core.date.DateTime;
 import org.dromara.hutool.core.exception.ExceptionUtil;
 import org.dromara.hutool.core.map.MapUtil;
@@ -47,12 +49,12 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_302;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电影;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧;
-import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧_季;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧_集;
 import static org.dromara.hutool.core.text.StrPool.COMMA;
 
@@ -83,6 +85,122 @@ public class EmbyProxy {
 
     @Resource
     private TmdbProxy tmdbProxy;
+
+    /**
+     * 获取视图
+     *
+     * @param userId 用户ID
+     * @return {@link List<EmbyItem> }
+     */
+    public EmbyViewOut getViews(String userId) {
+        String url = embyConfig.getHost() + StrUtil.format(embyConfig.getViewsUrl(), userId);
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET)
+                .form(MapUtil.<String, Object>builder("api_key", embyConfig.getApiKey()).map()))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+            return JSONUtil.toBean(resBody, EmbyViewOut.class);
+        } catch (Exception e) {
+            log.warn("getViews 网络请求异常: ", e);
+        }
+        return null;
+    }
+
+    /**
+     * 获取视图
+     *
+     * @param userId 用户ID
+     * @return {@link List<EmbyItem> }
+     */
+    public EmbyItemsInfoOut getUserItems(String userId, List<String> itemIds,
+                                         List<String> sortBy, String sortOrder,
+                                         Integer limit, String fields, String itemTypes) {
+        String url = embyConfig.getHost() + StrUtil.format(embyConfig.getUserItemUrl(), userId);
+        Map<String, Object> paramMap = MapUtil.<String, Object>builder("api_key", embyConfig.getApiKey())
+                .put("Ids", StrUtil.join(COMMA, itemIds)).put("Fields", fields)
+                .put("Recursive", true)
+                .put("IncludeItemTypes", StrUtil.isNotBlank(itemTypes) ? itemTypes : "Movie,Series").build();
+        if (CollUtil.isNotEmpty(sortBy)) {
+            paramMap.put("SortBy", StrUtil.join(COMMA, sortBy));
+        }
+        if (StrUtil.isNotBlank(sortOrder)) {
+            paramMap.put("SortOrder", sortOrder);
+        }
+        if (null != limit) {
+            paramMap.put("Limit", limit);
+            paramMap.put("StartIndex", 0);
+        }
+
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET).form(paramMap))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+            return JSONUtil.toBean(resBody, EmbyItemsInfoOut.class);
+        } catch (Exception e) {
+            log.warn("getUserItems 网络请求异常: ", e);
+        }
+        return null;
+    }
+
+    /**
+     * 获取用户拥有权限的媒体项(未观看)
+     *
+     * @param userId 用户ID
+     * @return {@link List<EmbyItem> }
+     */
+    public List<String> getUserPermsEmbyIdOnLock(String userId) {
+        Lock lock = LockUtil.lockUserPerms(userId);
+        if (LockUtil.isLock(lock)) {
+            return ListUtil.of();
+        }
+        String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
+
+        int start = 0;
+        int batchSize = 2000;
+
+        List<String> embyIds = ListUtil.of();
+        try {
+            while (true) {
+                try (Response res = httpClient.send(Request.of(url).method(Method.GET).form(Map.of(
+                        "api_key", embyConfig.getApiKey(), "Recursive", true,
+                        "IncludeItemTypes", "Movie,Series", "UserId", userId,
+                        "StartIndex", start, "Limit", batchSize,
+                        "Fields", "Id")))) {
+                    if (!res.isOk()) {
+                        throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+                    }
+                    String resBody = res.bodyStr();
+                    if (!JSONUtil.isTypeJSON(resBody)) {
+                        throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+                    }
+                    EmbyItemsInfoOut out = JSONUtil.toBean(resBody, EmbyItemsInfoOut.class);
+                    List<EmbyItem> itemList = out.getItems();
+                    embyIds.addAll(itemList.stream().filter(i ->
+                                    !Boolean.parseBoolean(i.getUserData().get("Played").toString()))
+                            .map(EmbyItem::getItemId).toList());
+                    if (CollUtil.isEmpty(itemList) || CollUtil.size(itemList) < batchSize) {
+                        break;
+                    }
+                    start += CollUtil.size(itemList);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("getUserPermsEmbyId 网络请求异常: ", e);
+        } finally {
+            LockUtil.unlockUserPerms(lock, userId);
+        }
+        return embyIds;
+    }
 
     /**
      * 获取媒体信息

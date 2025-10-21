@@ -4,6 +4,7 @@ import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.service.OriginReqService;
 import cn.acecandy.fasaxi.emma.service.PicRedirectService;
 import cn.acecandy.fasaxi.emma.service.VideoRedirectService;
+import cn.acecandy.fasaxi.emma.service.VirtualService;
 import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
@@ -70,6 +71,9 @@ public class EmbyProxyFilter implements Filter {
     @Resource
     private OriginReqService originReqService;
 
+    @Resource
+    private VirtualService virtualService;
+
 
     @Override
     @SneakyThrows
@@ -111,6 +115,10 @@ public class EmbyProxyFilter implements Filter {
                     if (StrUtil.isNotBlank(mediaSourceId)) {
                         reqWrapper.setMediaSourceId(mediaSourceId);
                         videoRedirectService.processVideo(reqWrapper, res);
+                    } else if (StrUtil.endWithIgnoreCase(reqWrapper.getRequestURI(), "/Views")) {
+                        virtualService.handleViews(reqWrapper, res);
+                    } else if (StrUtil.endWithIgnoreCase(reqWrapper.getRequestURI(), "/Items/Latest")) {
+                        virtualService.handleLatest(reqWrapper, res);
                     } else {
                         originReqService.forwardOriReq(reqWrapper, res);
                     }

@@ -7,6 +7,9 @@ package cn.acecandy.fasaxi.emma.common.constants;
 public interface CacheConstant {
     // 时间
     Long DAY_7_MS = 7 * 24 * 60 * 60 * 1000L;
+    Integer DAY_7_S = 7 * 24 * 60 * 60;
+    Integer DAY_1_S = 24 * 60 * 60;
+    Integer MINUTE_30_S = 30 * 60;
 
     // http状态码
 
@@ -18,6 +21,7 @@ public interface CacheConstant {
     Integer CODE_307 = 307;
     Integer CODE_308 = 308;
     Integer CODE_400 = 400;
+    Integer CODE_401 = 401;
     Integer CODE_404 = 404;
     /**
      * 请求超时

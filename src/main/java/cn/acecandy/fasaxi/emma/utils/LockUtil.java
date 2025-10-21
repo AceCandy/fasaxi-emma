@@ -100,6 +100,25 @@ public final class LockUtil extends org.dromara.hutool.core.thread.lock.LockUtil
         ORIGIN_LOCK_MAP.remove(buildOriginLock(request));
     }
 
+    // 用户权限请求------------------------------------------------------------------------------------------
+    private static final String LOCK_USER_PERMS_KEY = "lock:user-perms:{}";
+    private static final Map<String, Lock> USER_PERMS_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+
+    private static String buildUserPermsLock(String userId) {
+        return StrUtil.format(LOCK_USER_PERMS_KEY, userId);
+    }
+
+    public static Lock lockUserPerms(String userId) {
+        return ORIGIN_LOCK_MAP.computeIfAbsent(buildUserPermsLock(userId), k -> new ReentrantLock());
+    }
+
+    public static void unlockUserPerms(Lock lock, String userId) {
+        if (null != lock) {
+            lock.unlock();
+        }
+        USER_PERMS_LOCK_MAP.remove(buildUserPermsLock(userId));
+    }
+
     // 设备临时文件请求------------------------------------------------------------------------------------------
     private static final String LOCK_DEVICE_KEY = "lock:device:{}";
     private static final Map<String, Lock> DEVICE_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();

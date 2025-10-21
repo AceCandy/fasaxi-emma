@@ -6,7 +6,7 @@ import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.config.DoubanConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.config.TmdbConfig;
-import cn.acecandy.fasaxi.emma.dao.entity.EmbyItemPic;
+import cn.acecandy.fasaxi.emma.dao.embyboss.entity.EmbyItemPic;
 import jakarta.servlet.http.HttpServletRequest;
 import org.dromara.hutool.core.collection.CollUtil;
 import org.dromara.hutool.core.collection.ListUtil;

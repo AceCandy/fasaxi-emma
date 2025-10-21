@@ -20,6 +20,11 @@ import java.util.stream.Collectors;
 @Data
 @ConfigurationProperties(prefix = "emby")
 public class EmbyConfig {
+
+    /**
+     * 服务器id
+     */
+    private String serverId;
     /**
      * 内网emby地址
      */
@@ -57,6 +62,14 @@ public class EmbyConfig {
      */
     private String playbackUrl;
     /**
+     * 视图url
+     */
+    private String viewsUrl;
+    /**
+     * 用户项目url
+     */
+    private String userItemUrl;
+    /**
      * 剧集信息url
      */
     private String episodesUrl;
@@ -72,6 +85,11 @@ public class EmbyConfig {
      * 缓存路径
      */
     private String cachePath;
+
+    /**
+     * 虚拟视图 需要添加的原生库
+     */
+    private Map<String, String> virtual;
 
     /**
      * 公网emby地址

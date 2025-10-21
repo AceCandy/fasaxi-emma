@@ -22,6 +22,7 @@ public enum EmbyMediaType {
     音乐(10, "Audio", "", ""),
     // 书籍(11,"Audio", "",""),
     文件夹(20, "Folder", "", ""),
+    集合文件夹(50, "CollectionFolder", "", ""),
     ;
 
     private final Integer code;

@@ -1,7 +1,8 @@
-package cn.acecandy.fasaxi.emma.dao.service;
+package cn.acecandy.fasaxi.emma.dao.embyboss.service;
 
-import cn.acecandy.fasaxi.emma.dao.entity.EmbyItemPic;
-import cn.acecandy.fasaxi.emma.dao.mapper.EmbyItemPicMapper;
+import cn.acecandy.fasaxi.emma.dao.embyboss.entity.EmbyItemPic;
+import cn.acecandy.fasaxi.emma.dao.embyboss.mapper.EmbyItemPicMapper;
+import com.mybatisflex.annotation.UseDataSource;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -12,7 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-import static cn.acecandy.fasaxi.emma.dao.entity.table.EmbyItemPicTableDef.EMBY_ITEM_PIC;
+import static cn.acecandy.fasaxi.emma.dao.embyboss.entity.table.EmbyItemPicTableDef.EMBY_ITEM_PIC;
 
 /**
  * 卧底用户 dao
@@ -21,6 +22,7 @@ import static cn.acecandy.fasaxi.emma.dao.entity.table.EmbyItemPicTableDef.EMBY_
  * @since 2024/10/29
  */
 @Slf4j
+@UseDataSource("embyboss")
 @Component
 public class EmbyItemPicDao extends ServiceImpl<EmbyItemPicMapper, EmbyItemPic> {
 
