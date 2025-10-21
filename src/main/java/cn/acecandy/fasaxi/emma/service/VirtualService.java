@@ -155,7 +155,15 @@ public class VirtualService {
         if (CollUtil.isEmpty(originLibs)) {
             return originLibs;
         }
-        List<CustomCollections> customCollections = customCollectionsDao.findAllByStatus("active");
+        if (!redisClient.hasKey(CacheUtil.buildUserPermsCacheKey(userId))) {
+            try {
+                return originLibs;
+            } finally {
+                getUserAccessIdsByCache(userId);
+            }
+        }
+
+        List<CustomCollections> customCollections = customCollectionsDao.findAllByStatus(null);
         if (CollUtil.isEmpty(customCollections)) {
             return originLibs;
         }

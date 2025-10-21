@@ -31,6 +31,15 @@ public class RedisClient {
     @Resource
     private RedisTemplate<String, Object> redisTemplate;
 
+    public boolean hasKey(String key) {
+        try {
+            return redisTemplate.hasKey(key);
+        } catch (Exception e) {
+            log.warn("redis hasKey方法异常:", e);
+            return false;
+        }
+    }
+
     public boolean set(String key, Object value) {
         try {
             redisTemplate.opsForValue().set(key, value);

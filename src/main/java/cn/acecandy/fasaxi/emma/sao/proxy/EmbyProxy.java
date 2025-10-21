@@ -122,7 +122,7 @@ public class EmbyProxy {
         String url = embyConfig.getHost() + StrUtil.format(embyConfig.getUserItemUrl(), userId);
         Map<String, Object> paramMap = MapUtil.<String, Object>builder("api_key", embyConfig.getApiKey())
                 .put("Ids", StrUtil.join(COMMA, itemIds)).put("Fields", fields)
-                .put("Recursive", true)
+                .put("Recursive", true).put("Filters", "IsUnplayed")
                 .put("IncludeItemTypes", StrUtil.isNotBlank(itemTypes) ? itemTypes : "Movie,Series").build();
         if (CollUtil.isNotEmpty(sortBy)) {
             paramMap.put("SortBy", StrUtil.join(COMMA, sortBy));
@@ -166,7 +166,7 @@ public class EmbyProxy {
         String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
 
         int start = 0;
-        int batchSize = 5000;
+        int batchSize = 2000;
 
         List<String> embyIds = ListUtil.of();
         try {
@@ -185,9 +185,7 @@ public class EmbyProxy {
                     }
                     EmbyItemsInfoOut out = JSONUtil.toBean(resBody, EmbyItemsInfoOut.class);
                     List<EmbyItem> itemList = out.getItems();
-                    embyIds.addAll(itemList.stream().filter(i ->
-                                    !Boolean.parseBoolean(i.getUserData().get("Played").toString()))
-                            .map(EmbyItem::getItemId).toList());
+                    embyIds.addAll(itemList.stream().map(EmbyItem::getItemId).toList());
                     if (CollUtil.isEmpty(itemList) || CollUtil.size(itemList) < batchSize) {
                         break;
                     }
