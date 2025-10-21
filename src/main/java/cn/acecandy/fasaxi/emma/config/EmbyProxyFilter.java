@@ -120,6 +120,8 @@ public class EmbyProxyFilter implements Filter {
                     } else if (StrUtil.startWith(reqWrapper.getParentId(), "-")) {
                         if (StrUtil.endWithIgnoreCase(reqWrapper.getRequestURI(), "/Items/Latest")) {
                             virtualService.handleLatest(reqWrapper, res);
+                        } else if (StrUtil.endWithIgnoreCase(reqWrapper.getRequestURI(), "/Items/Resume")) {
+                            virtualService.handleResume(reqWrapper, res);
                         } else if (ReUtil.isItemsUrl(reqWrapper.getRequestURI())) {
                             virtualService.handleItems(reqWrapper, res);
                         }

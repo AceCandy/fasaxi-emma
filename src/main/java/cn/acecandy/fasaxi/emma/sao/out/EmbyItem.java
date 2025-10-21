@@ -177,4 +177,37 @@ public class EmbyItem {
      */
     @Alias("ProviderIds")
     private Map<String, String> providerIds;
+
+    /**
+     * 是否可删除
+     */
+    @Alias("CanDelete")
+    private Boolean canDelete;
+
+    /**
+     * 可以下载
+     */
+    @Alias("CanDownload")
+    private Boolean canDownload;
+
+    /**
+     * 社区评分
+     */
+    @Alias("CommunityRating")
+    private Double communityRating;
+
+    /**
+     * 影评人评分
+     */
+    @Alias("CriticRating")
+    private Double criticRating;
+
+    /**
+     * 家长分级
+     */
+    @Alias("OfficialRating")
+    private String officialRating;
+
+    @Alias("SupportsSync")
+    private Boolean supportsSync;
 }

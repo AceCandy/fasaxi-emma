@@ -219,6 +219,19 @@ public class VirtualService {
     }
 
     @SneakyThrows
+    public void handleResume(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
+        String userId = ReUtil.isResumeUrl(request.getRequestURI());
+        if (StrUtil.isBlank(userId)) {
+            response.setStatus(CODE_401);
+            return;
+        }
+        EmbyItemsInfoOut embyItems = EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
+        response.setStatus(CODE_200);
+        ServletUtil.write(response, JSONUtil.toJsonStr(embyItems),
+                "application/json;charset=UTF-8");
+    }
+
+    @SneakyThrows
     public void handleLatest(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
         String userId = ReUtil.isLatestUrl(request.getRequestURI());
         if (StrUtil.isBlank(userId)) {
@@ -226,14 +239,14 @@ public class VirtualService {
             return;
         }
         String parentId = request.getParentId();
-        EmbyItemsInfoOut embyItems = buildLatest(request.getCachedParam(), userId, parentId);
+        EmbyItemsInfoOut embyItems = buildLibDetail(request.getCachedParam(), userId, parentId);
         response.setStatus(CODE_200);
         ServletUtil.write(response, JSONUtil.toJsonStr(embyItems.getItems()),
                 "application/json;charset=UTF-8");
     }
 
-    private EmbyItemsInfoOut buildLatest(Map<String, Object> cachedParam,
-                                         String userId, String parentId) {
+    private EmbyItemsInfoOut buildLibDetail(Map<String, Object> cachedParam,
+                                            String userId, String parentId) {
         Long realId = fromMimickedId(parentId);
         CustomCollections coll = customCollectionsDao.getById(realId);
         if (coll == null) {
@@ -277,10 +290,8 @@ public class VirtualService {
 
         if (useNativeSort) {
             // Emby原生排序
-            EmbyItemsInfoOut itemsInfoOut = embyProxy.getUserItems(userId, embyIds, sortStr, sortOrder,
+            return embyProxy.getUserItems(userId, embyIds, sortStr, sortOrder,
                     start, showLimit, fields, MapUtil.getStr(cachedParam, "IncludeItemTypes"));
-            itemsInfoOut.setTotalRecordCount(embyIds.size());
-            return itemsInfoOut;
         } else {
             log.warn("非原生排序---->这里按理说不能进入");
             List<QueryColumn> dbSortStr = sortStr.stream().map(SORT_ORDER_MAP::get).toList();
@@ -288,10 +299,8 @@ public class VirtualService {
             List<MediaMetadata> metadataList = mediaMetadataDao.findByEmbyIdOrder(
                     embyIds, dbSortStr, dbSortOrder, showLimit);
             List<String> sortEmbyIds = metadataList.stream().map(MediaMetadata::getEmbyItemId).toList();
-            EmbyItemsInfoOut itemsInfoOut = embyProxy.getUserItems(userId, sortEmbyIds, null, null,
+            return embyProxy.getUserItems(userId, sortEmbyIds, null, null,
                     null, null, fields, null);
-            itemsInfoOut.setTotalRecordCount(embyIds.size());
-            return itemsInfoOut;
         }
     }
 
@@ -331,7 +340,7 @@ public class VirtualService {
             return;
         }
         String parentId = request.getParentId();
-        EmbyItemsInfoOut embyItems = buildLatest(request.getCachedParam(), userId, parentId);
+        EmbyItemsInfoOut embyItems = buildLibDetail(request.getCachedParam(), userId, parentId);
         response.setStatus(CODE_200);
         ServletUtil.write(response, JSONUtil.toJsonStr(embyItems),
                 "application/json;charset=UTF-8");

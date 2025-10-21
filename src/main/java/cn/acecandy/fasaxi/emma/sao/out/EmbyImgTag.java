@@ -22,4 +22,9 @@ public class EmbyImgTag {
      */
     @Alias("Logo")
     private String logo;
+    /**
+     * 缩略图
+     */
+    @Alias("Thumb")
+    private String thumb;
 }

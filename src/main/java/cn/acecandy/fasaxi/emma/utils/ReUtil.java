@@ -57,6 +57,9 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
     private static final Pattern REGEX_LATEST = PatternPool.get(
             "(/emby)?/users/([a-z0-9]+)/items/latest$", Pattern.DOTALL);
 
+    private static final Pattern REGEX_RESUME = PatternPool.get(
+            "(/emby)?/users/([a-z0-9]+)/items/resume$", Pattern.DOTALL);
+
     private static final Pattern REGEX_ITEMS = PatternPool.get(
             "(/emby)?/users/([a-z0-9]+)/items$", Pattern.DOTALL);
 
@@ -146,6 +149,14 @@ public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
 
     public static String isLatestUrl(String url) {
         List<String> groups = getAllGroups(REGEX_LATEST, url.toLowerCase());
+        if (groups == null || groups.size() < 3) {
+            return null;
+        }
+        return CollUtil.get(groups, 2);
+    }
+
+    public static String isResumeUrl(String url) {
+        List<String> groups = getAllGroups(REGEX_RESUME, url.toLowerCase());
         if (groups == null || groups.size() < 3) {
             return null;
         }
