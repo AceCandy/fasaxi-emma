@@ -2,13 +2,13 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
+import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.lang.mutable.MutablePair;
+import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.text.split.SplitUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.lang.mutable.MutablePair;
-import org.dromara.hutool.core.map.MapUtil;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.text.split.SplitUtil;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -29,12 +29,12 @@ import static cn.acecandy.fasaxi.emma.utils.CacheUtil.THREAD_LIMIT_KEY;
 @Slf4j
 @Component
 public class ThreadLimitUtil {
-    @Resource
-    private RedisClient redisClient;
     /**
      * EXP时间 2hour 防止重启导致的key丢失
      */
     private final static Integer EXP_TIME = 60 * 60 * 2;
+    @Resource
+    private RedisClient redisClient;
 
     /**
      * 设置线程缓存

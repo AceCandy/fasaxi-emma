@@ -4,13 +4,13 @@ package cn.acecandy.fasaxi.emma.utils;
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
-import org.dromara.hutool.core.cache.impl.FIFOCache;
-import org.dromara.hutool.core.collection.ListUtil;
-import org.dromara.hutool.core.date.DateUtil;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.crypto.SecureUtil;
-import org.dromara.hutool.crypto.digest.DigestUtil;
-import org.dromara.hutool.json.JSONUtil;
+import cn.hutool.v7.core.cache.impl.FIFOCache;
+import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.date.DateUtil;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.crypto.SecureUtil;
+import cn.hutool.v7.crypto.digest.DigestUtil;
+import cn.hutool.v7.json.JSONUtil;
 
 import java.util.List;
 
@@ -22,20 +22,38 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.DAY_7_MS;
  * @author tangningzhu
  * @since 2024/10/16
  */
-public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
-    private CacheUtil() {
-    }
-
-    // 缓存key
-
+public final class CacheUtil extends cn.hutool.v7.core.cache.CacheUtil {
     public static final String THREAD_LIMIT_KEY = "cache:a-thread-limit";
 
+    // 缓存key
     public static final String R_115_TOKEN = "cache:a-115-token";
     public static final String R_115_REFRESH_TOKEN = "cache:a-115-token-refresh";
     public static final String R_123_TOKEN = "cache:a-123-token";
     public static final String R_123_ZONG_TOKEN = "cache:a-123-zong-token";
-
     public static final String OPENLIST_TOKEN = "cache:openlist-token";
+    /**
+     * 媒体直链 缓存
+     */
+    public final static FIFOCache<String, String> MEDIA_CACHE = newFIFOCache(5000, DAY_7_MS);
+    private static final String CLOUD_SEARCH_CACHE_KEY = "cache:search:{}|{}|{}";
+    private static final String CLOUD_SEARCH_DEVICE_CACHE_KEY = "cache:search:{}|{}-{}|{}";
+    private static final String VIDEO_CACHE_KEY = "cache:302video:{}";
+    private static final String VIDEO_UA_CACHE_KEY = "cache:302video:{}|{}";
+    private static final String PIC_CACHE_KEY = "cache:pic:{}|{}";
+    private static final String USER_PERMS_CACHE_KEY = "cache:user-perms:{}";
+    private static final String ITEMS_CACHE_KEY = "cache:items:{}";
+    private static final String ITEMS_ID_CACHE_KEY = "cache:items-id:{}";
+    private static final String ORIGIN_CACHE_KEY = "cache:req:{}|{}";
+    private static final String ORIGIN_LATEST_CACHE_KEY = "cache:req-latest:{}|{}";
+    private static final String THIRD_CACHE_KEY = "cache:third:{}|{}";
+    private static final String ORIGIN_CACHE_REFRESH_KEY1 = "cache:req:/emby/Users/{}/Items";
+    private static final String ORIGIN_CACHE_REFRESH_KEY2 = "cache:req:/emby/Shows/{}";
+    private static final String ORIGIN_CACHE_REFRESH_KEY3 = "cache:req:/Users/{}/Items";
+    private static final String ORIGIN_CACHE_REFRESH_KEY1_ALL = "cache:req:/emby/Users/";
+    private static final String ORIGIN_CACHE_REFRESH_KEY2_ALL = "cache:req:/Users/";
+    private static final String DEVICE_CACHE_FILEID115_KEY = "cache:device-115:{}";
+    private CacheUtil() {
+    }
 
     public static String buildThreadLimitKey(CloudStorageType cloudStorageType, String deviceId) {
         return THREAD_LIMIT_KEY + ":" + deviceId + "|" + cloudStorageType.getValue();
@@ -44,32 +62,6 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
     public static String buildThreadLimitKey(String deviceId) {
         return THREAD_LIMIT_KEY + ":" + deviceId;
     }
-
-    private static final String CLOUD_SEARCH_CACHE_KEY = "cache:search:{}|{}|{}";
-    private static final String CLOUD_SEARCH_DEVICE_CACHE_KEY = "cache:search:{}|{}-{}|{}";
-
-    private static final String VIDEO_CACHE_KEY = "cache:302video:{}";
-    private static final String VIDEO_UA_CACHE_KEY = "cache:302video:{}|{}";
-    private static final String PIC_CACHE_KEY = "cache:pic:{}|{}";
-    private static final String USER_PERMS_CACHE_KEY = "cache:user-perms:{}";
-    private static final String ORIGIN_CACHE_KEY = "cache:req:{}|{}";
-    private static final String ORIGIN_VIEW_CACHE_KEY = "cache:req-view:{}";
-    private static final String ORIGIN_LATEST_CACHE_KEY = "cache:req-latest:{}|{}";
-
-    private static final String THIRD_CACHE_KEY = "cache:third:{}|{}";
-
-    public static final String CACHE_VIEW_KEY = "cache:view";
-
-    private static final String ORIGIN_CACHE_REFRESH_KEY1 = "cache:req:/emby/Users/{}/Items";
-    private static final String ORIGIN_CACHE_REFRESH_KEY2 = "cache:req:/emby/Shows/{}";
-    private static final String ORIGIN_CACHE_REFRESH_KEY3 = "cache:req:/Users/{}/Items";
-
-    private static final String ORIGIN_CACHE_REFRESH_KEY1_ALL = "cache:req:/emby/Users/";
-    private static final String ORIGIN_CACHE_REFRESH_KEY2_ALL = "cache:req:/Users/";
-
-
-    private static final String DEVICE_CACHE_FILEID115_KEY = "cache:device-115:{}";
-
 
     /**
      * 设备115文件id缓存key
@@ -119,14 +111,6 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
                 DigestUtil.md5Hex16(JSONUtil.toJsonStr(req.getCachedParam())));
     }
 
-    public static String buildOriginViewCacheKey(EmbyContentCacheReqWrapper req) {
-        return StrUtil.format(ORIGIN_VIEW_CACHE_KEY, req.getRequestURI(), req.getUserId());
-    }
-
-    public static String buildOriginViewCacheKey(String userId) {
-        return StrUtil.format(ORIGIN_VIEW_CACHE_KEY, userId);
-    }
-
     public static String buildOriginLatestCacheKey(String userId, String parentId) {
         return StrUtil.format(ORIGIN_LATEST_CACHE_KEY, userId, parentId);
     }
@@ -166,10 +150,13 @@ public final class CacheUtil extends org.dromara.hutool.core.cache.CacheUtil {
         return StrUtil.format(USER_PERMS_CACHE_KEY, userId);
     }
 
-    /**
-     * 媒体直链 缓存
-     */
-    public final static FIFOCache<String, String> MEDIA_CACHE = newFIFOCache(5000, DAY_7_MS);
+    public static String buildItemsCacheKey(String parentId) {
+        return StrUtil.format(ITEMS_CACHE_KEY, parentId);
+    }
+
+    public static String buildItemsIdCacheKey(String parentId) {
+        return StrUtil.format(ITEMS_ID_CACHE_KEY, parentId);
+    }
 
     private static String mediaCacheKey(String ua, String mediaSourceId) {
         return StrUtil.format(VIDEO_CACHE_KEY, mediaSourceId, ua);

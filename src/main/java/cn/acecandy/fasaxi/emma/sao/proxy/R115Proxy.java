@@ -7,13 +7,13 @@ import cn.acecandy.fasaxi.emma.sao.client.R115Client;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.dto.Rile;
 import cn.acecandy.fasaxi.emma.sao.out.*;
+import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.text.UnicodeUtil;
+import cn.hutool.v7.json.JSONUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.collection.ListUtil;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.text.UnicodeUtil;
-import org.dromara.hutool.json.JSONUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -35,29 +35,24 @@ import static cn.acecandy.fasaxi.emma.utils.CacheUtil.R_115_TOKEN;
 @Slf4j
 public class R115Proxy {
 
+    /**
+     * 页数限制
+     */
+    private static final Integer PAGE_LIMIT = 1150;
     @Resource
     private R115Client r115Client;
-
     @Resource
     private R115AuthClient r115AuthClient;
-
     @Value("${cloud.r115.default.refresh-token}")
     private String refreshToken;
-
     @Value("${cloud.r115.default.copy-folder}")
     private Long copyFolder;
-
     @Resource
     private RedisClient redisClient;
 
     public String getCacheTokenKey() {
         return R_115_TOKEN;
     }
-
-    /**
-     * 页数限制
-     */
-    private static final Integer PAGE_LIMIT = 1150;
 
     private String getRefreshToken() {
         String result = redisClient.getStr(R_115_REFRESH_TOKEN);

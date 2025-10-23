@@ -15,7 +15,7 @@ import java.io.InputStream;
  * @author AceCandy
  * @since 2025/05/05
  */
-public final class CompressUtil extends org.dromara.hutool.extra.compress.CompressUtil {
+public final class CompressUtil extends cn.hutool.v7.extra.compress.CompressUtil {
 
     private CompressUtil() {
     }

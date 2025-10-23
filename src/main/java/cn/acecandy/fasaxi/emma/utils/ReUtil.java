@@ -1,12 +1,12 @@
 package cn.acecandy.fasaxi.emma.utils;
 
 
-import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.collection.ListUtil;
-import org.dromara.hutool.core.lang.Console;
-import org.dromara.hutool.core.regex.PatternPool;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.text.split.SplitUtil;
+import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.lang.Console;
+import cn.hutool.v7.core.regex.PatternPool;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.text.split.SplitUtil;
 
 import java.util.List;
 import java.util.regex.Pattern;
@@ -17,63 +17,51 @@ import java.util.regex.Pattern;
  * @author tangningzhu
  * @since 2024/10/16
  */
-public final class ReUtil extends org.dromara.hutool.core.regex.ReUtil {
-    private ReUtil() {
-    }
-
+public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
     /**
      * 匹配标题中的标点符号进行分割
      */
     public static final Pattern REGEX_SPILT_TITLE = PatternPool.get(
             "[,.，。；;'\"“”‘’：:【】]", Pattern.DOTALL);
-
     /**
      * 匹配标题中的标点符号进行分割
      */
     public static final Pattern REGEX_DOUBAN_HTML_ID = PatternPool.get(
             "subject_id:\\s*'([0-9]+)'", Pattern.DOTALL);
-
     /**
      * 匹配标题中的标点符号进行分割
      */
     public static final Pattern REGEX_DOUBAN_JSON_ID = PatternPool.get(
             "movie\\\\/subject\\\\/(\\d+)", Pattern.DOTALL);
-
     /**
      * 匹配类似 /emby/Users/656fcefa283149708880b416786e5fde/Items/1417552/Delete
      */
     private static final Pattern REGEX_SIMILAR_ITEM = PatternPool.get(
             "(/emby)?/users/([a-z0-9]+)/(?:[a-z]*items|items)/(-?[0-9]+)(/delete)?$", Pattern.DOTALL);
-
     /**
      * 匹配类似 /emby/Users/656fcefa283149708880b416786e5fde/Items/1417552
      */
     private static final Pattern REGEX_ITEM = PatternPool.get(
             "(/emby)?/users/([a-z0-9]+)/items/([0-9]+)$", Pattern.DOTALL);
-
     private static final Pattern REGEX_VIEW = PatternPool.get(
             "(/emby)?/users/([a-z0-9]+)/views$", Pattern.DOTALL);
-
     private static final Pattern REGEX_LATEST = PatternPool.get(
             "(/emby)?/users/([a-z0-9]+)/items/latest$", Pattern.DOTALL);
-
     private static final Pattern REGEX_RESUME = PatternPool.get(
             "(/emby)?/users/([a-z0-9]+)/items/resume$", Pattern.DOTALL);
-
     private static final Pattern REGEX_ITEMS = PatternPool.get(
             "(/emby)?/users/([a-z0-9]+)/items$", Pattern.DOTALL);
-
     private static final Pattern REGEX_PLAYLIST = PatternPool.get(
             "(/emby)?/playlist/(\\d+)/items$", Pattern.DOTALL);
-
     private static final Pattern REGEX_PLAYBACK = PatternPool.get(
             "(/emby)?/items/(\\d+)/playbackinfo$", Pattern.DOTALL);
-
     private static final Pattern REGEX_VIDEO = PatternPool.get(
             "(/emby)?/(videos|items)/(\\d+)/(?:original\\.[^/]+|download|stream.*)$", Pattern.DOTALL);
-
     private static final Pattern REGEX_AUDIO = PatternPool.get(
             "(/emby)?/audio/(\\d+)/(?:original\\.[^/]+|download|stream|stream.*)$", Pattern.DOTALL);
+
+    private ReUtil() {
+    }
 
     public static String findDouBanIdByHtml(String html) {
         html = StrUtil.trim(html);

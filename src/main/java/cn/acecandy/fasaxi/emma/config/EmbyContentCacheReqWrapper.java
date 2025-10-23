@@ -1,20 +1,20 @@
 package cn.acecandy.fasaxi.emma.config;
 
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
+import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.text.split.SplitUtil;
+import cn.hutool.v7.http.HttpUtil;
+import cn.hutool.v7.http.server.servlet.ServletUtil;
+import cn.hutool.v7.json.JSONArray;
+import cn.hutool.v7.json.JSONObject;
+import cn.hutool.v7.json.JSONUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import lombok.Getter;
 import lombok.Setter;
-import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.collection.ListUtil;
-import org.dromara.hutool.core.map.MapUtil;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.text.split.SplitUtil;
-import org.dromara.hutool.http.HttpUtil;
-import org.dromara.hutool.http.server.servlet.ServletUtil;
-import org.dromara.hutool.json.JSONArray;
-import org.dromara.hutool.json.JSONObject;
-import org.dromara.hutool.json.JSONUtil;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -22,7 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import static org.dromara.hutool.core.text.StrPool.COMMA;
+import static cn.hutool.v7.core.text.StrPool.COMMA;
+
 
 /**
  * emby请求体缓存包装器
@@ -40,16 +41,18 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     @Getter
     private final Map<String, String> cachedHeader = MapUtil.newHashMap();
     @Getter
-    private String ua;
-    @Getter
-    private String range;
-    @Getter
-    private String paramUri;
+    private final Map<String, Object> cachedParam = new TreeMap<>();
     @Getter
     @Setter
     public String mediaSourceId;
     @Getter
     public String parentId;
+    @Getter
+    private String ua;
+    @Getter
+    private String range;
+    @Getter
+    private String paramUri;
     @Getter
     private String userId;
     @Getter
@@ -59,18 +62,7 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     @Getter
     private String ip;
     @Getter
-    private final Map<String, Object> cachedParam = new TreeMap<>();
-
-    @Getter
     private JSONArray toolkitView;
-
-    public void buildToolKit(String toolkitView) {
-        if (!JSONUtil.isTypeJSON(toolkitView) || StrUtil.equals(toolkitView, "{}")) {
-            return;
-        }
-        JSONObject viewJn = JSONUtil.parseObj(toolkitView);
-        this.toolkitView = viewJn.getJSONArray("Items");
-    }
 
     public EmbyContentCacheReqWrapper(HttpServletRequest request) throws IOException {
         super(request);
@@ -80,6 +72,14 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         parseFormData(this.cachedBody);
         cacheHeader(request);
         cacheParam(request);
+    }
+
+    public void buildToolKit(String toolkitView) {
+        if (!JSONUtil.isTypeJSON(toolkitView) || StrUtil.equals(toolkitView, "{}")) {
+            return;
+        }
+        JSONObject viewJn = JSONUtil.parseObj(toolkitView);
+        this.toolkitView = viewJn.getJSONArray("Items");
     }
 
     private void parseFormData(String formData) {

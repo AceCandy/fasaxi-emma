@@ -1,8 +1,8 @@
 package cn.acecandy.fasaxi.emma.common.enums;
 
+import cn.hutool.v7.core.text.StrUtil;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.dromara.hutool.core.text.StrUtil;
 
 /**
  * 云盘类型

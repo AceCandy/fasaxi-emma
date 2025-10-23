@@ -5,20 +5,20 @@ import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.config.DoubanConfig;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
+import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.lang.Console;
+import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.text.UnicodeUtil;
+import cn.hutool.v7.core.util.RandomUtil;
+import cn.hutool.v7.http.HttpUtil;
+import cn.hutool.v7.http.client.Request;
+import cn.hutool.v7.http.client.Response;
+import cn.hutool.v7.http.client.engine.ClientEngine;
+import cn.hutool.v7.http.meta.Method;
+import cn.hutool.v7.json.JSONUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.lang.Console;
-import org.dromara.hutool.core.map.MapUtil;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.text.UnicodeUtil;
-import org.dromara.hutool.core.util.RandomUtil;
-import org.dromara.hutool.http.HttpUtil;
-import org.dromara.hutool.http.client.Request;
-import org.dromara.hutool.http.client.Response;
-import org.dromara.hutool.http.client.engine.ClientEngine;
-import org.dromara.hutool.http.meta.Method;
-import org.dromara.hutool.json.JSONUtil;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -40,6 +40,19 @@ public class DoubanProxy {
 
     @Resource
     private DoubanConfig doubanConfig;
+
+    public static void main(String[] args) {
+        String imdbId = "tt6718170"; // Example IMDb ID for "The Shawshank Redemption"
+        String doubanUrl = StrUtil.format("https://api.douban.com/v2/movie/imdb/tt6718170");
+
+        String url = "https://api.douban.com/v2/movie/imdb/tt6718170";
+
+        Map<String, Object> paramMap = new HashMap<>();
+        paramMap.put("apikey", "0ac44ae016490db2204ce0a042db2916");
+        String result = HttpUtil.post(url, paramMap);
+        Console.log(result);
+        Console.log(ReUtil.findDouBanIdByJson(result));
+    }
 
     /**
      * 按id获取豆瓣配置
@@ -78,7 +91,6 @@ public class DoubanProxy {
         return null;
     }
 
-
     /**
      * 通过imdb id获取豆瓣id
      *
@@ -98,7 +110,6 @@ public class DoubanProxy {
         }
         return doubanId;
     }
-
 
     /**
      * 通过imdbid获取豆瓣信息
@@ -152,19 +163,5 @@ public class DoubanProxy {
             log.warn("getHtmlByImdbId 网络请求异常: ", e);
         }
         return null;
-    }
-
-
-    public static void main(String[] args) {
-        String imdbId = "tt6718170"; // Example IMDb ID for "The Shawshank Redemption"
-        String doubanUrl = StrUtil.format("https://api.douban.com/v2/movie/imdb/tt6718170");
-
-        String url = "https://api.douban.com/v2/movie/imdb/tt6718170";
-
-        Map<String, Object> paramMap = new HashMap<>();
-        paramMap.put("apikey", "0ac44ae016490db2204ce0a042db2916");
-        String result = HttpUtil.post(url, paramMap);
-        Console.log(result);
-        Console.log(ReUtil.findDouBanIdByJson(result));
     }
 }

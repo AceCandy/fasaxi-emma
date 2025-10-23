@@ -3,24 +3,24 @@ package cn.acecandy.fasaxi.emma.utils;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
+import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.io.file.FileNameUtil;
+import cn.hutool.v7.core.io.file.FileUtil;
+import cn.hutool.v7.core.io.file.PathUtil;
+import cn.hutool.v7.core.lang.Console;
+import cn.hutool.v7.core.lang.tuple.Pair;
+import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.crypto.SecureUtil;
+import cn.hutool.v7.http.client.Request;
+import cn.hutool.v7.http.client.Response;
+import cn.hutool.v7.http.client.engine.ClientEngine;
+import cn.hutool.v7.http.meta.Method;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.io.file.FileNameUtil;
-import org.dromara.hutool.core.io.file.FileUtil;
-import org.dromara.hutool.core.io.file.PathUtil;
-import org.dromara.hutool.core.lang.Console;
-import org.dromara.hutool.core.lang.tuple.Pair;
-import org.dromara.hutool.core.map.MapUtil;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.crypto.SecureUtil;
-import org.dromara.hutool.http.client.Request;
-import org.dromara.hutool.http.client.Response;
-import org.dromara.hutool.http.client.engine.ClientEngine;
-import org.dromara.hutool.http.meta.Method;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -56,22 +56,23 @@ import static java.nio.file.StandardOpenOption.WRITE;
 @Component
 public class FileCacheUtil {
 
+    private static final Map<String, ReentrantLock> FILE_CACHE_LOCK = MapUtil.newSafeConcurrentHashMap();
     @Resource
     private ClientEngine httpClient;
-
     @Resource
     private EmbyProxy embyProxy;
-
     @Resource
     private EmbyConfig embyConfig;
-
-    private static final Map<String, ReentrantLock> FILE_CACHE_LOCK = MapUtil.newSafeConcurrentHashMap();
     @Resource
     private VideoUtil videoUtil;
 
     public static Path getCachePath(String itemId, String mediaType, String filePath) {
         return PathUtil.of(mediaType, itemId,
                 SecureUtil.md5(PathUtil.getLastPathEle(Paths.get(filePath)).toString()));
+    }
+
+    public static void main(String[] args) {
+        Console.log(getCachePath("12345", 电影.getEmbyName(), "/vol2/1000/dockerThirdConf/bili-sync-rs/docker-compose.yml"));
     }
 
     /**
@@ -366,9 +367,5 @@ public class FileCacheUtil {
         } finally {
             LockUtil.unlockVideoCache(lock, embyItem.getItemId());
         }
-    }
-
-    public static void main(String[] args) {
-        Console.log(getCachePath("12345", 电影.getEmbyName(), "/vol2/1000/dockerThirdConf/bili-sync-rs/docker-compose.yml"));
     }
 }

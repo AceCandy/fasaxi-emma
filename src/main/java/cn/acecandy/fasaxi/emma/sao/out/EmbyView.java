@@ -1,8 +1,8 @@
 package cn.acecandy.fasaxi.emma.sao.out;
 
+import cn.hutool.v7.core.annotation.Alias;
 import lombok.Builder;
 import lombok.Data;
-import org.dromara.hutool.core.annotation.Alias;
 
 import java.util.List;
 import java.util.Map;

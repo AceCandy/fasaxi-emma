@@ -1,10 +1,10 @@
 package cn.acecandy.fasaxi.emma.utils;
 
+import cn.hutool.v7.core.io.file.FileUtil;
+import cn.hutool.v7.core.io.resource.ResourceUtil;
+import cn.hutool.v7.core.text.StrUtil;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.io.file.FileUtil;
-import org.dromara.hutool.core.io.resource.ResourceUtil;
-import org.dromara.hutool.core.text.StrUtil;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -31,7 +31,7 @@ import java.util.Random;
  * @since 2025/3/3
  */
 @Slf4j
-public final class ImgUtil extends org.dromara.hutool.swing.img.ImgUtil {
+public final class ImgUtil extends cn.hutool.v7.swing.img.ImgUtil {
     private ImgUtil() {
     }
 
@@ -127,14 +127,6 @@ public final class ImgUtil extends org.dromara.hutool.swing.img.ImgUtil {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
-    }
-
-    // 覆盖模式枚举
-    public enum ScaleMode {
-        WIDTH,       // 按宽度比例缩放
-        HEIGHT,      // 按高度比例缩放
-        CONTAIN,     // 保持比例最大适应
-        COVER        // 保持比例完全覆盖
     }
 
     /**
@@ -367,5 +359,13 @@ public final class ImgUtil extends org.dromara.hutool.swing.img.ImgUtil {
         g2d.drawImage(original, 0, 0, targetWidth, targetHeight, null);
         g2d.dispose();
         return resized;
+    }
+
+    // 覆盖模式枚举
+    public enum ScaleMode {
+        WIDTH,       // 按宽度比例缩放
+        HEIGHT,      // 按高度比例缩放
+        CONTAIN,     // 保持比例最大适应
+        COVER        // 保持比例完全覆盖
     }
 }

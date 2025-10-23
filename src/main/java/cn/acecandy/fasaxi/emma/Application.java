@@ -1,8 +1,8 @@
 package cn.acecandy.fasaxi.emma;
 
+import cn.hutool.v7.core.text.StrUtil;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.text.StrUtil;
 import org.springframework.boot.Banner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -11,6 +11,7 @@ import org.springframework.boot.web.servlet.ServletComponentScan;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.Environment;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.net.InetAddress;
 
@@ -21,9 +22,9 @@ import java.net.InetAddress;
  * @since 2025/01/03
  */
 @Slf4j
-// @EnableScheduling
 // @EnableRetry
 // @RestController
+@EnableScheduling
 @EnableFeignClients(basePackages = "cn.acecandy.fasaxi.emma.sao.client")
 @ConfigurationPropertiesScan
 @ServletComponentScan

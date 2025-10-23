@@ -1,19 +1,19 @@
 package cn.acecandy.fasaxi.emma.utils;
 
+import cn.hutool.v7.core.lang.Console;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.text.split.SplitUtil;
+import cn.hutool.v7.extra.pinyin.PinyinUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.lang.Console;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.text.split.SplitUtil;
-import org.dromara.hutool.extra.pinyin.PinyinUtil;
 
 import java.util.List;
 import java.util.Locale;
 
-import static org.dromara.hutool.core.text.CharSequenceUtil.subPre;
-import static org.dromara.hutool.core.text.CharSequenceUtil.upperFirst;
-import static org.dromara.hutool.core.text.StrPool.SPACE;
-import static org.dromara.hutool.core.text.StrValidator.EMPTY;
-import static org.dromara.hutool.core.text.StrValidator.isBlank;
+import static cn.hutool.v7.core.text.CharSequenceUtil.subPre;
+import static cn.hutool.v7.core.text.CharSequenceUtil.upperFirst;
+import static cn.hutool.v7.core.text.StrPool.SPACE;
+import static cn.hutool.v7.core.text.StrValidator.EMPTY;
+import static cn.hutool.v7.core.text.StrValidator.isBlank;
 
 
 /**

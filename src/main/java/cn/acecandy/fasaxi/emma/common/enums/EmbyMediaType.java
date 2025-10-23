@@ -1,9 +1,9 @@
 package cn.acecandy.fasaxi.emma.common.enums;
 
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
+import cn.hutool.v7.core.text.StrUtil;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.dromara.hutool.core.text.StrUtil;
 
 /**
  * emby 媒体类型

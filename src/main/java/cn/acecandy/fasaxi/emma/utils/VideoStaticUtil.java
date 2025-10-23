@@ -1,18 +1,18 @@
 package cn.acecandy.fasaxi.emma.utils;
 
+import cn.hutool.v7.core.convert.ConvertUtil;
+import cn.hutool.v7.core.math.NumberUtil;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.util.ByteUtil;
+import cn.hutool.v7.http.HttpUtil;
+import cn.hutool.v7.http.client.Request;
+import cn.hutool.v7.http.client.Response;
+import cn.hutool.v7.http.meta.HeaderName;
+import cn.hutool.v7.http.meta.Method;
 import lombok.Builder;
 import lombok.Data;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.convert.ConvertUtil;
-import org.dromara.hutool.core.math.NumberUtil;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.util.ByteUtil;
-import org.dromara.hutool.http.HttpUtil;
-import org.dromara.hutool.http.client.Request;
-import org.dromara.hutool.http.client.Response;
-import org.dromara.hutool.http.meta.HeaderName;
-import org.dromara.hutool.http.meta.Method;
 
 import java.util.Arrays;
 
@@ -54,41 +54,6 @@ public class VideoStaticUtil {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    /**
-     * 从URL分析moov BOX位置，自动处理优化和未优化的MP4文件
-     */
-    public MoovPos analyzeMp4(String url, Long fileSize) {
-        // 1. 先尝试获取文件总大小
-        if (NumberUtil.isValidNumber(fileSize) || NumberUtil.isZero(fileSize)) {
-            fileSize = getFileSize(url);
-        }
-
-        // 2. 分析文件头部前8k（适用于优化过的MP4）
-        byte[] headData = downloadRange(url, 0, 2 * 1024 * 1024 - 1);
-        MoovPos pos = findMoovInData(headData, 0);
-        if (pos != null) return pos.withPosDesc(头部);
-
-        // 3. 分析尾部1m（适用于未优化的MP4）
-        if (fileSize > 0) {
-            long tailStart = Math.max(0, fileSize - 2 * 1024 * 1024);
-            byte[] tailData = downloadRange(url, tailStart, fileSize - 1);
-            pos = findMoovInData(tailData, tailStart);
-            if (pos != null) return pos.withPosDesc(尾部);
-        }
-
-        // 4. 尝试结合mdat位置推测moov位置
-        BoxInfo mdat = findBox(headData, BOX_TYPE_MDAT);
-        if (mdat != null && fileSize > 0) {
-            long searchStart = mdat.start() + mdat.size();
-            long searchEnd = Math.min(fileSize - 1, searchStart + 2 * 1024 * 1024);
-            byte[] searchData = downloadRange(url, searchStart, searchEnd);
-            pos = findMoovInData(searchData, searchStart);
-            if (pos != null) return pos.withPosDesc(mdat之后);
-        }
-        log.warn("未找到moov位置,size:{} -> {}", fileSize, url);
-        return null;
     }
 
     /**
@@ -149,7 +114,6 @@ public class VideoStaticUtil {
         return null;
     }
 
-
     /**
      * 实用方法：读取32位无符号整数
      *
@@ -174,6 +138,41 @@ public class VideoStaticUtil {
                 (data[offset + 2] & 0xFFL) << 40 | (data[offset + 3] & 0xFFL) << 32 |
                 (data[offset + 4] & 0xFFL) << 24 | (data[offset + 5] & 0xFFL) << 16 |
                 (data[offset + 6] & 0xFFL) << 8 | (data[offset + 7] & 0xFFL);
+    }
+
+    /**
+     * 从URL分析moov BOX位置，自动处理优化和未优化的MP4文件
+     */
+    public MoovPos analyzeMp4(String url, Long fileSize) {
+        // 1. 先尝试获取文件总大小
+        if (NumberUtil.isValidNumber(fileSize) || NumberUtil.isZero(fileSize)) {
+            fileSize = getFileSize(url);
+        }
+
+        // 2. 分析文件头部前8k（适用于优化过的MP4）
+        byte[] headData = downloadRange(url, 0, 2 * 1024 * 1024 - 1);
+        MoovPos pos = findMoovInData(headData, 0);
+        if (pos != null) return pos.withPosDesc(头部);
+
+        // 3. 分析尾部1m（适用于未优化的MP4）
+        if (fileSize > 0) {
+            long tailStart = Math.max(0, fileSize - 2 * 1024 * 1024);
+            byte[] tailData = downloadRange(url, tailStart, fileSize - 1);
+            pos = findMoovInData(tailData, tailStart);
+            if (pos != null) return pos.withPosDesc(尾部);
+        }
+
+        // 4. 尝试结合mdat位置推测moov位置
+        BoxInfo mdat = findBox(headData, BOX_TYPE_MDAT);
+        if (mdat != null && fileSize > 0) {
+            long searchStart = mdat.start() + mdat.size();
+            long searchEnd = Math.min(fileSize - 1, searchStart + 2 * 1024 * 1024);
+            byte[] searchData = downloadRange(url, searchStart, searchEnd);
+            pos = findMoovInData(searchData, searchStart);
+            if (pos != null) return pos.withPosDesc(mdat之后);
+        }
+        log.warn("未找到moov位置,size:{} -> {}", fileSize, url);
+        return null;
     }
 
     /**

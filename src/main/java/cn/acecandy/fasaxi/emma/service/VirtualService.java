@@ -15,24 +15,23 @@ import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
+import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.date.DateUtil;
+import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.text.split.SplitUtil;
+import cn.hutool.v7.core.util.ObjUtil;
+import cn.hutool.v7.crypto.SecureUtil;
+import cn.hutool.v7.http.server.servlet.ServletUtil;
+import cn.hutool.v7.json.JSONArray;
+import cn.hutool.v7.json.JSONObject;
+import cn.hutool.v7.json.JSONUtil;
 import com.mybatisflex.core.query.QueryColumn;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.collection.ListUtil;
-import org.dromara.hutool.core.data.id.IdUtil;
-import org.dromara.hutool.core.date.DateUtil;
-import org.dromara.hutool.core.lang.Console;
-import org.dromara.hutool.core.map.MapUtil;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.text.split.SplitUtil;
-import org.dromara.hutool.core.util.ObjUtil;
-import org.dromara.hutool.http.server.servlet.ServletUtil;
-import org.dromara.hutool.json.JSONArray;
-import org.dromara.hutool.json.JSONObject;
-import org.dromara.hutool.json.JSONUtil;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -40,7 +39,6 @@ import java.util.Map;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_401;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.DAY_1_S;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.DAY_7_S;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.MINUTE_30_S;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.集合文件夹;
@@ -56,32 +54,15 @@ import static cn.acecandy.fasaxi.emma.dao.toolkit.entity.table.MediaMetadataTabl
 @Component
 public class VirtualService {
 
-    @Resource
-    private CustomCollectionsDao customCollectionsDao;
-
-    @Resource
-    private MediaMetadataDao mediaMetadataDao;
-
-    @Resource
-    private EmbyProxy embyProxy;
-
-    @Resource
-    private EmbyConfig embyConfig;
-
-    @Resource
-    private RedisClient redisClient;
-
     /**
      * 虚拟id基准
      */
     private static final int MIMICKED_ID_BASE = 900000;
-
     /**
      * 支持原生emby本地排序字段
      */
     private static final List<String> NATIVE_SORT_FIELDS = ListUtil.of("PremiereDate",
             "DateCreated", "CommunityRating", "ProductionYear", "SortName", "original", "DateLastContentAdded");
-
     /**
      * 元数据 排序字段映射
      */
@@ -91,6 +72,39 @@ public class VirtualService {
             "CommunityRating", MEDIA_METADATA.RATING,
             "ProductionYear", MEDIA_METADATA.RELEASE_YEAR,
             "SortName", MEDIA_METADATA.TITLE);
+    @Resource
+    private CustomCollectionsDao customCollectionsDao;
+    @Resource
+    private MediaMetadataDao mediaMetadataDao;
+    @Resource
+    private EmbyProxy embyProxy;
+    @Resource
+    private EmbyConfig embyConfig;
+    @Resource
+    private RedisClient redisClient;
+
+    public static void main(String[] args) {
+        String s = "{\n" +
+                "      \"Guid\": \"8381d29afe8546b0b0199366d4f8855d\",\n" +
+                "      \"Etag\": \"29d428cad00374d9fedcdc3956b03d83\",\n" +
+                "      \"DateCreated\": \"2024-09-01T15:24:40.0000000Z\",\n" +
+                "      \"DateModified\": \"0001-01-01T00:00:00.0000000Z\",\n" +
+                "      \"CanDelete\": false,\n" +
+                "      \"CanDownload\": false,\n" +
+                "      \"SortName\": \"\uD83C\uDFAC 华语电影\",\n" +
+                "      \"ForcedSortName\": \"\uD83C\uDFAC 华语电影\",\n" +
+                "      \"ExternalUrls\": [],\n" +
+                "      \"Taglines\": [],\n" +
+                "      \"RemoteTrailers\": [],\n" +
+                "      \"ChildCount\": 1,\n" +
+                "      \"DisplayPreferencesId\": \"8381d29afe8546b0b0199366d4f8855d\",\n" +
+                "      \"CollectionType\": \"movies\",\n" +
+                "      \"LockedFields\": [],\n" +
+                "      \"LockData\": false\n" +
+                "    }";
+        EmbyItem embyItem = JSONUtil.toBean(s, EmbyItem.class);
+        System.out.println(JSONUtil.toJsonStr(embyItem));
+    }
 
     @SneakyThrows
     public void handleViews(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
@@ -98,33 +112,6 @@ public class VirtualService {
         if (StrUtil.isBlank(userId)) {
             response.setStatus(CODE_401);
             return;
-        }
-        String cacheKey = CacheUtil.buildOriginViewCacheKey(userId);
-        String result = redisClient.getStr(cacheKey);
-        if (StrUtil.isNotBlank(result)) {
-            List<String> resultList = SplitUtil.splitTrim(result, "||");
-
-            try {
-                response.setStatus(CODE_200);
-                ServletUtil.write(response, CollUtil.getLast(resultList),
-                        "application/json;charset=UTF-8");
-                return;
-            } finally {
-                // 缓存如果超过半小时 自动异步更新
-                if (DateUtil.currentSeconds() - MINUTE_30_S > Long.parseLong(CollUtil.getFirst(resultList))) {
-                    ThreadUtil.execute(() -> {
-                        List<EmbyView> fakeViewsItems = buildViews(userId);
-                        if (CollUtil.isNotEmpty(fakeViewsItems)) {
-                            EmbyViewOut finalLibs = EmbyViewOut.builder()
-                                    .items(fakeViewsItems)
-                                    .totalRecordCount(fakeViewsItems.size())
-                                    .build();
-                            redisClient.set(cacheKey, StrUtil.format("{}||{}",
-                                    DateUtil.currentSeconds(), JSONUtil.toJsonStr(finalLibs)), DAY_1_S);
-                        }
-                    });
-                }
-            }
         }
         List<EmbyView> fakeViewsItems = buildViews(userId);
         if (CollUtil.isEmpty(fakeViewsItems)) {
@@ -135,9 +122,6 @@ public class VirtualService {
                 .items(fakeViewsItems)
                 .totalRecordCount(fakeViewsItems.size())
                 .build();
-        redisClient.set(cacheKey, StrUtil.format("{}||{}",
-                DateUtil.currentSeconds(), JSONUtil.toJsonStr(finalLibs)), DAY_1_S);
-
         response.setStatus(CODE_200);
         ServletUtil.write(response, JSONUtil.toJsonStr(finalLibs),
                 "application/json;charset=UTF-8");
@@ -155,14 +139,6 @@ public class VirtualService {
         if (CollUtil.isEmpty(originLibs)) {
             return originLibs;
         }
-        if (!redisClient.hasKey(CacheUtil.buildUserPermsCacheKey(userId))) {
-            try {
-                return originLibs;
-            } finally {
-                getUserAccessIdsByCache(userId);
-            }
-        }
-
         List<CustomCollections> customCollections = customCollectionsDao.findAllByStatus(null);
         if (CollUtil.isEmpty(customCollections)) {
             return originLibs;
@@ -196,12 +172,13 @@ public class VirtualService {
             if (CollUtil.contains(itemTypeFromDb, "Series")) {
                 collectionType = "tvshows";
             }
-
+            String guid = SecureUtil.md5(mimickedId + embyConfig.getServerId() + coll.getName() + nameSuffix);
+            String etag = SecureUtil.md5(embyConfig.getServerId() + coll.getName() + nameSuffix);
             fakeViewsItems.add(EmbyView.builder()
                     .id(mimickedId).serverId(embyConfig.getServerId()).name(coll.getName() + nameSuffix)
-                    .guid(IdUtil.fastSimpleUUID()).etag(IdUtil.fastSimpleUUID())
+                    .guid(guid).etag(etag)
                     .dateCreated("2025-10-01T00:00:00.0000000Z").dateModified("2025-10-01T00:00:00.0000000Z")
-                    .canDelete(false).canDownload(false).presentationUniqueKey(IdUtil.fastSimpleUUID())
+                    .canDelete(false).canDownload(false).presentationUniqueKey(guid)
                     .sortName(coll.getName()).forcedSortName(coll.getName())
                     .externalUrls(ListUtil.of()).taglines(ListUtil.of()).remoteTrailers(ListUtil.of())
                     .providerIds(MapUtil.newHashMap()).isFolder(true).parentId("2")
@@ -209,7 +186,7 @@ public class VirtualService {
                     .userData(Map.of("PlaybackPositionTicks", 0,
                             "IsFavorite", false,
                             "Played", false))
-                    .childCount(1).displayPreferencesId(IdUtil.fastSimpleUUID())
+                    .childCount(1).displayPreferencesId(guid)
                     .primaryImageAspectRatio(1.7777777777777777).collectionType(collectionType)
                     .imageTags(Map.of("Primary", StrUtil.format(
                             "{}?timestamp={}", realEmbyCollectionId, DateUtil.currentSeconds())))
@@ -270,8 +247,8 @@ public class VirtualService {
         JSONObject definition = JSONUtil.parseObj(coll.getDefinitionJson());
         if (definition.getBool("enforce_emby_permissions", false)) {
             // 强制emby原生权限验证(默认只展示未观看完的)
-            List<String> allItemIds = getUserAccessIdsByCache(userId);
-            embyIds = CollUtil.intersection(embyIds, allItemIds).stream().toList();
+            List<String> allItemIds = getAllItemsIdByCache();
+            embyIds = embyIds.stream().filter(allItemIds::contains).toList();
             if (CollUtil.isEmpty(embyIds)) {
                 return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
             }
@@ -312,6 +289,29 @@ public class VirtualService {
         }
     }
 
+    /**
+     * 通过缓存获取所有项目id
+     *
+     * @return {@link List }<{@link String }>
+     */
+    private List<String> getAllItemsIdByCache() {
+        List<String> allItemsId = ListUtil.ofCopyOnWrite();
+        embyConfig.getVirtualHide().keySet().parallelStream().forEach(k -> {
+            String result = redisClient.getStr(CacheUtil.buildItemsIdCacheKey(k));
+            allItemsId.addAll(SplitUtil.splitTrim(result, ","));
+        });
+        return allItemsId;
+    }
+
+    /**
+     * 通过缓存获取用户拥有权限的id
+     * <p>
+     * 弃用 使用getAllItemsIdByCache获取所有的id之后 最后再通过用户接口进行输出可直接过滤掉没有权限的id
+     *
+     * @param userId 用户ID
+     * @return {@link List }<{@link String }>
+     */
+    @Deprecated
     private List<String> getUserAccessIdsByCache(String userId) {
         String cacheKey = CacheUtil.buildUserPermsCacheKey(userId);
         String result = redisClient.getStr(cacheKey);
@@ -338,7 +338,6 @@ public class VirtualService {
         }
         return itemIds;
     }
-
 
     @SneakyThrows
     public void handleItems(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
@@ -372,28 +371,5 @@ public class VirtualService {
      */
     private Long fromMimickedId(String mimickedId) {
         return (long) (-(Integer.parseInt(mimickedId)) - MIMICKED_ID_BASE);
-    }
-
-    public static void main(String[] args) {
-        String s = "{\n" +
-                "      \"Guid\": \"8381d29afe8546b0b0199366d4f8855d\",\n" +
-                "      \"Etag\": \"29d428cad00374d9fedcdc3956b03d83\",\n" +
-                "      \"DateCreated\": \"2024-09-01T15:24:40.0000000Z\",\n" +
-                "      \"DateModified\": \"0001-01-01T00:00:00.0000000Z\",\n" +
-                "      \"CanDelete\": false,\n" +
-                "      \"CanDownload\": false,\n" +
-                "      \"SortName\": \"\uD83C\uDFAC 华语电影\",\n" +
-                "      \"ForcedSortName\": \"\uD83C\uDFAC 华语电影\",\n" +
-                "      \"ExternalUrls\": [],\n" +
-                "      \"Taglines\": [],\n" +
-                "      \"RemoteTrailers\": [],\n" +
-                "      \"ChildCount\": 1,\n" +
-                "      \"DisplayPreferencesId\": \"8381d29afe8546b0b0199366d4f8855d\",\n" +
-                "      \"CollectionType\": \"movies\",\n" +
-                "      \"LockedFields\": [],\n" +
-                "      \"LockData\": false\n" +
-                "    }";
-        EmbyItem embyItem = JSONUtil.toBean(s, EmbyItem.class);
-        System.out.println(JSONUtil.toJsonStr(embyItem));
     }
 }

@@ -1,9 +1,8 @@
 package cn.acecandy.fasaxi.emma.config;
 
-import org.dromara.hutool.http.client.ApacheHttpClientConfig;
-import org.dromara.hutool.http.client.engine.ClientEngine;
-import org.dromara.hutool.http.client.engine.ClientEngineFactory;
-import org.dromara.hutool.http.client.engine.okhttp.OkHttpClientConfig;
+import cn.hutool.v7.http.client.ApacheHttpClientConfig;
+import cn.hutool.v7.http.client.engine.ClientEngine;
+import cn.hutool.v7.http.client.engine.ClientEngineFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.4</version>
+        <version>3.5.6</version>
         <relativePath/>
     </parent>
 
@@ -18,19 +18,19 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <java.version>24</java.version>
+        <java.version>25</java.version>
 
         <brotli.version>0.1.2</brotli.version>
-        <common-sompress.version>1.27.1</common-sompress.version>
+        <common-compress.version>1.27.1</common-compress.version>
         <disruptor.version>4.0.0</disruptor.version>
-        <guava.version>33.4.8-jre</guava.version>
-        <httpclient.version>5.5</httpclient.version>
-        <hutool.version>6.0.0-M22</hutool.version>
+        <guava.version>33.5.0-jre</guava.version>
+        <httpclient.version>5.5.1</httpclient.version>
+        <hutool.version>7.0.0-M2</hutool.version>
         <jpinyin.version>1.1.8</jpinyin.version>
-        <lombok.version>1.18.38</lombok.version>
-        <mybatis-flex.version>1.11.1</mybatis-flex.version>
+        <lombok.version>1.18.42</lombok.version>
+        <mybatis-flex.version>1.11.3</mybatis-flex.version>
         <okhttp.version>4.12.0</okhttp.version>
-<!--        <spring-cloud.version>2025.1.0-M1</spring-cloud.version>-->
+        <!--        <spring-cloud.version>2025.1.0-M1</spring-cloud.version>-->
         <spring-cloud.version>2025.0.0</spring-cloud.version>
     </properties>
 
@@ -77,7 +77,7 @@
             <artifactId>spring-boot-starter-undertow</artifactId>
         </dependency>
         <dependency>
-            <groupId> org.springframework.cloud</groupId>
+            <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
         <!--<dependency>
@@ -153,7 +153,7 @@
             <version>${guava.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.dromara.hutool</groupId>
+            <groupId>cn.hutool.v7</groupId>
             <artifactId>hutool-all</artifactId>
             <version>${hutool.version}</version>
         </dependency>
@@ -161,7 +161,7 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-compress</artifactId>
-            <version>${common-sompress.version}</version>
+            <version>${common-compress.version}</version>
         </dependency>
         <!-- 使用pinyinUtil需要引入 -->
         <dependency>

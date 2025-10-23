@@ -4,15 +4,15 @@ import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.config.TmdbConfig;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
+import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.http.client.Request;
+import cn.hutool.v7.http.client.Response;
+import cn.hutool.v7.http.client.engine.ClientEngine;
+import cn.hutool.v7.http.meta.Method;
+import cn.hutool.v7.json.JSONUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.map.MapUtil;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.http.client.Request;
-import org.dromara.hutool.http.client.Response;
-import org.dromara.hutool.http.client.engine.ClientEngine;
-import org.dromara.hutool.http.meta.Method;
-import org.dromara.hutool.json.JSONUtil;
 import org.springframework.stereotype.Component;
 
 /**

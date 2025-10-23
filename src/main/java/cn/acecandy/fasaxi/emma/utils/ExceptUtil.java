@@ -1,8 +1,8 @@
 package cn.acecandy.fasaxi.emma.utils;
 
 
-import org.dromara.hutool.core.exception.ExceptionUtil;
-import org.dromara.hutool.core.text.StrUtil;
+import cn.hutool.v7.core.exception.ExceptionUtil;
+import cn.hutool.v7.core.text.StrUtil;
 
 import java.io.IOException;
 

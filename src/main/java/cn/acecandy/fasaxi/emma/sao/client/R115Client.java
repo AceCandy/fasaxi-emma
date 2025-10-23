@@ -54,8 +54,8 @@ public interface R115Client {
      */
     @GetMapping(path = "/open/folder/get_info")
     R115<Object> getFileInfo(@RequestHeader("Authorization") String auth,
-                                       @RequestParam("file_id") Long fileId,
-                                       @SpringQueryMap R115FileInfoReq req);
+                             @RequestParam("file_id") Long fileId,
+                             @SpringQueryMap R115FileInfoReq req);
 
     /**
      * 获取下载链接

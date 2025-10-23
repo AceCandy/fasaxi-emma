@@ -1,7 +1,7 @@
 package cn.acecandy.fasaxi.emma.common.resp;
 
+import cn.hutool.v7.core.annotation.Alias;
 import lombok.Data;
-import org.dromara.hutool.core.annotation.Alias;
 
 import java.util.List;
 

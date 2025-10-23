@@ -5,28 +5,28 @@ import cn.acecandy.fasaxi.emma.common.vo.HttpReqVO;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.TmdbConfig;
 import cn.acecandy.fasaxi.emma.sao.proxy.TmdbProxy;
+import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.net.url.UrlEncoder;
+import cn.hutool.v7.core.net.url.UrlUtil;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.http.client.Request;
+import cn.hutool.v7.http.client.Response;
+import cn.hutool.v7.http.client.engine.ClientEngine;
+import cn.hutool.v7.http.meta.Method;
+import cn.hutool.v7.json.JSONObject;
+import cn.hutool.v7.json.JSONUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.map.MapUtil;
-import org.dromara.hutool.core.net.url.UrlEncoder;
-import org.dromara.hutool.core.net.url.UrlUtil;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.http.client.Request;
-import org.dromara.hutool.http.client.Response;
-import org.dromara.hutool.http.client.engine.ClientEngine;
-import org.dromara.hutool.http.meta.Method;
-import org.dromara.hutool.json.JSONObject;
-import org.dromara.hutool.json.JSONUtil;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.Map;
 
-import static org.dromara.hutool.http.meta.HttpStatus.HTTP_MOVED_TEMP;
+import static cn.hutool.v7.http.meta.HttpStatus.HTTP_MOVED_TEMP;
 
 /**
  * emby 工具类
@@ -37,18 +37,6 @@ import static org.dromara.hutool.http.meta.HttpStatus.HTTP_MOVED_TEMP;
 @Slf4j
 @Component
 public class EmbyUtil {
-    @Resource
-    private ClientEngine httpClient;
-
-    @Resource
-    private EmbyConfig embyConfig;
-
-    @Resource
-    private TmdbConfig tmdbConfig;
-
-    @Resource
-    private TmdbProxy tmdbProxy;
-
     private static final String EMBY_INNER_URL = "http://192.168.1.205:8096";
     private static final String EMBY_PUBLIC_URL = "http://emby-real.acecandy.cn:800";
     private static final String EMBY_API_KEY = "b8647127d2fa4ae6b27b6918ed8a0593";
@@ -56,13 +44,20 @@ public class EmbyUtil {
     private static final String ALIST_PUBLIC_ADDR = "https://alist.acecandy.cn:880";
     private static final String ALIST_TOKEN =
             "alist-1fbc1ca5-4506-49d8-9950-53d9ab7edefaNH7xJwk7OYxNvaEP2Vd5fd9lpIBLanXcfNFZHtMvMQ73YfL4Z0ojIFwAjbFGsccd";
-
     private static final Map<String, String> PATH_ALIST_CONFIG = MapUtil.<String, String>builder()
             .put("Z:\\", "/")
             .put("100PB:", "/115")
             .put("https://alist.acecandy.cn:880/d/", "/")
             .put("http://192.168.1.205:5244/d", "/")
             .build();
+    @Resource
+    private ClientEngine httpClient;
+    @Resource
+    private EmbyConfig embyConfig;
+    @Resource
+    private TmdbConfig tmdbConfig;
+    @Resource
+    private TmdbProxy tmdbProxy;
 
     /**
      * 解析头
@@ -106,6 +101,47 @@ public class EmbyUtil {
                 .headers(rebuildReqHeader(request)).ua(request.getHeader("User-Agent"))
                 .paramsDict(request.getParameterMap())
                 .build();
+    }
+
+    public static String replacePath2Alist(String inputPath) {
+        for (Map.Entry<String, String> entry : PATH_ALIST_CONFIG.entrySet()) {
+            String k = entry.getKey();
+            String v = entry.getValue();
+            if (!inputPath.startsWith(k)) {
+                continue;
+            }
+            String changePath = StrUtil.replace(inputPath, k, v);
+            return UrlUtil.normalize(changePath, true, true);
+        }
+        return "";
+    }
+
+    public static String buildAlistPath(String embyUri) {
+        if (StrUtil.isBlank(embyUri)) {
+            return "";
+        }
+        return ALIST_PUBLIC_ADDR + "/d" + UrlEncoder.encodeQuery(embyUri);
+    }
+
+    /**
+     * 重新设置转换请求头
+     * <p>
+     * 忽略host参数
+     *
+     * @param request 请求
+     * @return {@link HttpHeaders }
+     */
+    public static HttpHeaders rebuildReqHeader(HttpServletRequest request) {
+        HttpHeaders headers = new HttpHeaders();
+
+        Map<String, String> headerMap = MapUtil.newHashMap();
+        for (String headerName : Collections.list(request.getHeaderNames())) {
+            if (!"host".equalsIgnoreCase(headerName)) {
+                headerMap.put(headerName, request.getHeader(headerName));
+            }
+        }
+        headers.setAll(headerMap);
+        return headers;
     }
 
     /**
@@ -160,47 +196,6 @@ public class EmbyUtil {
             }
         }
         return "";
-    }
-
-    public static String replacePath2Alist(String inputPath) {
-        for (Map.Entry<String, String> entry : PATH_ALIST_CONFIG.entrySet()) {
-            String k = entry.getKey();
-            String v = entry.getValue();
-            if (!inputPath.startsWith(k)) {
-                continue;
-            }
-            String changePath = StrUtil.replace(inputPath, k, v);
-            return UrlUtil.normalize(changePath, true, true);
-        }
-        return "";
-    }
-
-    public static String buildAlistPath(String embyUri) {
-        if (StrUtil.isBlank(embyUri)) {
-            return "";
-        }
-        return ALIST_PUBLIC_ADDR + "/d" + UrlEncoder.encodeQuery(embyUri);
-    }
-
-    /**
-     * 重新设置转换请求头
-     * <p>
-     * 忽略host参数
-     *
-     * @param request 请求
-     * @return {@link HttpHeaders }
-     */
-    public static HttpHeaders rebuildReqHeader(HttpServletRequest request) {
-        HttpHeaders headers = new HttpHeaders();
-
-        Map<String, String> headerMap = MapUtil.newHashMap();
-        for (String headerName : Collections.list(request.getHeaderNames())) {
-            if (!"host".equalsIgnoreCase(headerName)) {
-                headerMap.put(headerName, request.getHeader(headerName));
-            }
-        }
-        headers.setAll(headerMap);
-        return headers;
     }
 
 }

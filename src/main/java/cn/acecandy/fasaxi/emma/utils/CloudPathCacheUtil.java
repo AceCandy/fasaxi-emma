@@ -2,8 +2,8 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.sao.dto.Rile;
-import org.dromara.hutool.core.map.MapUtil;
-import org.dromara.hutool.core.text.StrUtil;
+import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.text.StrUtil;
 
 import java.util.List;
 import java.util.Map;
@@ -15,15 +15,14 @@ import java.util.Map;
  * @since 2025/8/19
  */
 public final class CloudPathCacheUtil {
-    private CloudPathCacheUtil() {
-    }
-
     private static final Map<String, Rile> CLOUD_CACHE = MapUtil.newSafeConcurrentHashMap();
-
     /**
      * 缓存key格式
      */
     private static final String KEY_FORMAT = "{}:{}";
+
+    private CloudPathCacheUtil() {
+    }
 
     private static String buildCacheKey(CloudStorageType cloudStorage, String path) {
         return StrUtil.format(KEY_FORMAT, cloudStorage, path);

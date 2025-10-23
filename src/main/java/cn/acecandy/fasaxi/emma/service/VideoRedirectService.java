@@ -15,27 +15,26 @@ import cn.acecandy.fasaxi.emma.utils.PathUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.acecandy.fasaxi.emma.utils.VideoUtil;
+import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.date.DateUtil;
+import cn.hutool.v7.core.lang.mutable.MutablePair;
+import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.net.url.UrlDecoder;
+import cn.hutool.v7.core.net.url.UrlEncoder;
+import cn.hutool.v7.core.net.url.UrlQueryUtil;
+import cn.hutool.v7.core.net.url.UrlUtil;
+import cn.hutool.v7.core.text.StrPool;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.text.split.SplitUtil;
+import cn.hutool.v7.http.client.Request;
+import cn.hutool.v7.http.client.Response;
+import cn.hutool.v7.http.client.engine.ClientEngine;
+import cn.hutool.v7.http.meta.Method;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.date.DateUtil;
-import org.dromara.hutool.core.lang.Console;
-import org.dromara.hutool.core.lang.mutable.MutablePair;
-import org.dromara.hutool.core.map.MapUtil;
-import org.dromara.hutool.core.net.url.UrlDecoder;
-import org.dromara.hutool.core.net.url.UrlEncoder;
-import org.dromara.hutool.core.net.url.UrlQueryUtil;
-import org.dromara.hutool.core.net.url.UrlUtil;
-import org.dromara.hutool.core.text.StrPool;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.text.split.SplitUtil;
-import org.dromara.hutool.http.client.Request;
-import org.dromara.hutool.http.client.Response;
-import org.dromara.hutool.http.client.engine.ClientEngine;
-import org.dromara.hutool.http.meta.Method;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -132,6 +131,7 @@ public class VideoRedirectService {
 
             response.setStatus(HttpServletResponse.SC_FOUND);
             response.setHeader("Location", cacheUrl);
+            response.setHeader("Referrer-Policy", "no-referrer");
             log.warn("视频重定向(缓存):[{}|{}] => {}", mediaSourceId, deviceId, UrlDecoder.decode(cacheUrl));
             return true;
         }
@@ -299,23 +299,8 @@ public class VideoRedirectService {
         }
     }
 
-
     private int getDefaultExpireTime() {
         return 24 * 60 * 60;
-    }
-
-
-    /**
-     * 临时存放mediaPath和size的实体
-     *
-     * @author AceCandy
-     * @since 2025/09/28
-     */
-    record MediaInfo(String path, long size) {
-
-    }
-
-    record RedirectResult(String url, String storageType, int expireTime, String originalPath) {
     }
 
     /**
@@ -348,6 +333,7 @@ public class VideoRedirectService {
                             String mediaPath) {
         response.setStatus(HttpServletResponse.SC_FOUND);
         response.setHeader("Location", realUrl);
+        response.setHeader("Referrer-Policy", "no-referrer");
         log.warn("视频重定向({}): [{}] => {}",
                 DateUtil.date((DateUtil.currentSeconds() + exTime) * 1000), mediaPath, UrlDecoder.decode(realUrl));
     }
@@ -452,15 +438,16 @@ public class VideoRedirectService {
         return mediaPath;
     }
 
-    public static void main(String[] args) {
-        // String mediaPath = "http://192.168.1.249:5244/d/123/整理/短剧3/龙游沧海逸云间/S01E002.mp4";
-        String mediaPath = "https://alist2.acecandy.cn:880/d/123/整理/短剧3/龙游沧海逸云间/S01E0021.mp4";
-        try (Response resp = Request.of(mediaPath).method(Method.HEAD).send()) {
-            Console.log(resp.headers());
-            Console.log(resp.header("Location"));
-            Console.log(CollUtil.getFirst(resp.headerList("Location")));
-        } catch (IOException e) {
-            Console.log(e);
-        }
+    /**
+     * 临时存放mediaPath和size的实体
+     *
+     * @author AceCandy
+     * @since 2025/09/28
+     */
+    record MediaInfo(String path, long size) {
+
+    }
+
+    record RedirectResult(String url, String storageType, int expireTime, String originalPath) {
     }
 }

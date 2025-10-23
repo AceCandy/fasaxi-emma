@@ -1,7 +1,7 @@
 package cn.acecandy.fasaxi.emma.common.req;
 
+import cn.hutool.v7.core.text.StrUtil;
 import lombok.Data;
-import org.dromara.hutool.core.text.StrUtil;
 
 /**
  * 视频重定向 入参

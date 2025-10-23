@@ -22,28 +22,28 @@ import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.acecandy.fasaxi.emma.utils.SortUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
+import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.date.DateTime;
+import cn.hutool.v7.core.exception.ExceptionUtil;
+import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.net.url.UrlBuilder;
+import cn.hutool.v7.core.net.url.UrlDecoder;
+import cn.hutool.v7.core.net.url.UrlPath;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.http.HttpUtil;
+import cn.hutool.v7.http.client.Request;
+import cn.hutool.v7.http.client.Response;
+import cn.hutool.v7.http.client.body.ResponseBody;
+import cn.hutool.v7.http.client.engine.ClientEngine;
+import cn.hutool.v7.http.meta.Method;
+import cn.hutool.v7.http.server.servlet.ServletUtil;
+import cn.hutool.v7.json.JSONArray;
+import cn.hutool.v7.json.JSONObject;
+import cn.hutool.v7.json.JSONUtil;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.collection.ListUtil;
-import org.dromara.hutool.core.date.DateTime;
-import org.dromara.hutool.core.exception.ExceptionUtil;
-import org.dromara.hutool.core.map.MapUtil;
-import org.dromara.hutool.core.net.url.UrlBuilder;
-import org.dromara.hutool.core.net.url.UrlDecoder;
-import org.dromara.hutool.core.net.url.UrlPath;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.http.HttpUtil;
-import org.dromara.hutool.http.client.Request;
-import org.dromara.hutool.http.client.Response;
-import org.dromara.hutool.http.client.body.ResponseBody;
-import org.dromara.hutool.http.client.engine.ClientEngine;
-import org.dromara.hutool.http.meta.Method;
-import org.dromara.hutool.http.server.servlet.ServletUtil;
-import org.dromara.hutool.json.JSONArray;
-import org.dromara.hutool.json.JSONObject;
-import org.dromara.hutool.json.JSONUtil;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.Charset;
@@ -56,7 +56,7 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_302;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电影;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧_集;
-import static org.dromara.hutool.core.text.StrPool.COMMA;
+import static cn.hutool.v7.core.text.StrPool.COMMA;
 
 /**
  * emby 代理服务
@@ -85,6 +85,66 @@ public class EmbyProxy {
 
     @Resource
     private TmdbProxy tmdbProxy;
+
+    /**
+     * 返回结果个性化排序
+     *
+     * @param request 要求
+     * @param bodyStr 身体str
+     */
+    private static String searchItem(EmbyContentCacheReqWrapper request, String bodyStr) {
+        if (!ReUtil.isItemsUrl(request.getRequestURI().toLowerCase()) ||
+                !request.getCachedParam().containsKey("SearchTerm")) {
+            return bodyStr;
+        }
+        EmbyItemsInfoOut itemInfo = JSONUtil.toBean(bodyStr, EmbyItemsInfoOut.class);
+        if (CollUtil.isEmpty(itemInfo.getItems())) {
+            return bodyStr;
+        }
+        List<EmbyItem> items = SortUtil.searchSortItem(itemInfo.getItems(),
+                request.getCachedParam().get("SearchTerm").toString());
+        itemInfo.setItems(items);
+        return JSONUtil.toJsonStr(itemInfo);
+    }
+
+    /**
+     * 重建虚拟视图
+     *
+     * @param request 要求
+     * @param bodyStr 身体str
+     * @return {@link String }
+     */
+    private static String reBuildView(EmbyContentCacheReqWrapper request, String bodyStr) {
+        if (request.getToolkitView() == null) {
+            return bodyStr;
+        }
+        JSONObject viewJn = JSONUtil.parseObj(bodyStr);
+        JSONArray items = viewJn.getJSONArray("Items");
+        items.addAll(0, request.getToolkitView());
+        items.removeIf(item -> {
+            JSONObject jn = item.asJSONObject();
+            return StrUtil.equalsAny(jn.getStr("Name"), "🎬 华语电影", "🎬 外语电影", "🐦 动画电影",
+                    "🐧 动漫", "🐧 国漫", "📺 国产剧", "📺 欧美剧", "📺 日韩剧", "🎭 综艺", "🦉 记录电影", "🦉 纪录片");
+        });
+        return viewJn.toString();
+    }
+
+    /**
+     * 重建虚拟视图
+     *
+     * @param request 要求
+     * @param bodyStr 身体str
+     * @return {@link String }
+     */
+    private static String reBuildLatest(EmbyContentCacheReqWrapper request, String bodyStr) {
+        if (!StrUtil.containsIgnoreCase(request.getRequestURI(), "Items/Latest")) {
+            return bodyStr;
+        }
+        if (!JSONUtil.isTypeJSONObject(bodyStr)) {
+            return bodyStr;
+        }
+        return JSONUtil.parseObj(bodyStr).getStr("Items");
+    }
 
     /**
      * 获取视图
@@ -153,7 +213,7 @@ public class EmbyProxy {
     }
 
     /**
-     * 获取用户拥有权限的媒体项(未观看)
+     * 获取用户拥有权限的媒体项
      *
      * @param userId 用户ID
      * @return {@link List<EmbyItem> }
@@ -200,6 +260,55 @@ public class EmbyProxy {
             LockUtil.unlockUserPerms(lock, userId);
         }
         return embyIds;
+    }
+
+    /**
+     * 获取整库的媒体项
+     *
+     * @param parentId 库id
+     * @return {@link List<EmbyItem> }
+     */
+    public List<EmbyItem> getItemsByParentIdOnLock(String parentId) {
+        Lock lock = LockUtil.lockItems(parentId);
+        if (LockUtil.isLock(lock)) {
+            return ListUtil.of();
+        }
+        String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
+
+        int start = 0;
+        int batchSize = 5000;
+
+        List<EmbyItem> items = ListUtil.of();
+        try {
+            while (true) {
+                try (Response res = httpClient.send(Request.of(url).method(Method.GET).form(Map.of(
+                        "api_key", embyConfig.getApiKey(), "Recursive", true,
+                        "IncludeItemTypes", "Movie,Series",
+                        "ParentId", parentId, "StartIndex", start, "Limit", batchSize)))) {
+                    if (!res.isOk()) {
+                        throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+                    }
+                    String resBody = res.bodyStr();
+                    if (!JSONUtil.isTypeJSON(resBody)) {
+                        throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+                    }
+                    EmbyItemsInfoOut out = JSONUtil.toBean(resBody, EmbyItemsInfoOut.class);
+                    List<EmbyItem> itemList = out.getItems();
+                    items.addAll(itemList);
+                    if (CollUtil.isEmpty(itemList) || CollUtil.size(itemList) < batchSize) {
+                        break;
+                    }
+                    start += CollUtil.size(itemList);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("getItemsByParentIdOnLock 网络请求异常: ", e);
+        } finally {
+            LockUtil.unlockItems(lock, parentId);
+        }
+        return items;
     }
 
     /**
@@ -334,7 +443,6 @@ public class EmbyProxy {
         return result;
     }
 
-
     public void initTmdbProvider(EmbyItem embyItem) {
         try {
             if (null == embyItem) {
@@ -372,7 +480,6 @@ public class EmbyProxy {
             log.warn("[itemId:{}]初始化构建tmdb-douban失败: ", embyItem.getItemId(), e);
         }
     }
-
 
     public synchronized void expertTmdbProvider(EmbyItem embyItem) {
         try {
@@ -607,67 +714,6 @@ public class EmbyProxy {
         bodyStr = reBuildView(request, bodyStr);
         bodyStr = reBuildLatest(request, bodyStr);
         return StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
-    }
-
-
-    /**
-     * 返回结果个性化排序
-     *
-     * @param request 要求
-     * @param bodyStr 身体str
-     */
-    private static String searchItem(EmbyContentCacheReqWrapper request, String bodyStr) {
-        if (!ReUtil.isItemsUrl(request.getRequestURI().toLowerCase()) ||
-                !request.getCachedParam().containsKey("SearchTerm")) {
-            return bodyStr;
-        }
-        EmbyItemsInfoOut itemInfo = JSONUtil.toBean(bodyStr, EmbyItemsInfoOut.class);
-        if (CollUtil.isEmpty(itemInfo.getItems())) {
-            return bodyStr;
-        }
-        List<EmbyItem> items = SortUtil.searchSortItem(itemInfo.getItems(),
-                request.getCachedParam().get("SearchTerm").toString());
-        itemInfo.setItems(items);
-        return JSONUtil.toJsonStr(itemInfo);
-    }
-
-    /**
-     * 重建虚拟视图
-     *
-     * @param request 要求
-     * @param bodyStr 身体str
-     * @return {@link String }
-     */
-    private static String reBuildView(EmbyContentCacheReqWrapper request, String bodyStr) {
-        if (request.getToolkitView() == null) {
-            return bodyStr;
-        }
-        JSONObject viewJn = JSONUtil.parseObj(bodyStr);
-        JSONArray items = viewJn.getJSONArray("Items");
-        items.addAll(0, request.getToolkitView());
-        items.removeIf(item -> {
-            JSONObject jn = item.asJSONObject();
-            return StrUtil.equalsAny(jn.getStr("Name"), "🎬 华语电影", "🎬 外语电影", "🐦 动画电影",
-                    "🐧 动漫", "🐧 国漫", "📺 国产剧", "📺 欧美剧", "📺 日韩剧", "🎭 综艺", "🦉 记录电影", "🦉 纪录片");
-        });
-        return viewJn.toString();
-    }
-
-    /**
-     * 重建虚拟视图
-     *
-     * @param request 要求
-     * @param bodyStr 身体str
-     * @return {@link String }
-     */
-    private static String reBuildLatest(EmbyContentCacheReqWrapper request, String bodyStr) {
-        if (!StrUtil.containsIgnoreCase(request.getRequestURI(), "Items/Latest")) {
-            return bodyStr;
-        }
-        if (!JSONUtil.isTypeJSONObject(bodyStr)) {
-            return bodyStr;
-        }
-        return JSONUtil.parseObj(bodyStr).getStr("Items");
     }
 
     /**

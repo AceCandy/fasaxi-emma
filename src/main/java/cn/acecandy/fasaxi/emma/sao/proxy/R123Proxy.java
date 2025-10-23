@@ -11,14 +11,14 @@ import cn.acecandy.fasaxi.emma.sao.out.R123FileListReq;
 import cn.acecandy.fasaxi.emma.sao.out.R123FileListResp;
 import cn.acecandy.fasaxi.emma.sao.out.R123TokenReq;
 import cn.acecandy.fasaxi.emma.sao.out.R123TokenResp;
+import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.date.DateUtil;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.text.UnicodeUtil;
 import jakarta.annotation.Resource;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.collection.ListUtil;
-import org.dromara.hutool.core.date.DateUtil;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.text.UnicodeUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -39,28 +39,24 @@ import static cn.acecandy.fasaxi.emma.utils.CacheUtil.R_123_TOKEN;
 @Slf4j
 public class R123Proxy {
 
+    /**
+     * r123页数限制
+     */
+    private static final Integer PAGE_LIMIT = 100;
     @Resource
     private R123Client r123Client;
-
     @Getter
     @Value("${cloud.r123.default.client-id}")
     private String clientId;
-
     @Getter
     @Value("${cloud.r123.default.client-secret}")
     private String clientSecret;
-
     @Resource
     private RedisClient redisClient;
 
     public String getCacheTokenKey() {
         return R_123_TOKEN;
     }
-
-    /**
-     * r123页数限制
-     */
-    private static final Integer PAGE_LIMIT = 100;
 
     /**
      * 获取访问令牌

@@ -12,21 +12,21 @@ import cn.acecandy.fasaxi.emma.sao.proxy.OpProxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R115Proxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123Proxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123ZongProxy;
+import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.date.DateUtil;
+import cn.hutool.v7.core.io.file.FileNameUtil;
+import cn.hutool.v7.core.io.file.FileUtil;
+import cn.hutool.v7.core.lang.Console;
+import cn.hutool.v7.core.net.url.UrlDecoder;
+import cn.hutool.v7.core.net.url.UrlPath;
+import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.util.CharsetUtil;
+import cn.hutool.v7.http.client.Request;
+import cn.hutool.v7.http.client.Response;
+import cn.hutool.v7.http.meta.Method;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.hutool.core.collection.CollUtil;
-import org.dromara.hutool.core.collection.ListUtil;
-import org.dromara.hutool.core.date.DateUtil;
-import org.dromara.hutool.core.io.file.FileNameUtil;
-import org.dromara.hutool.core.io.file.FileUtil;
-import org.dromara.hutool.core.lang.Console;
-import org.dromara.hutool.core.net.url.UrlDecoder;
-import org.dromara.hutool.core.net.url.UrlPath;
-import org.dromara.hutool.core.text.StrUtil;
-import org.dromara.hutool.core.util.CharsetUtil;
-import org.dromara.hutool.http.client.Request;
-import org.dromara.hutool.http.client.Response;
-import org.dromara.hutool.http.meta.Method;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.Charset;
@@ -47,28 +47,29 @@ import static cn.acecandy.fasaxi.emma.utils.CacheUtil.buildDeviceFileId115Key;
 @Slf4j
 @Component
 public final class CloudUtil {
+    final String TEMP_DIR = "0-临时";
     @Resource
     private R115Proxy r115Proxy;
-
     @Resource
     private R123Proxy r123Proxy;
-
     @Resource
     private R123ZongProxy r123ZongProxy;
-
     @Resource
     private RedisClient redisClient;
-
     @Resource
     private OpProxy opProxy;
-
     @Resource
     private OpConfig opConfig;
-
     @Resource
     private EmbyConfig embyConfig;
 
-    final String TEMP_DIR = "0-临时";
+    static void main(String[] args) {
+        String filePath = "//Users/mac/Library//CloudStorage\\OneDrive-%E4%B8%AA%E4%BA%BA%2Fworkspace%2Fgithub%2Fjava%2Ffasaxi-emma%2Fsrc%2Fmain%2Fjava%2Fcn%2Facecandy%2Ffasaxi%2Femma%2Futils%2FCloudUtil.java";
+        Console.log(filePath);
+        filePath = FileUtil.normalize(filePath);
+        Console.log(filePath);
+        Console.log(UrlPath.of(filePath, CharsetUtil.defaultCharset()).getSegments());
+    }
 
     /**
      * 获取文件
@@ -410,14 +411,5 @@ public final class CloudUtil {
                 DateUtil.formatToday(), deviceId))) {
             redisClient.set(cacheKey, 1, 60 * 60 * 24 * 2);
         }
-    }
-
-
-    public static void main(String[] args) {
-        String filePath = "//Users/mac/Library//CloudStorage\\OneDrive-%E4%B8%AA%E4%BA%BA%2Fworkspace%2Fgithub%2Fjava%2Ffasaxi-emma%2Fsrc%2Fmain%2Fjava%2Fcn%2Facecandy%2Ffasaxi%2Femma%2Futils%2FCloudUtil.java";
-        Console.log(filePath);
-        filePath = FileUtil.normalize(filePath);
-        Console.log(filePath);
-        Console.log(UrlPath.of(filePath, CharsetUtil.defaultCharset()).getSegments());
     }
 }

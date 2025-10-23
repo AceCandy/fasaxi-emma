@@ -1,7 +1,7 @@
 package cn.acecandy.fasaxi.emma.common.resp;
 
+import cn.hutool.v7.core.map.MapUtil;
 import lombok.Data;
-import org.dromara.hutool.core.map.MapUtil;
 
 import java.io.Serializable;
 import java.util.Map;

@@ -3,9 +3,9 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
+import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.text.StrUtil;
 import lombok.SneakyThrows;
-import org.dromara.hutool.core.map.MapUtil;
-import org.dromara.hutool.core.text.StrUtil;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -18,7 +18,30 @@ import java.util.concurrent.locks.ReentrantLock;
  * @author tangningzhu
  * @since 2024/10/16
  */
-public final class LockUtil extends org.dromara.hutool.core.thread.lock.LockUtil {
+public final class LockUtil extends cn.hutool.v7.core.thread.lock.LockUtil {
+    private static final String LOCK_VIDEO_KEY = "lock:video:{}";
+    private static final String LOCK_VIDEO_CACHE_KEY = "lock:video-cache:{}";
+    private static final Map<String, Lock> VIDEO_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+
+    // 视频重定向------------------------------------------------------------------------------------------
+    private static final Map<String, Lock> VIDEO_LOCK_CACHE_MAP = MapUtil.newSafeConcurrentHashMap();
+    // 原始请求------------------------------------------------------------------------------------------
+    private static final String LOCK_ORIGIN_KEY = "lock:origin:{}|{}";
+    private static final Map<String, Lock> ORIGIN_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    // 用户权限请求------------------------------------------------------------------------------------------
+    private static final String LOCK_USER_PERMS_KEY = "lock:user-perms:{}";
+    private static final Map<String, Lock> USER_PERMS_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    // 库中媒体项请求------------------------------------------------------------------------------------------
+    private static final String LOCK_ITEMS_KEY = "lock:items:{}";
+    private static final Map<String, Lock> ITEMS_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    // 设备临时文件请求------------------------------------------------------------------------------------------
+    private static final String LOCK_DEVICE_KEY = "lock:device:{}";
+    private static final Map<String, Lock> DEVICE_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    private static final String LOCK_PIC_KEY = "lock:pic:{}|{}";
+    private static final Map<String, Lock> PIC_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    private static final String LOCK_REFRESH_TMDB_KEY = "lock:refresh-tmdb:{}";
+    private static final String LOCK_REFRESH_MEDIA_KEY = "lock:refresh-media:{}";
+
     private LockUtil() {
     }
 
@@ -43,13 +66,6 @@ public final class LockUtil extends org.dromara.hutool.core.thread.lock.LockUtil
     public static boolean isLock1s(Lock lock) {
         return !lock.tryLock(1, TimeUnit.SECONDS);
     }
-
-    // 视频重定向------------------------------------------------------------------------------------------
-
-    private static final String LOCK_VIDEO_KEY = "lock:video:{}";
-    private static final String LOCK_VIDEO_CACHE_KEY = "lock:video-cache:{}";
-    private static final Map<String, Lock> VIDEO_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
-    private static final Map<String, Lock> VIDEO_LOCK_CACHE_MAP = MapUtil.newSafeConcurrentHashMap();
 
     private static String buildVideoLock(String mediaSourceId) {
         return StrUtil.format(LOCK_VIDEO_KEY, mediaSourceId);
@@ -81,10 +97,6 @@ public final class LockUtil extends org.dromara.hutool.core.thread.lock.LockUtil
         VIDEO_LOCK_CACHE_MAP.remove(buildVideoCacheLock(itemId));
     }
 
-    // 原始请求------------------------------------------------------------------------------------------
-    private static final String LOCK_ORIGIN_KEY = "lock:origin:{}|{}";
-    private static final Map<String, Lock> ORIGIN_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
-
     private static String buildOriginLock(EmbyContentCacheReqWrapper request) {
         return StrUtil.format(LOCK_ORIGIN_KEY, request.getRequestURI(), request.getCachedParam());
     }
@@ -99,10 +111,6 @@ public final class LockUtil extends org.dromara.hutool.core.thread.lock.LockUtil
         }
         ORIGIN_LOCK_MAP.remove(buildOriginLock(request));
     }
-
-    // 用户权限请求------------------------------------------------------------------------------------------
-    private static final String LOCK_USER_PERMS_KEY = "lock:user-perms:{}";
-    private static final Map<String, Lock> USER_PERMS_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
 
     private static String buildUserPermsLock(String userId) {
         return StrUtil.format(LOCK_USER_PERMS_KEY, userId);
@@ -119,9 +127,22 @@ public final class LockUtil extends org.dromara.hutool.core.thread.lock.LockUtil
         USER_PERMS_LOCK_MAP.remove(buildUserPermsLock(userId));
     }
 
-    // 设备临时文件请求------------------------------------------------------------------------------------------
-    private static final String LOCK_DEVICE_KEY = "lock:device:{}";
-    private static final Map<String, Lock> DEVICE_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    private static String buildItemsLock(String parentId) {
+        return StrUtil.format(LOCK_ITEMS_KEY, parentId);
+    }
+
+    public static Lock lockItems(String parentId) {
+        return ITEMS_LOCK_MAP.computeIfAbsent(buildItemsLock(parentId), k -> new ReentrantLock());
+    }
+
+    // 图片请求-------------------------------------------------------------------------------------------
+
+    public static void unlockItems(Lock lock, String parentId) {
+        if (null != lock) {
+            lock.unlock();
+        }
+        ITEMS_LOCK_MAP.remove(buildItemsLock(parentId));
+    }
 
     private static String buildDeviceLock(String deviceId) {
         return StrUtil.format(LOCK_DEVICE_KEY, deviceId);
@@ -138,14 +159,11 @@ public final class LockUtil extends org.dromara.hutool.core.thread.lock.LockUtil
         ORIGIN_LOCK_MAP.remove(buildDeviceLock(deviceId));
     }
 
-    // 图片请求-------------------------------------------------------------------------------------------
-
-    private static final String LOCK_PIC_KEY = "lock:pic:{}|{}";
-    private static final Map<String, Lock> PIC_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
-
     private static String buildPicLock(String mediaSourceId, EmbyPicType picType) {
         return StrUtil.format(LOCK_PIC_KEY, mediaSourceId, picType.getValue());
     }
+
+    // tmdb信息更新-------------------------------------------------------------------------------------------
 
     public static Lock lockPic(String mediaSourceId, EmbyPicType picType) {
         return ORIGIN_LOCK_MAP.computeIfAbsent(buildPicLock(mediaSourceId, picType), k -> new ReentrantLock());
@@ -157,11 +175,6 @@ public final class LockUtil extends org.dromara.hutool.core.thread.lock.LockUtil
         }
         ORIGIN_LOCK_MAP.remove(buildPicLock(mediaSourceId, picType));
     }
-
-    // tmdb信息更新-------------------------------------------------------------------------------------------
-
-    private static final String LOCK_REFRESH_TMDB_KEY = "lock:refresh-tmdb:{}";
-    private static final String LOCK_REFRESH_MEDIA_KEY = "lock:refresh-media:{}";
 
     public static String buildRefreshTmdbLock(String itemId) {
         return StrUtil.format(LOCK_REFRESH_TMDB_KEY, itemId);
