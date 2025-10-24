@@ -120,11 +120,11 @@
             <artifactId>httpclient5</artifactId>
             <version>${httpclient.version}</version>
         </dependency>
-        <dependency>
+        <!--<dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp</artifactId>
             <version>${okhttp.version}</version>
-        </dependency>
+        </dependency>-->
         <!-- https://mvnrepository.com/artifact/media.emby/embyclient -->
 
         <!-- 缓存 -->
@@ -171,11 +171,6 @@
         </dependency>
 
         <!-- MySql数据库 -->
-        <!--<dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
-            <version>3.5.12</version>
-        </dependency>-->
         <dependency>
             <groupId>com.mybatis-flex</groupId>
             <artifactId>mybatis-flex-spring-boot3-starter</artifactId>
@@ -209,7 +204,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.14.0</version>
+                <version>3.14.1</version>
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
@@ -220,7 +215,7 @@
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
-                            <version>1.18.38</version>
+                            <version>${lombok.version}</version>
                         </path>
                         <path>
                             <groupId>com.mybatis-flex</groupId>
@@ -232,6 +227,10 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- 替换为你的主类全限定名（如上面示例中的Application类） -->
+                    <mainClass>cn.acecandy.fasaxi.emma.Application</mainClass>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>
@@ -239,16 +238,6 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <configuration>
-                    <archive>
-                        <index>true</index>
-                    </archive>
-                </configuration>
             </plugin>
         </plugins>
     </build>

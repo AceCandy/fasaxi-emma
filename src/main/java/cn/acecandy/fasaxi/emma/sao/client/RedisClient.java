@@ -6,6 +6,7 @@ import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.collection.set.SetUtil;
 import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.util.ObjUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.Cursor;
@@ -40,6 +41,21 @@ public class RedisClient {
         }
     }
 
+    /**
+     * 获取剩余生存时间
+     *
+     * @param key 钥匙
+     * @return {@link Long }
+     */
+    public Long ttl(String key) {
+        try {
+            return redisTemplate.getExpire(key);
+        } catch (Exception e) {
+            log.warn("redis ttl方法异常:", e);
+            return -1L;
+        }
+    }
+
     public boolean set(String key, Object value) {
         try {
             redisTemplate.opsForValue().set(key, value);
@@ -51,6 +67,9 @@ public class RedisClient {
     }
 
     public boolean set(String key, Object value, Integer time) {
+        if (ObjUtil.isEmpty(value)) {
+            return false;
+        }
         try {
             redisTemplate.opsForValue().set(key, value, time, TimeUnit.SECONDS);
             return true;
@@ -218,11 +237,17 @@ public class RedisClient {
 
     @SuppressWarnings("unchecked")
     public <T> T getBean(String key) {
+
         Object result = redisTemplate.opsForValue().get(key);
         if (null == result) {
             return null;
         }
-        return (T) result;
+        try {
+            return (T) result;
+        } catch (Exception e) {
+            log.warn("redis getBean方法异常:", e);
+            return null;
+        }
     }
 
     public void del(String... key) {

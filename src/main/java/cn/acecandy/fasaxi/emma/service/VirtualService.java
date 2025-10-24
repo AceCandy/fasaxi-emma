@@ -1,5 +1,6 @@
 package cn.acecandy.fasaxi.emma.service;
 
+import cn.acecandy.fasaxi.emma.common.constants.CacheConstant;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.dao.toolkit.entity.CustomCollections;
@@ -7,18 +8,18 @@ import cn.acecandy.fasaxi.emma.dao.toolkit.entity.MediaMetadata;
 import cn.acecandy.fasaxi.emma.dao.toolkit.service.CustomCollectionsDao;
 import cn.acecandy.fasaxi.emma.dao.toolkit.service.MediaMetadataDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
-import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItemsInfoOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyView;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyViewOut;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
-import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.collection.set.ConcurrentHashSet;
 import cn.hutool.v7.core.date.DateUtil;
 import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
 import cn.hutool.v7.core.util.ObjUtil;
@@ -36,11 +37,13 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_308;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_401;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.DAY_7_S;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.MINUTE_30_S;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.集合文件夹;
 import static cn.acecandy.fasaxi.emma.dao.toolkit.entity.table.MediaMetadataTableDef.MEDIA_METADATA;
 
@@ -58,11 +61,19 @@ public class VirtualService {
      * 虚拟id基准
      */
     private static final int MIMICKED_ID_BASE = 900000;
+
+    /**
+     * 库详细信息请求标记
+     */
+    private final Set<String> libDetailFlag = new ConcurrentHashSet<>();
     /**
      * 支持原生emby本地排序字段
      */
     private static final List<String> NATIVE_SORT_FIELDS = ListUtil.of("PremiereDate",
             "DateCreated", "CommunityRating", "ProductionYear", "SortName", "original", "DateLastContentAdded");
+
+    @Resource
+    private Executor cacheRefreshExecutor;
     /**
      * 元数据 排序字段映射
      */
@@ -82,29 +93,6 @@ public class VirtualService {
     private EmbyConfig embyConfig;
     @Resource
     private RedisClient redisClient;
-
-    public static void main(String[] args) {
-        String s = "{\n" +
-                "      \"Guid\": \"8381d29afe8546b0b0199366d4f8855d\",\n" +
-                "      \"Etag\": \"29d428cad00374d9fedcdc3956b03d83\",\n" +
-                "      \"DateCreated\": \"2024-09-01T15:24:40.0000000Z\",\n" +
-                "      \"DateModified\": \"0001-01-01T00:00:00.0000000Z\",\n" +
-                "      \"CanDelete\": false,\n" +
-                "      \"CanDownload\": false,\n" +
-                "      \"SortName\": \"\uD83C\uDFAC 华语电影\",\n" +
-                "      \"ForcedSortName\": \"\uD83C\uDFAC 华语电影\",\n" +
-                "      \"ExternalUrls\": [],\n" +
-                "      \"Taglines\": [],\n" +
-                "      \"RemoteTrailers\": [],\n" +
-                "      \"ChildCount\": 1,\n" +
-                "      \"DisplayPreferencesId\": \"8381d29afe8546b0b0199366d4f8855d\",\n" +
-                "      \"CollectionType\": \"movies\",\n" +
-                "      \"LockedFields\": [],\n" +
-                "      \"LockData\": false\n" +
-                "    }";
-        EmbyItem embyItem = JSONUtil.toBean(s, EmbyItem.class);
-        System.out.println(JSONUtil.toJsonStr(embyItem));
-    }
 
     @SneakyThrows
     public void handleViews(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
@@ -224,10 +212,65 @@ public class VirtualService {
             return;
         }
         String parentId = request.getParentId();
-        EmbyItemsInfoOut embyItems = buildLibDetail(request.getCachedParam(), userId, parentId);
+        EmbyItemsInfoOut embyItems = buildLibDetailByCache(request.getCachedParam(), userId, parentId);
         response.setStatus(CODE_200);
         ServletUtil.write(response, JSONUtil.toJsonStr(embyItems.getItems()),
                 "application/json;charset=UTF-8");
+    }
+
+    /**
+     * 通过缓存构建库详情
+     *
+     * @param cachedParam 缓存参数
+     * @param userId      用户ID
+     * @param parentId    父ID
+     * @return {@link EmbyItemsInfoOut }
+     */
+    private EmbyItemsInfoOut buildLibDetailByCache(Map<String, Object> cachedParam,
+                                                   String userId, String parentId) {
+        String cacheKey = CacheUtil.buildOriginLatestCacheKey(userId, parentId);
+        EmbyItemsInfoOut embyItems = redisClient.getBean(cacheKey);
+
+        if (embyItems != null) {
+            // 异步刷新检查（防止重复刷新）
+            if (!libDetailFlag.contains(cacheKey)) {
+                Long ttl = redisClient.ttl(cacheKey);
+                if (ttl != null && ttl > 0 && CacheConstant.DAY_30_S - ttl > 60) {
+                    // 标记正在刷新，防止重复刷新
+                    if (CollUtil.addIfAbsent(libDetailFlag, cacheKey)) {
+                        refreshCacheAsync(cachedParam, userId, parentId);
+                    }
+                }
+            }
+            return embyItems;
+        }
+
+        // 缓存不存在，同步构建
+        embyItems = buildLibDetail(cachedParam, userId, parentId);
+        redisClient.set(cacheKey, embyItems, CacheConstant.DAY_30_S);
+        return embyItems;
+    }
+
+    /**
+     * 刷新缓存异步
+     *
+     * @param cachedParam 缓存参数
+     * @param userId      用户ID
+     * @param parentId    父ID
+     */
+    private void refreshCacheAsync(Map<String, Object> cachedParam, String userId, String parentId) {
+        CompletableFuture.runAsync(() -> {
+            String cacheKey = CacheUtil.buildOriginLatestCacheKey(userId, parentId);
+            try {
+                EmbyItemsInfoOut freshData = buildLibDetail(cachedParam, userId, parentId);
+                redisClient.set(cacheKey, freshData, CacheConstant.DAY_30_S);
+            } catch (Exception e) {
+                log.warn("异步刷新缓存失败: {}", cacheKey, e);
+            } finally {
+                // 移除刷新标记
+                libDetailFlag.remove(cacheKey);
+            }
+        }, cacheRefreshExecutor);
     }
 
     private EmbyItemsInfoOut buildLibDetail(Map<String, Object> cachedParam,
@@ -303,42 +346,6 @@ public class VirtualService {
         return allItemsId;
     }
 
-    /**
-     * 通过缓存获取用户拥有权限的id
-     * <p>
-     * 弃用 使用getAllItemsIdByCache获取所有的id之后 最后再通过用户接口进行输出可直接过滤掉没有权限的id
-     *
-     * @param userId 用户ID
-     * @return {@link List }<{@link String }>
-     */
-    @Deprecated
-    private List<String> getUserAccessIdsByCache(String userId) {
-        String cacheKey = CacheUtil.buildUserPermsCacheKey(userId);
-        String result = redisClient.getStr(cacheKey);
-        if (StrUtil.isNotBlank(result)) {
-            List<String> resultList = SplitUtil.splitTrim(result, "||");
-            try {
-                return SplitUtil.splitTrim(CollUtil.getLast(resultList), ",");
-            } finally {
-                if (DateUtil.currentSeconds() - MINUTE_30_S > Long.parseLong(CollUtil.getFirst(resultList))) {
-                    ThreadUtil.execute(() -> {
-                        List<String> itemIds = embyProxy.getUserPermsEmbyIdOnLock(userId);
-                        if (CollUtil.isNotEmpty(itemIds)) {
-                            redisClient.set(cacheKey, StrUtil.format("{}||{}",
-                                    DateUtil.currentSeconds(), StrUtil.join(",", itemIds)), DAY_7_S);
-                        }
-                    });
-                }
-            }
-        }
-        List<String> itemIds = embyProxy.getUserPermsEmbyIdOnLock(userId);
-        if (CollUtil.isNotEmpty(itemIds)) {
-            redisClient.set(cacheKey, StrUtil.format("{}||{}",
-                    DateUtil.currentSeconds(), StrUtil.join(",", itemIds)), DAY_7_S);
-        }
-        return itemIds;
-    }
-
     @SneakyThrows
     public void handleItems(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
         String userId = ReUtil.getUserByItemsUrl(request.getRequestURI());
@@ -347,10 +354,29 @@ public class VirtualService {
             return;
         }
         String parentId = request.getParentId();
-        EmbyItemsInfoOut embyItems = buildLibDetail(request.getCachedParam(), userId, parentId);
+        EmbyItemsInfoOut embyItems = buildLibDetailByCache(request.getCachedParam(), userId, parentId);
         response.setStatus(CODE_200);
         ServletUtil.write(response, JSONUtil.toJsonStr(embyItems),
                 "application/json;charset=UTF-8");
+    }
+
+    @SneakyThrows
+    public void handleImage(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
+        String tag = MapUtil.getStr(request.getCachedParam(), "tag");
+        if (StrUtil.isBlank(tag)) {
+            response.setStatus(CODE_401);
+            return;
+        }
+        String realEmbyCollectionId = CollUtil.getFirst(SplitUtil.splitTrim(tag, "?"));
+        return308(response, StrUtil.format("{}/Items/{}/Images/Primary?maxWidth={}&quality=90",
+                embyConfig.getOuterHost(), realEmbyCollectionId,
+                MapUtil.getInt(request.getCachedParam(), "maxWidth")));
+    }
+
+    public void return308(HttpServletResponse response, String url) {
+        response.setStatus(CODE_308);
+        response.setHeader("Location", url);
+        response.setHeader("Referer", UrlUtil.url(url).getHost());
     }
 
     /**

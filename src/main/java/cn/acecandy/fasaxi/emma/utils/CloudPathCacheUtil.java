@@ -2,11 +2,13 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.sao.dto.Rile;
+import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.text.StrUtil;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 云盘 路径缓存工具类
@@ -15,7 +17,7 @@ import java.util.Map;
  * @since 2025/8/19
  */
 public final class CloudPathCacheUtil {
-    private static final Map<String, Rile> CLOUD_CACHE = MapUtil.newSafeConcurrentHashMap();
+    private static final Map<String, Rile> CLOUD_CACHE = new ConcurrentHashMap<>();
     /**
      * 缓存key格式
      */
@@ -72,5 +74,12 @@ public final class CloudPathCacheUtil {
                         StrUtil.startWith(buildCacheKey(cloudStorage, path), entry.getKey()))
                 .findFirst()
                 .orElse(null);
+    }
+
+    static void main() {
+        CLOUD_CACHE.put("/", new Rile());
+        CLOUD_CACHE.put("/1", new Rile());
+        CLOUD_CACHE.put("/2", new Rile());
+        Console.log(CLOUD_CACHE);
     }
 }

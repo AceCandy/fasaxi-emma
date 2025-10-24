@@ -7,6 +7,7 @@ package cn.acecandy.fasaxi.emma.common.constants;
 public interface CacheConstant {
     // 时间
     Long DAY_7_MS = 7 * 24 * 60 * 60 * 1000L;
+    Integer DAY_30_S = 30 * 24 * 60 * 60;
     Integer DAY_7_S = 7 * 24 * 60 * 60;
     Integer DAY_1_S = 24 * 60 * 60;
     Integer MINUTE_30_S = 30 * 60;

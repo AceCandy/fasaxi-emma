@@ -12,24 +12,19 @@ import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
-import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.math.NumberUtil;
 import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
-import cn.hutool.v7.http.client.Request;
-import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.client.engine.ClientEngine;
 import jakarta.annotation.Resource;
-import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
 import java.util.concurrent.locks.Lock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
@@ -53,6 +48,9 @@ public class PicRedirectService {
 
     @Resource
     private OriginReqService originReqService;
+
+    @Resource
+    private VirtualService virtualService;
 
     @Resource
     private EmbyProxy embyProxy;
@@ -92,17 +90,7 @@ public class PicRedirectService {
             return;
         }
         if (Integer.parseInt(itemId) < 0) {
-            try (Response res = httpClient.send(Request.of(
-                    embyConfig.getEmbyToolkitHost() + request.getParamUri()))) {
-                response.setStatus(res.getStatus());
-                try (ServletOutputStream outputStream = response.getOutputStream()) {
-                    outputStream.write(res.bodyBytes());
-                } catch (IOException e) {
-                    if (!ExceptUtil.isConnectionTerminated(e)) {
-                        throw e;
-                    }
-                }
-            }
+            virtualService.handleImage(request, response);
             return;
         }
 
@@ -197,7 +185,7 @@ public class PicRedirectService {
         asyncWriteItemPic(NumberUtil.parseInt(itemId), uri, picType);
     }
 
-    private void return308(HttpServletResponse response, String url) {
+    public void return308(HttpServletResponse response, String url) {
         response.setStatus(CODE_308);
         response.setHeader("Location", url);
         response.setHeader("Referer", UrlUtil.url(url).getHost());

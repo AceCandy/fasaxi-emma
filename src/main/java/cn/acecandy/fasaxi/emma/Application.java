@@ -32,7 +32,7 @@ import java.net.InetAddress;
 public class Application {
 
     @SneakyThrows
-    public static void main(String[] args) {
+    static void main(String[] args) {
         // 显式创建 SpringApplication 实例
         SpringApplication app = new SpringApplication(Application.class);
         app.setBannerMode(Banner.Mode.OFF);

@@ -9,7 +9,6 @@ import cn.hutool.v7.core.io.file.FileUtil;
 import cn.hutool.v7.core.io.file.PathUtil;
 import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.lang.tuple.Pair;
-import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.crypto.SecureUtil;
 import cn.hutool.v7.http.client.Request;
@@ -36,7 +35,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_206;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_500;
@@ -56,7 +54,6 @@ import static java.nio.file.StandardOpenOption.WRITE;
 @Component
 public class FileCacheUtil {
 
-    private static final Map<String, ReentrantLock> FILE_CACHE_LOCK = MapUtil.newSafeConcurrentHashMap();
     @Resource
     private ClientEngine httpClient;
     @Resource

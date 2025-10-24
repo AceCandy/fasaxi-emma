@@ -3,11 +3,11 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
-import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import lombok.SneakyThrows;
 
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -21,24 +21,31 @@ import java.util.concurrent.locks.ReentrantLock;
 public final class LockUtil extends cn.hutool.v7.core.thread.lock.LockUtil {
     private static final String LOCK_VIDEO_KEY = "lock:video:{}";
     private static final String LOCK_VIDEO_CACHE_KEY = "lock:video-cache:{}";
-    private static final Map<String, Lock> VIDEO_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    // private static final Map<String, Lock> VIDEO_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    private static final Map<String, Lock> VIDEO_LOCK_MAP = new ConcurrentHashMap<>();
 
     // 视频重定向------------------------------------------------------------------------------------------
-    private static final Map<String, Lock> VIDEO_LOCK_CACHE_MAP = MapUtil.newSafeConcurrentHashMap();
+    private static final Map<String, Lock> VIDEO_LOCK_CACHE_MAP =
+            new ConcurrentHashMap<>();
     // 原始请求------------------------------------------------------------------------------------------
     private static final String LOCK_ORIGIN_KEY = "lock:origin:{}|{}";
-    private static final Map<String, Lock> ORIGIN_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    private static final Map<String, Lock> ORIGIN_LOCK_MAP =
+            new ConcurrentHashMap<>();
     // 用户权限请求------------------------------------------------------------------------------------------
     private static final String LOCK_USER_PERMS_KEY = "lock:user-perms:{}";
-    private static final Map<String, Lock> USER_PERMS_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    private static final Map<String, Lock> USER_PERMS_LOCK_MAP =
+            new ConcurrentHashMap<>();
     // 库中媒体项请求------------------------------------------------------------------------------------------
     private static final String LOCK_ITEMS_KEY = "lock:items:{}";
-    private static final Map<String, Lock> ITEMS_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    private static final Map<String, Lock> ITEMS_LOCK_MAP =
+            new ConcurrentHashMap<>();
     // 设备临时文件请求------------------------------------------------------------------------------------------
     private static final String LOCK_DEVICE_KEY = "lock:device:{}";
-    private static final Map<String, Lock> DEVICE_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    private static final Map<String, Lock> DEVICE_LOCK_MAP =
+            new ConcurrentHashMap<>();
     private static final String LOCK_PIC_KEY = "lock:pic:{}|{}";
-    private static final Map<String, Lock> PIC_LOCK_MAP = MapUtil.newSafeConcurrentHashMap();
+    private static final Map<String, Lock> PIC_LOCK_MAP =
+            new ConcurrentHashMap<>();
     private static final String LOCK_REFRESH_TMDB_KEY = "lock:refresh-tmdb:{}";
     private static final String LOCK_REFRESH_MEDIA_KEY = "lock:refresh-media:{}";
 
@@ -46,7 +53,7 @@ public final class LockUtil extends cn.hutool.v7.core.thread.lock.LockUtil {
     }
 
     /**
-     * 是否锁定 等待3秒
+     * 是否锁定
      *
      * @param lock 锁
      * @return boolean
