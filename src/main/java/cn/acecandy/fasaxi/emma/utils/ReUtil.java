@@ -51,6 +51,8 @@ public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
             "(/emby)?/users/([a-z0-9]+)/items/resume$", Pattern.DOTALL);
     private static final Pattern REGEX_ITEMS = PatternPool.get(
             "(/emby)?/users/([a-z0-9]+)/items$", Pattern.DOTALL);
+    private static final Pattern REGEX_COMMON_USER = PatternPool.get(
+            "(/emby)?/users/([a-z0-9]+)/items", Pattern.DOTALL);
     private static final Pattern REGEX_PLAYLIST = PatternPool.get(
             "(/emby)?/playlist/(\\d+)/items$", Pattern.DOTALL);
     private static final Pattern REGEX_PLAYBACK = PatternPool.get(
@@ -145,6 +147,14 @@ public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
 
     public static String isResumeUrl(String url) {
         List<String> groups = getAllGroups(REGEX_RESUME, url.toLowerCase());
+        if (groups == null || groups.size() < 3) {
+            return null;
+        }
+        return CollUtil.get(groups, 2);
+    }
+
+    public static String isCommonUserUrl(String url) {
+        List<String> groups = getAllGroups(REGEX_COMMON_USER, url.toLowerCase());
         if (groups == null || groups.size() < 3) {
             return null;
         }

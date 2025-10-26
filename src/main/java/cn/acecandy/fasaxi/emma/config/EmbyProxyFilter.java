@@ -9,6 +9,7 @@ import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.hutool.v7.core.date.DateUtil;
+import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.http.server.servlet.ServletUtil;
 import jakarta.annotation.Resource;
@@ -117,13 +118,17 @@ public class EmbyProxyFilter implements Filter {
                         videoRedirectService.processVideo(reqWrapper, res);
                     } else if (StrUtil.endWithIgnoreCase(reqWrapper.getRequestURI(), "/Views")) {
                         virtualService.handleViews(reqWrapper, res);
+                    } else if (StrUtil.endWithAnyIgnoreCase(reqWrapper.getRequestURI(), "/Shows/NextUp")) {
+                        virtualService.handleShowNext(reqWrapper, res);
+                    } else if (StrUtil.endWithAnyIgnoreCase(reqWrapper.getRequestURI(), "/Items/Resume")) {
+                        virtualService.handleUserResume(reqWrapper, res);
+                    } else if (StrUtil.endWithIgnoreCase(reqWrapper.getRequestURI(), "/Items/Latest")) {
+                        virtualService.handleLatest(reqWrapper, res);
                     } else if (StrUtil.startWith(reqWrapper.getParentId(), "-")) {
-                        if (StrUtil.endWithIgnoreCase(reqWrapper.getRequestURI(), "/Items/Latest")) {
-                            virtualService.handleLatest(reqWrapper, res);
-                        } else if (StrUtil.endWithIgnoreCase(reqWrapper.getRequestURI(), "/Items/Resume")) {
-                            virtualService.handleResume(reqWrapper, res);
-                        } else if (ReUtil.isItemsUrl(reqWrapper.getRequestURI())) {
+                        if (ReUtil.isItemsUrl(reqWrapper.getRequestURI())) {
                             virtualService.handleItems(reqWrapper, res);
+                        } else {
+                            virtualService.handleOtherEndpoint(reqWrapper, res);
                         }
                     } else {
                         originReqService.forwardOriReq(reqWrapper, res);

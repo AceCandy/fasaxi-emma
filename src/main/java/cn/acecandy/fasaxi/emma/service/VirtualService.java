@@ -1,6 +1,7 @@
 package cn.acecandy.fasaxi.emma.service;
 
 import cn.acecandy.fasaxi.emma.common.constants.CacheConstant;
+import cn.acecandy.fasaxi.emma.common.resp.EmbyItemsResp;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.dao.toolkit.entity.CustomCollections;
@@ -8,6 +9,7 @@ import cn.acecandy.fasaxi.emma.dao.toolkit.entity.MediaMetadata;
 import cn.acecandy.fasaxi.emma.dao.toolkit.service.CustomCollectionsDao;
 import cn.acecandy.fasaxi.emma.dao.toolkit.service.MediaMetadataDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
+import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItemsInfoOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyView;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyViewOut;
@@ -24,6 +26,11 @@ import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
 import cn.hutool.v7.core.util.ObjUtil;
 import cn.hutool.v7.crypto.SecureUtil;
+import cn.hutool.v7.http.HttpUtil;
+import cn.hutool.v7.http.client.Request;
+import cn.hutool.v7.http.client.Response;
+import cn.hutool.v7.http.client.engine.ClientEngine;
+import cn.hutool.v7.http.meta.Method;
 import cn.hutool.v7.http.server.servlet.ServletUtil;
 import cn.hutool.v7.json.JSONArray;
 import cn.hutool.v7.json.JSONObject;
@@ -35,6 +42,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -72,6 +80,18 @@ public class VirtualService {
     private static final List<String> NATIVE_SORT_FIELDS = ListUtil.of("PremiereDate",
             "DateCreated", "CommunityRating", "ProductionYear", "SortName", "original", "DateLastContentAdded");
 
+    /**
+     * 元数据端点
+     */
+    private static final List<String> METADATA_ENDPOINTS = ListUtil.of(
+            "/Items/Prefixes", // A-Z 首字母索引
+            "/Genres",      // 类型筛选
+            "/Studios",     // 工作室筛选
+            "/Tags",         // 标签筛选
+            "/OfficialRatings",// 官方评级筛选
+            "/Years"          // 年份筛选
+    );
+
     @Resource
     private Executor cacheRefreshExecutor;
     /**
@@ -94,6 +114,9 @@ public class VirtualService {
     @Resource
     private RedisClient redisClient;
 
+    @Resource
+    private ClientEngine httpClient;
+
     @SneakyThrows
     public void handleViews(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
         String userId = ReUtil.isViewUrl(request.getRequestURI());
@@ -113,6 +136,93 @@ public class VirtualService {
         response.setStatus(CODE_200);
         ServletUtil.write(response, JSONUtil.toJsonStr(finalLibs),
                 "application/json;charset=UTF-8");
+    }
+
+    @SneakyThrows
+    public void handleShowNext(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
+        String userId = request.getUserId();
+        if (StrUtil.isBlank(userId)) {
+            response.setStatus(CODE_401);
+            return;
+        }
+        String cacheKey = CacheUtil.buildOriginShowNextCacheKey(userId);
+        EmbyItemsInfoOut embyItems = redisClient.getBean(cacheKey);
+
+        if (embyItems != null) {
+            // 异步刷新检查（防止重复刷新）
+            if (!libDetailFlag.contains(cacheKey)) {
+                Long ttl = redisClient.ttl(cacheKey);
+                if (ttl != null && ttl > 0 && CacheConstant.DAY_30_S - ttl > 60) {
+                    // 标记正在刷新，防止重复刷新
+                    if (CollUtil.addIfAbsent(libDetailFlag, cacheKey)) {
+                        refreshShowCacheAsync(request, userId);
+                    }
+                }
+            }
+            response.setStatus(200);
+            ServletUtil.write(response, JSONUtil.toJsonStr(embyItems),
+                    "application/json;charset=UTF-8");
+            return;
+        }
+
+        // 缓存不存在，同步构建
+        embyItems = JSONUtil.toBean(buildShowNext(request.getRequestURI(), request.getCachedParam(),
+                embyConfig.getApiKey()), EmbyItemsInfoOut.class);
+        redisClient.set(cacheKey, embyItems, CacheConstant.DAY_30_S);
+        response.setStatus(200);
+        ServletUtil.write(response, JSONUtil.toJsonStr(embyItems),
+                "application/json;charset=UTF-8");
+    }
+
+    @SneakyThrows
+    private String buildShowNext(String uri, Map<String, Object> cachedParam, String apiKey) {
+        String url = embyConfig.getHost() + HttpUtil.urlWithFormUrlEncoded(uri,
+                cachedParam, Charset.defaultCharset()) + "&api_key=" + apiKey;
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET))) {
+            if (CODE_200.equals(res.getStatus())) {
+                return res.bodyStr();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 刷新缓存异步
+     *
+     * @param cachedParam 缓存参数
+     * @param userId      用户ID
+     */
+    private void refreshShowCacheAsync(EmbyContentCacheReqWrapper request, String userId) {
+        CompletableFuture.runAsync(() -> {
+            String cacheKey = CacheUtil.buildOriginShowNextCacheKey(userId);
+            try {
+                EmbyItemsInfoOut freshData = JSONUtil.toBean(buildShowNext(request.getRequestURI(),
+                        request.getCachedParam(), embyConfig.getApiKey()), EmbyItemsInfoOut.class);
+                redisClient.set(cacheKey, freshData, CacheConstant.DAY_30_S);
+            } catch (Exception e) {
+                log.warn("异步刷新缓存失败: {}", cacheKey, e);
+            } finally {
+                // 移除刷新标记
+                libDetailFlag.remove(cacheKey);
+            }
+        }, cacheRefreshExecutor);
+    }
+
+    @SneakyThrows
+    public void handleUserResume(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
+        String userId = ReUtil.isResumeUrl(request.getRequestURI());
+        if (StrUtil.isBlank(userId)) {
+            response.setStatus(CODE_401);
+            return;
+        }
+        if (StrUtil.startWith(request.getParentId(), "-")) {
+            EmbyItemsInfoOut embyItems = EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
+            response.setStatus(CODE_200);
+            ServletUtil.write(response, JSONUtil.toJsonStr(embyItems),
+                    "application/json;charset=UTF-8");
+            return;
+        }
+        handleShowNext(request, response);
     }
 
     /**
@@ -192,27 +302,13 @@ public class VirtualService {
     }
 
     @SneakyThrows
-    public void handleResume(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
-        String userId = ReUtil.isResumeUrl(request.getRequestURI());
-        if (StrUtil.isBlank(userId)) {
-            response.setStatus(CODE_401);
-            return;
-        }
-        EmbyItemsInfoOut embyItems = EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
-        response.setStatus(CODE_200);
-        ServletUtil.write(response, JSONUtil.toJsonStr(embyItems),
-                "application/json;charset=UTF-8");
-    }
-
-    @SneakyThrows
     public void handleLatest(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
         String userId = ReUtil.isLatestUrl(request.getRequestURI());
         if (StrUtil.isBlank(userId)) {
             response.setStatus(CODE_401);
             return;
         }
-        String parentId = request.getParentId();
-        EmbyItemsInfoOut embyItems = buildLibDetailByCache(request.getCachedParam(), userId, parentId);
+        EmbyItemsInfoOut embyItems = buildLibDetailByCache(request);
         response.setStatus(CODE_200);
         ServletUtil.write(response, JSONUtil.toJsonStr(embyItems.getItems()),
                 "application/json;charset=UTF-8");
@@ -221,13 +317,11 @@ public class VirtualService {
     /**
      * 通过缓存构建库详情
      *
-     * @param cachedParam 缓存参数
-     * @param userId      用户ID
-     * @param parentId    父ID
      * @return {@link EmbyItemsInfoOut }
      */
-    private EmbyItemsInfoOut buildLibDetailByCache(Map<String, Object> cachedParam,
-                                                   String userId, String parentId) {
+    private EmbyItemsInfoOut buildLibDetailByCache(EmbyContentCacheReqWrapper request) {
+        String userId = request.getUserId();
+        String parentId = request.getParentId();
         String cacheKey = CacheUtil.buildOriginLatestCacheKey(userId, parentId);
         EmbyItemsInfoOut embyItems = redisClient.getBean(cacheKey);
 
@@ -238,7 +332,7 @@ public class VirtualService {
                 if (ttl != null && ttl > 0 && CacheConstant.DAY_30_S - ttl > 60) {
                     // 标记正在刷新，防止重复刷新
                     if (CollUtil.addIfAbsent(libDetailFlag, cacheKey)) {
-                        refreshCacheAsync(cachedParam, userId, parentId);
+                        refreshLatestCacheAsync(request);
                     }
                 }
             }
@@ -246,7 +340,7 @@ public class VirtualService {
         }
 
         // 缓存不存在，同步构建
-        embyItems = buildLibDetail(cachedParam, userId, parentId);
+        embyItems = buildLibDetail(request);
         redisClient.set(cacheKey, embyItems, CacheConstant.DAY_30_S);
         return embyItems;
     }
@@ -254,15 +348,14 @@ public class VirtualService {
     /**
      * 刷新缓存异步
      *
-     * @param cachedParam 缓存参数
-     * @param userId      用户ID
-     * @param parentId    父ID
      */
-    private void refreshCacheAsync(Map<String, Object> cachedParam, String userId, String parentId) {
+    private void refreshLatestCacheAsync(EmbyContentCacheReqWrapper request) {
         CompletableFuture.runAsync(() -> {
+            String userId = request.getUserId();
+            String parentId = request.getParentId();
             String cacheKey = CacheUtil.buildOriginLatestCacheKey(userId, parentId);
             try {
-                EmbyItemsInfoOut freshData = buildLibDetail(cachedParam, userId, parentId);
+                EmbyItemsInfoOut freshData = buildLibDetail(request);
                 redisClient.set(cacheKey, freshData, CacheConstant.DAY_30_S);
             } catch (Exception e) {
                 log.warn("异步刷新缓存失败: {}", cacheKey, e);
@@ -273,8 +366,16 @@ public class VirtualService {
         }, cacheRefreshExecutor);
     }
 
-    private EmbyItemsInfoOut buildLibDetail(Map<String, Object> cachedParam,
-                                            String userId, String parentId) {
+    private EmbyItemsInfoOut buildLibDetail(EmbyContentCacheReqWrapper request) {
+        Map<String, Object> cachedParam = request.getCachedParam();
+        String userId = request.getUserId();
+        String parentId = request.getParentId();
+
+        if (!StrUtil.startWith(parentId, "-")) {
+            List<EmbyItem> items = JSONUtil.toList(buildShowNext(request.getRequestURI(),
+                    cachedParam, embyConfig.getApiKey()), EmbyItem.class);
+            return EmbyItemsInfoOut.builder().items(items).totalRecordCount(items.size()).build();
+        }
         Long realId = fromMimickedId(parentId);
         CustomCollections coll = customCollectionsDao.getById(realId);
         if (coll == null) {
@@ -353,8 +454,7 @@ public class VirtualService {
             response.setStatus(CODE_401);
             return;
         }
-        String parentId = request.getParentId();
-        EmbyItemsInfoOut embyItems = buildLibDetailByCache(request.getCachedParam(), userId, parentId);
+        EmbyItemsInfoOut embyItems = buildLibDetailByCache(request);
         response.setStatus(CODE_200);
         ServletUtil.write(response, JSONUtil.toJsonStr(embyItems),
                 "application/json;charset=UTF-8");
@@ -371,6 +471,30 @@ public class VirtualService {
         return308(response, StrUtil.format("{}/Items/{}/Images/Primary?maxWidth={}&quality=90",
                 embyConfig.getOuterHost(), realEmbyCollectionId,
                 MapUtil.getInt(request.getCachedParam(), "maxWidth")));
+    }
+
+    @SneakyThrows
+    public void handleOtherEndpoint(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
+        String uri = request.getRequestURI();
+        if (!StrUtil.endWithAny(uri, METADATA_ENDPOINTS.toArray(new String[0]))) {
+            response.setStatus(CODE_401);
+            return;
+        }
+        String parentId = request.getParentId();
+        Long realId = fromMimickedId(parentId);
+        CustomCollections customCollections = customCollectionsDao.getById(realId);
+        if (null == customCollections) {
+            response.setStatus(CODE_401);
+            return;
+        }
+        String realEmbyCollectionId = customCollections.getEmbyCollectionId();
+        String url = embyConfig.getHost() + StrUtil.replace(request.getParamUri(), parentId, realEmbyCollectionId);
+        Request originalRequest = Request.of(url).method(Method.valueOf(request.getMethod()));
+        try (Response res = httpClient.send(originalRequest)) {
+            response.setStatus(res.getStatus());
+            ServletUtil.write(response, res.bodyStream(),
+                    "application/json;charset=UTF-8");
+        }
     }
 
     public void return308(HttpServletResponse response, String url) {

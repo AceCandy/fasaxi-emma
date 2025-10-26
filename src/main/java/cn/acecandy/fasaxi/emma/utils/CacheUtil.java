@@ -45,6 +45,7 @@ public final class CacheUtil extends cn.hutool.v7.core.cache.CacheUtil {
     private static final String ITEMS_ID_CACHE_KEY = "cache:items-id:{}";
     private static final String ORIGIN_CACHE_KEY = "cache:req:{}|{}";
     private static final String ORIGIN_LATEST_CACHE_KEY = "cache:req-latest:{}|{}";
+    private static final String ORIGIN_SHOWNEXT_CACHE_KEY = "cache:req-showNext:{}";
     private static final String THIRD_CACHE_KEY = "cache:third:{}|{}";
     private static final String ORIGIN_CACHE_REFRESH_KEY1 = "cache:req:/emby/Users/{}/Items";
     private static final String ORIGIN_CACHE_REFRESH_KEY2 = "cache:req:/emby/Shows/{}";
@@ -113,6 +114,10 @@ public final class CacheUtil extends cn.hutool.v7.core.cache.CacheUtil {
 
     public static String buildOriginLatestCacheKey(String userId, String parentId) {
         return StrUtil.format(ORIGIN_LATEST_CACHE_KEY, userId, parentId);
+    }
+
+    public static String buildOriginShowNextCacheKey(String userId) {
+        return StrUtil.format(ORIGIN_SHOWNEXT_CACHE_KEY, userId);
     }
 
     public static List<String> buildOriginRefreshCacheKey(EmbyContentCacheReqWrapper req) {
