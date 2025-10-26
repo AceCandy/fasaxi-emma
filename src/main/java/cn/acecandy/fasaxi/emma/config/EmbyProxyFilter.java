@@ -39,6 +39,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_416;
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_500;
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_504;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.非图片;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getPicType;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.needClose;
@@ -138,12 +140,14 @@ public class EmbyProxyFilter implements Filter {
         } catch (Exception e) {
             log.warn("转发请求失败[{}]: {}?{},e:{}", req.getMethod(),
                     reqWrapper.getRequestURI(), reqWrapper.getQueryString(), ExceptUtil.getSimpleMessage(e));
-            if (ServletUtil.isGetMethod(req)) {
+            res.setStatus(CODE_504);
+            return;
+            /*if (ServletUtil.isGetMethod(req)) {
                 res.setStatus(HttpServletResponse.SC_FOUND);
                 String url302 = embyConfig.getOuterHost() + reqWrapper.getParamUri();
                 res.setHeader("Location", url302);
                 log.info("302原始转发->[{}]", url302);
-            }
+            }*/
             // originReqService.forwardOriReq(reqWrapper, res);
         } finally {
             accessLog.log(reqWrapper.getMethod(), reqWrapper.getRequestURI(), reqWrapper.getIp(),

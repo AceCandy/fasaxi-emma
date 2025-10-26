@@ -44,7 +44,7 @@ public final class CacheUtil extends cn.hutool.v7.core.cache.CacheUtil {
     private static final String ITEMS_CACHE_KEY = "cache:items:{}";
     private static final String ITEMS_ID_CACHE_KEY = "cache:items-id:{}";
     private static final String ORIGIN_CACHE_KEY = "cache:req:{}|{}";
-    private static final String ORIGIN_LATEST_CACHE_KEY = "cache:req-latest:{}|{}";
+    private static final String ORIGIN_LATEST_CACHE_KEY = "cache:req-latest:{}|{}-{}:{}";
     private static final String ORIGIN_SHOWNEXT_CACHE_KEY = "cache:req-showNext:{}";
     private static final String THIRD_CACHE_KEY = "cache:third:{}|{}";
     private static final String ORIGIN_CACHE_REFRESH_KEY1 = "cache:req:/emby/Users/{}/Items";
@@ -53,6 +53,7 @@ public final class CacheUtil extends cn.hutool.v7.core.cache.CacheUtil {
     private static final String ORIGIN_CACHE_REFRESH_KEY1_ALL = "cache:req:/emby/Users/";
     private static final String ORIGIN_CACHE_REFRESH_KEY2_ALL = "cache:req:/Users/";
     private static final String DEVICE_CACHE_FILEID115_KEY = "cache:device-115:{}";
+
     private CacheUtil() {
     }
 
@@ -112,8 +113,10 @@ public final class CacheUtil extends cn.hutool.v7.core.cache.CacheUtil {
                 DigestUtil.md5Hex16(JSONUtil.toJsonStr(req.getCachedParam())));
     }
 
-    public static String buildOriginLatestCacheKey(String userId, String parentId) {
-        return StrUtil.format(ORIGIN_LATEST_CACHE_KEY, userId, parentId);
+    public static String buildOriginLatestCacheKey(EmbyContentCacheReqWrapper request) {
+        return StrUtil.format(ORIGIN_LATEST_CACHE_KEY, request.getUserId(), request.getParentId(),
+                request.getCachedParam().get("StartIndex"),
+                request.getCachedParam().get("Limit"));
     }
 
     public static String buildOriginShowNextCacheKey(String userId) {

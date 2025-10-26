@@ -320,9 +320,7 @@ public class VirtualService {
      * @return {@link EmbyItemsInfoOut }
      */
     private EmbyItemsInfoOut buildLibDetailByCache(EmbyContentCacheReqWrapper request) {
-        String userId = request.getUserId();
-        String parentId = request.getParentId();
-        String cacheKey = CacheUtil.buildOriginLatestCacheKey(userId, parentId);
+        String cacheKey = CacheUtil.buildOriginLatestCacheKey(request);
         EmbyItemsInfoOut embyItems = redisClient.getBean(cacheKey);
 
         if (embyItems != null) {
@@ -351,9 +349,7 @@ public class VirtualService {
      */
     private void refreshLatestCacheAsync(EmbyContentCacheReqWrapper request) {
         CompletableFuture.runAsync(() -> {
-            String userId = request.getUserId();
-            String parentId = request.getParentId();
-            String cacheKey = CacheUtil.buildOriginLatestCacheKey(userId, parentId);
+            String cacheKey = CacheUtil.buildOriginLatestCacheKey(request);
             try {
                 EmbyItemsInfoOut freshData = buildLibDetail(request);
                 redisClient.set(cacheKey, freshData, CacheConstant.DAY_30_S);
