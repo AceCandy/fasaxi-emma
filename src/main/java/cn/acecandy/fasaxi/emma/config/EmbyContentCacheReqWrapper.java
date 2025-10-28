@@ -63,9 +63,12 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     private String ip;
     @Getter
     private JSONArray toolkitView;
+    @Getter
+    private String requestURI;
 
     public EmbyContentCacheReqWrapper(HttpServletRequest request) throws IOException {
         super(request);
+        requestURI = request.getRequestURI();
         this.paramMap = ServletUtil.getParamMap(request);
 
         this.cachedBody = ServletUtil.getBody(request);
