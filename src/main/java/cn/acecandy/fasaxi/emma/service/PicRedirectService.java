@@ -131,7 +131,7 @@ public class PicRedirectService {
             String url = getCdnPicUrl(uri, doubanConfig, tmdbConfig, maxWidth);
             return308(response, url);
             log.info("{}-图片重定向(DB):[{}-{}] => {}", picType, itemId, maxWidth, url);
-            asyncWriteItemPicRedis(itemId, uri, picType);
+            redisClient.set(CacheUtil.buildPicCacheKey(itemId, picType), url, 2 * 24 * 60 * 60);
             return true;
         }
         return false;
@@ -213,19 +213,6 @@ public class PicRedirectService {
             } finally {
                 redisClient.set(CacheUtil.buildPicCacheKey(String.valueOf(itemId), picType), url, 2 * 24 * 60 * 60);
             }
-        });
-    }
-
-    /**
-     * 异步写入 实体
-     *
-     * @param itemId  项目id
-     * @param url     网址
-     * @param picType 图片类型
-     */
-    private void asyncWriteItemPicRedis(String itemId, String url, EmbyPicType picType) {
-        ThreadUtil.execVirtual(() -> {
-            redisClient.set(CacheUtil.buildPicCacheKey(itemId, picType), url, 2 * 24 * 60 * 60);
         });
     }
 }

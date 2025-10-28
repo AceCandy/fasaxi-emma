@@ -209,7 +209,7 @@ public class OriginReqService {
             httpClient5WarningCatch(request, response, e, cached);
         } finally {
             stopWatch.stop();
-            if (EmbyProxyUtil.isHttpOk(cached.getStatusCode())) {
+            if (EmbyProxyUtil.isHttpOk2(cached.getStatusCode())) {
                 log.debug("请求原始转发->[{}-{}:{}ms] {}", cached.getStatusCode(), request.getMethod(),
                         stopWatch.getLastTaskTimeMillis(),
                         StrUtil.format("{}&api_key={}", request.getParamUri(), embyConfig.getApiKey()));

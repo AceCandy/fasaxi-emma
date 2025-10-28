@@ -1,6 +1,5 @@
 package cn.acecandy.fasaxi.emma.sao.client;
 
-import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.array.ArrayUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
@@ -254,9 +253,7 @@ public class RedisClient {
         if (ArrayUtil.isEmpty(key)) {
             return;
         }
-        ThreadUtil.execVirtual(() -> {
-            redisTemplate.delete(ListUtil.of(key));
-        });
+        redisTemplate.delete(ListUtil.of(key));
     }
 
     /**
@@ -268,14 +265,12 @@ public class RedisClient {
         if (StrUtil.isBlank(prefix)) {
             return;
         }
-        ThreadUtil.execVirtual(() -> {
-            Set<String> keysToDelete = scanKeysByPrefix(prefix);
-            if (CollUtil.isEmpty(keysToDelete)) {
-                return;
-            }
-            // 统一序列化方式后删除
-            redisTemplate.unlink(keysToDelete);
-        });
+        Set<String> keysToDelete = scanKeysByPrefix(prefix);
+        if (CollUtil.isEmpty(keysToDelete)) {
+            return;
+        }
+        // 统一序列化方式后删除
+        redisTemplate.unlink(keysToDelete);
     }
 
     /**
@@ -287,17 +282,13 @@ public class RedisClient {
         if (CollUtil.isEmpty(prefixes)) {
             return;
         }
-        ThreadUtil.execVirtual(() -> {
-            Set<String> keysToDelete = SetUtil.of();
-            prefixes.forEach(prefix -> keysToDelete.addAll(scanKeysByPrefix(prefix)));
-            if (CollUtil.isEmpty(keysToDelete)) {
-                return;
-            }
-            // 统一序列化方式后删除
-            redisTemplate.unlink(keysToDelete);
-        });
-        // TODO 为了让操作同步这里先等待100毫秒，确保删除操作完成
-        ThreadUtil.safeSleep(100);
+        Set<String> keysToDelete = SetUtil.of();
+        prefixes.forEach(prefix -> keysToDelete.addAll(scanKeysByPrefix(prefix)));
+        if (CollUtil.isEmpty(keysToDelete)) {
+            return;
+        }
+        // 统一序列化方式后删除
+        redisTemplate.unlink(keysToDelete);
     }
 
     /**

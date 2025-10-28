@@ -1,9 +1,5 @@
 package cn.acecandy.fasaxi.emma.config;
 
-import io.undertow.server.DefaultByteBufferPool;
-import io.undertow.websockets.jsr.WebSocketDeploymentInfo;
-import org.springframework.boot.web.embedded.undertow.UndertowServletWebServerFactory;
-import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -48,23 +44,6 @@ public class GodConfig {
         template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
         template.afterPropertiesSet();
         return template;
-    }
-
-    @Bean
-    public WebServerFactoryCustomizer<UndertowServletWebServerFactory> undertowCustomizer() {
-        return factory ->
-                factory.addDeploymentInfoCustomizers(deploymentInfo -> {
-                    // 创建自定义缓冲区池 不使用直接内存（堆外内存）缓冲区1024kb 最大缓冲区数量100 池最大容量10m 线程局部换成32
-                    DefaultByteBufferPool bufferPool = new DefaultByteBufferPool(
-                            false, 1024, 100, 10, 32
-                    );
-                    // 获取或创建 WebSocket 部署信息
-                    WebSocketDeploymentInfo webSocketDeploymentInfo =
-                            (WebSocketDeploymentInfo) deploymentInfo.getServletContextAttributes()
-                                    .computeIfAbsent(WebSocketDeploymentInfo.ATTRIBUTE_NAME, k -> new WebSocketDeploymentInfo());
-                    // 设置缓冲区池
-                    webSocketDeploymentInfo.setBuffers(bufferPool);
-                });
     }
 
     @Bean("cacheRefreshExecutor")

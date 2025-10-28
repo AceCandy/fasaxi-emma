@@ -245,6 +245,10 @@ public final class EmbyProxyUtil {
         return statusCode >= 200 && statusCode < 300;
     }
 
+    public static boolean isHttpOk2(int statusCode) {
+        return statusCode >= 200 && statusCode < 400;
+    }
+
     /**
      * 构建香港url
      *

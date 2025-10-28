@@ -30,7 +30,7 @@ public class AccessLog {
     public void log(String method, String uri, String ip, String queryStr,
                     Map<String, String> cachedHeader,
                     String apiKey, int status, long start) {
-        ThreadUtil.execVirtual(() -> {
+        ThreadUtil.execute(() -> {
             String logMessage = StrUtil.format("[{}][{}-{}:{}ms] {}?{}&api_key={} [{}]",
                     ip, method, status, DateUtil.current() - start, uri, queryStr,
                     StrUtil.isBlank(apiKey) ? embyConfig.getApiKey() : apiKey, JSONUtil.toJsonStr(cachedHeader));
