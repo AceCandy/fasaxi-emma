@@ -13,7 +13,6 @@ import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
-import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.array.ArrayUtil;
 import cn.hutool.v7.core.date.StopWatch;
 import cn.hutool.v7.core.exception.ExceptionUtil;
@@ -87,7 +86,6 @@ public class OriginReqService {
             writeCacheResponse(response, cached);
             return;
         }
-        ThreadUtil.execVirtual(() -> cloudUtil.mkdirDeviceTmpDir(request.getDeviceId()));
 
         // 获取或创建对应的锁
         Lock lock = LockUtil.lockOrigin(request);

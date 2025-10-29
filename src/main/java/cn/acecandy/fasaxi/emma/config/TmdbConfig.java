@@ -29,6 +29,11 @@ public class TmdbConfig {
     private String detailInfoUrl;
 
     /**
+     * 搜索详情信息url
+     */
+    private String searchDetailInfoUrl;
+
+    /**
      * 图片信息url
      */
     private String imageInfoUrl;

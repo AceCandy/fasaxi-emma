@@ -1,7 +1,6 @@
 package cn.acecandy.fasaxi.emma.service;
 
 import cn.acecandy.fasaxi.emma.common.constants.CacheConstant;
-import cn.acecandy.fasaxi.emma.common.resp.EmbyItemsResp;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.dao.toolkit.entity.CustomCollections;
@@ -15,7 +14,9 @@ import cn.acecandy.fasaxi.emma.sao.out.EmbyView;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyViewOut;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
+import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
+import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.collection.set.ConcurrentHashSet;
@@ -117,6 +118,9 @@ public class VirtualService {
     @Resource
     private ClientEngine httpClient;
 
+    @Resource
+    private CloudUtil cloudUtil;
+
     @SneakyThrows
     public void handleViews(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
         String userId = ReUtil.isViewUrl(request.getRequestURI());
@@ -124,11 +128,47 @@ public class VirtualService {
             response.setStatus(CODE_401);
             return;
         }
-        List<EmbyView> fakeViewsItems = buildViews(userId);
+        String cacheKey = CacheUtil.buildOriginViewsCacheKey(userId);
+        List<EmbyView> fakeViewsItems = redisClient.getBean(cacheKey);
+        if (fakeViewsItems != null) {
+            // 异步刷新检查（防止重复刷新）
+            if (!libDetailFlag.contains(cacheKey)) {
+                Long ttl = redisClient.ttl(cacheKey);
+                if (ttl != null && ttl > 0 && CacheConstant.DAY_30_S - ttl > 60) {
+                    // 标记正在刷新，防止重复刷新
+                    if (CollUtil.addIfAbsent(libDetailFlag, cacheKey)) {
+                        CompletableFuture.runAsync(() -> {
+                            try {
+                                List<EmbyView> freshViews = buildViews(userId);
+                                if (CollUtil.isNotEmpty(freshViews)) {
+                                    redisClient.set(cacheKey, freshViews, CacheConstant.DAY_30_S);
+                                }
+                            } catch (Exception e) {
+                                log.warn("异步刷新缓存失败: {}", cacheKey, e);
+                            } finally {
+                                libDetailFlag.remove(cacheKey);
+                            }
+                        }, cacheRefreshExecutor);
+                    }
+                }
+            }
+            EmbyViewOut finalLibs = EmbyViewOut.builder()
+                    .items(fakeViewsItems)
+                    .totalRecordCount(fakeViewsItems.size())
+                    .build();
+            response.setStatus(200);
+            ServletUtil.write(response, JSONUtil.toJsonStr(finalLibs),
+                    "application/json;charset=UTF-8");
+            return;
+        }
+
+        fakeViewsItems = buildViews(userId);
         if (CollUtil.isEmpty(fakeViewsItems)) {
             response.setStatus(CODE_401);
             return;
         }
+        redisClient.set(cacheKey, fakeViewsItems, CacheConstant.DAY_30_S);
+
         EmbyViewOut finalLibs = EmbyViewOut.builder()
                 .items(fakeViewsItems)
                 .totalRecordCount(fakeViewsItems.size())
@@ -137,6 +177,7 @@ public class VirtualService {
         ServletUtil.write(response, JSONUtil.toJsonStr(finalLibs),
                 "application/json;charset=UTF-8");
     }
+
 
     @SneakyThrows
     public void handleShowNext(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
@@ -199,6 +240,8 @@ public class VirtualService {
                 EmbyItemsInfoOut freshData = JSONUtil.toBean(buildShowNext(request.getRequestURI(),
                         request.getCachedParam(), embyConfig.getApiKey()), EmbyItemsInfoOut.class);
                 redisClient.set(cacheKey, freshData, CacheConstant.DAY_30_S);
+
+                ThreadUtil.execVirtual(() -> cloudUtil.mkdirDeviceTmpDir(request.getDeviceId()));
             } catch (Exception e) {
                 log.warn("异步刷新缓存失败: {}", cacheKey, e);
             } finally {

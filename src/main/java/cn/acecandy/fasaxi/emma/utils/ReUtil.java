@@ -4,6 +4,7 @@ package cn.acecandy.fasaxi.emma.utils;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.lang.Console;
+import cn.hutool.v7.core.lang.mutable.MutablePair;
 import cn.hutool.v7.core.regex.PatternPool;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
@@ -34,6 +35,23 @@ public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
     public static final Pattern REGEX_DOUBAN_JSON_ID = PatternPool.get(
             "movie\\\\/subject\\\\/(\\d+)", Pattern.DOTALL);
     /**
+     * "爱奇艺第一季",
+     * "爱奇艺第2季",
+     * "爱奇艺 第三季",
+     * "爱奇艺 第4季",
+     * "爱奇艺5",
+     * "爱奇艺2025",
+     * "喜人奇妙夜第一季",
+     * "天地剑心第2季",
+     * "欢乐喜剧人 第10季",
+     * "脱口秀大会5",
+     * "跨年晚会2024"
+     * <p>
+     * 提取中间的名字和季号
+     */
+    public static final Pattern REGEX_TV_SEASON = PatternPool.get(
+            "(.+?)(?:\\s*第?)\\s*(\\d+)(?:季)?", Pattern.DOTALL);
+    /**
      * 匹配类似 /emby/Users/656fcefa283149708880b416786e5fde/Items/1417552/Delete
      */
     private static final Pattern REGEX_SIMILAR_ITEM = PatternPool.get(
@@ -63,6 +81,24 @@ public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
             "(/emby)?/audio/(\\d+)/(?:original\\.[^/]+|download|stream|stream.*)$", Pattern.DOTALL);
 
     private ReUtil() {
+    }
+
+    /**
+     * 解析猫眼电视剧名称季
+     *
+     * @param originName 原产地名称
+     * @return {@link MutablePair }<{@link String }, {@link String }>
+     */
+    public static MutablePair<String, String> parseMaoyanTvNameSeason(String originName) {
+        originName = StrUtil.trim(originName);
+        if (StrUtil.isBlank(originName)) {
+            return null;
+        }
+        List<String> groups = getAllGroups(REGEX_TV_SEASON, originName);
+        if (CollUtil.isEmpty(groups) || groups.size() < 3) {
+            return null;
+        }
+        return MutablePair.of(CollUtil.get(groups, 1), CollUtil.get(groups, 2));
     }
 
     public static String findDouBanIdByHtml(String html) {
@@ -192,20 +228,12 @@ public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
     }
 
     public static void main(String[] args) {
-        // String url = "/items/123123/playbackinfo".toLowerCase();
-        String url = "/emby/Users/656fcefa283149708880b416786e5fde/Views".toLowerCase();
-        Console.log(isViewUrl(url));
-        /*Console.log(url);
-        System.out.println(isSimilarItemUrl(url));
-        System.out.println(isItemUrl(url));
-        url = "/emby/Users/656fcefa283149708880b416786e5fde/Items/213123/delete".toLowerCase();
-        System.out.println(isSimilarItemUrl(url));
-        System.out.println(isItemUrl(url));
-        url = "/emby/Users/656fcefa283149708880b416786e5fde/Items".toLowerCase();
-        System.out.println(isSimilarItemUrl(url));
-        System.out.println(isItemUrl(url));
-        url = "/emby/Users/656fcefa283149708880b416786e5fde".toLowerCase();
-        System.out.println(isSimilarItemUrl(url));
-        System.out.println(isItemUrl(url));*/
+        Console.log(parseMaoyanTvNameSeason("我不是药神2023"));
+        Console.log(parseMaoyanTvNameSeason("我不是药神第六季"));
+        Console.log(parseMaoyanTvNameSeason("我不是药神3"));
+        Console.log(parseMaoyanTvNameSeason("我不是药神"));
+        Console.log(parseMaoyanTvNameSeason("我不是药神第2季"));
+        Console.log(parseMaoyanTvNameSeason("我不是药神 第一季"));
+        Console.log(parseMaoyanTvNameSeason("我不是药神 第4季"));
     }
 }

@@ -20,6 +20,7 @@ public enum EmbyMediaType {
     电视剧_季(3, "Season", "", ""),
     电视剧_集(4, "Episode", "", ""),
     音乐(10, "Audio", "", ""),
+    人员(11, "", "person", ""),
     // 书籍(11,"Audio", "",""),
     文件夹(20, "Folder", "", ""),
     集合文件夹(50, "CollectionFolder", "", ""),
