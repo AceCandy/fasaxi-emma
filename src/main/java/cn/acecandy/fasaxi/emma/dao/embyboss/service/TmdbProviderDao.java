@@ -2,6 +2,7 @@ package cn.acecandy.fasaxi.emma.dao.embyboss.service;
 
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.TmdbProvider;
 import cn.acecandy.fasaxi.emma.dao.embyboss.mapper.TmdbProviderMapper;
+import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import com.mybatisflex.annotation.UseDataSource;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -53,6 +54,24 @@ public class TmdbProviderDao extends ServiceImpl<TmdbProviderMapper, TmdbProvide
                 .where(TMDB_PROVIDER.TMDB_ID.eq(tmdbId))
                 .and(TMDB_PROVIDER.EMBY_TYPE.eq(embyType));
         return mapper.selectOneByQuery(wrapper);
+    }
+
+    /**
+     * 通过doubanId查询
+     *
+     * @param doubanId 豆瓣 id
+     * @param embyType Emby类型
+     * @return boolean
+     */
+    public List<TmdbProvider> findByDouban(List<String> doubanId, String embyType) {
+        if (CollUtil.isEmpty(doubanId) || StrUtil.isBlank(embyType)) {
+            return null;
+        }
+
+        QueryWrapper wrapper = QueryWrapper.create()
+                .where(TMDB_PROVIDER.DOUBAN_ID.in(doubanId))
+                .and(TMDB_PROVIDER.EMBY_TYPE.eq(embyType));
+        return mapper.selectListByQuery(wrapper);
     }
 
     public List<TmdbProvider> findAllImdbNoDouBan() {

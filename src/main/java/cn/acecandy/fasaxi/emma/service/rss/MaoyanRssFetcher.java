@@ -1,15 +1,19 @@
 package cn.acecandy.fasaxi.emma.service.rss;
 
+import cn.acecandy.fasaxi.emma.sao.entity.MatchedItem;
 import cn.acecandy.fasaxi.emma.sao.out.RTmdbMovie;
 import cn.acecandy.fasaxi.emma.sao.out.RTmdbTv;
 import cn.acecandy.fasaxi.emma.sao.proxy.MaoyanProxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.TmdbProxy;
+import cn.acecandy.fasaxi.emma.utils.HtmlUtil;
+import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.collection.set.SetUtil;
 import cn.hutool.v7.core.lang.mutable.MutablePair;
 import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.text.split.SplitUtil;
 import cn.hutool.v7.json.JSONArray;
 import cn.hutool.v7.json.JSONObject;
 import jakarta.annotation.Resource;
@@ -19,12 +23,15 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Pattern;
 
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电影;
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧;
 import static cn.acecandy.fasaxi.emma.sao.proxy.MaoyanProxy.PLATFORM_MAP;
 import static cn.acecandy.fasaxi.emma.sao.proxy.MaoyanProxy.TV_HEAT_MAP;
+import static cn.hutool.v7.core.text.StrPool.COMMA;
 
 /**
+ * 猫眼rss处理器
  *
  * @author tangningzhu
  * @since 2025/10/29
@@ -39,13 +46,31 @@ public class MaoyanRssFetcher {
     @Resource
     private TmdbProxy tmdbProxy;
 
+    /**
+     * 有效猫眼平台
+     */
+    private static final List<String> VALID_MAOYAN_PLATFORMS =
+            List.of("tencent", "iqiyi", "youku", "mango");
 
-    private static final Pattern SEASON_PATTERN_CN = Pattern.compile("(.*?)\\s*[（(]?\\s*(第?[一二三四五六七八九十百]+)\\s*季\\s*[)）]?");
-    private static final Pattern SEASON_PATTERN_EN = Pattern.compile("(.*?)\\s+Season\\s+(\\d+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern SEASON_PATTERN_NUM = Pattern.compile("^(.*?)\\s*(\\d+)$");
-    private static final Pattern YEAR_PATTERN = Pattern.compile("\\b(19|20)\\d{2}$");
+    /**
+     * 核心处理
+     *
+     * @param url 网址
+     * @return {@link List }<{@link MatchedItem }>
+     */
+    public List<MatchedItem> exec(String url) {
+        if (StrUtil.isBlank(url)) {
+            return ListUtil.of();
+        }
+        List<String> keys = SplitUtil.splitTrim(StrUtil.removePrefix(url, "maoyan://"), COMMA);
+        if (CollUtil.isNotEmpty(keys)) {
+            return ListUtil.of();
+        }
+        String platform = CollUtil.getLast(SplitUtil.splitTrim(CollUtil.getFirst(keys), "-"));
+        if (!VALID_MAOYAN_PLATFORMS.contains(platform)) {
+            platform = "all";
+        }
 
-    private void exec(List<String> keys, String platform, Integer limit) {
         MutablePair<Set<String>, Set<String>> topTitles =
                 getMaoyanTopTitles(keys, platform);
 
@@ -58,41 +83,7 @@ public class MaoyanRssFetcher {
         List<MatchedItem> allItems = ListUtil.of();
         allItems.addAll(matchedMovies);
         allItems.addAll(matchedSeries);
-
-        /*List<Map<String, String>> uniqueItems = allItems.stream()
-                .collect(Collectors.toMap(
-                        item -> item.get("type") + "-" + item.get("id"),
-                        item -> item,
-                        (existing, replacement) -> existing
-                ))
-                .values()
-                .stream()
-                .collect(Collectors.toList());
-
-        try (Writer writer = new FileWriter(argsParser.getOutputFile(), StandardCharsets.UTF_8)) {
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(writer, uniqueItems);
-            log.info("成功将 {} 个项目写入到缓存文件: {}", uniqueItems.size(), argsParser.getOutputFile());
-        }*/
-
-        log.info("任务执行完毕。");
-    }
-
-    /**
-     * 匹配项目
-     *
-     * @author AceCandy
-     * @since 2025/10/29
-     */
-    public record MatchedItem(Integer id, String name, String type) {
-    }
-
-    /**
-     * 季信息
-     *
-     * @author AceCandy
-     * @since 2025/10/29
-     */
-    public record SeriesInfo(String showName, Integer seasonNumber) {
+        return allItems;
     }
 
     /**
@@ -102,8 +93,8 @@ public class MaoyanRssFetcher {
      * @param platform 平台
      * @return {@link MutablePair }<{@link Set }<{@link String }>, {@link Set }<{@link String }>>
      */
-    private MutablePair<Set<String>, Set<String>> getMaoyanTopTitles(
-            List<String> keys, String platform) {
+    private MutablePair<Set<String>, Set<String>> getMaoyanTopTitles(List<String> keys,
+                                                                     String platform) {
         Set<String> moviesList = SetUtil.of();
         Set<String> tvTitles = SetUtil.of();
 
@@ -130,64 +121,32 @@ public class MaoyanRssFetcher {
         return MutablePair.of(moviesList, tvTitles);
     }
 
-    private static SeriesInfo parseSeriesTitle(String title) {
-        if (StrUtil.isBlank(title)) {
-            return new SeriesInfo(null, null);
-        }
-        String showName = title.strip();
-        Integer seasonNumber = null;
-
-        /*MutablePair<String, String> parsedResult = ReUtil.parseMaoyanTvNameSeason(showName);
-        if (matchCn.find()) {
-            showName = matchCn.group(1).strip();
-            if (seasonNumber == null) {
-                String seasonWord = matchCn.group(2);
-                seasonNumber = CHINESE_NUM_MAP.get(seasonWord);
-            }
-        }
-
-        if (seasonNumber == null) {
-            if (!YEAR_PATTERN.matcher(showName).find()) {
-                Matcher matchNum = SEASON_PATTERN_NUM.matcher(showName);
-                if (matchNum.find()) {
-                    String potentialName = matchNum.group(1).strip();
-                    if (!potentialName.isEmpty()) {
-                        showName = potentialName;
-                        try {
-                            seasonNumber = Integer.parseInt(matchNum.group(2));
-                        } catch (NumberFormatException e) {
-                            log.debug("解析数字季号失败", e);
-                        }
-                    }
-                }
-            }
-        }*/
-
-        return new SeriesInfo(showName, seasonNumber);
-    }
-
-    private List<MatchedItem> matchTitlesToTmdb(
-            Set<String> titles, String itemType) {
-
+    /**
+     * 将标题与tmdb匹配
+     *
+     * @param titles   标题
+     * @param itemType 项目类型
+     * @return {@link List }<{@link MatchedItem }>
+     */
+    private List<MatchedItem> matchTitlesToTmdb(Set<String> titles, String itemType) {
         List<MatchedItem> matchedItems = new ArrayList<>();
 
         for (String title : titles) {
             if (StrUtil.isBlank(title)) {
                 continue;
             }
-
             if ("Movie".equals(itemType)) {
                 List<RTmdbMovie> results = tmdbProxy.getMovieByName(title, null);
                 if (CollUtil.isEmpty(results)) {
                     continue;
                 }
                 RTmdbMovie bestMatch = CollUtil.getFirst(results);
-                matchedItems.add(new MatchedItem(bestMatch.getId(), bestMatch.getTitle(), "Movie"));
+                matchedItems.add(new MatchedItem(bestMatch.getId(), bestMatch.getTitle(), 电影));
             } else if ("Series".equals(itemType)) {
-                SeriesInfo tvInfo = parseSeriesTitle(title);
-                String showName = tvInfo.showName;
+                MutablePair<String, Integer> tvInfo = ReUtil.parseMaoyanTvNameSeason(title);
+                String showName = tvInfo.getLeft();
                 // TODO 暂时不知道用来干嘛
-                Integer seasonNumber = tvInfo.seasonNumber;
+                Integer seasonNumber = tvInfo.getRight();
                 try {
                     List<RTmdbTv> results = tmdbProxy.getTvByName(showName, null);
                     if (CollUtil.isEmpty(results)) {
@@ -195,11 +154,11 @@ public class MaoyanRssFetcher {
                     }
 
                     RTmdbTv seriesResult = null;
-                    String normShowName = normalizeString(showName);
+                    String normShowName = HtmlUtil.normalizeString(showName);
                     // 精确匹配
                     for (RTmdbTv tv : results) {
                         String resultName = tv.getName();
-                        if (StrUtil.equalsIgnoreCase(normalizeString(resultName), normShowName)) {
+                        if (StrUtil.equalsIgnoreCase(HtmlUtil.normalizeString(resultName), normShowName)) {
                             seriesResult = tv;
                             break;
                         }
@@ -208,7 +167,7 @@ public class MaoyanRssFetcher {
                     if (null == seriesResult) {
                         seriesResult = CollUtil.getFirst(results);
                     }
-                    matchedItems.add(new MatchedItem(seriesResult.getId(), seriesResult.getName(), "Series"));
+                    matchedItems.add(new MatchedItem(seriesResult.getId(), seriesResult.getName(), 电视剧));
 
                 } catch (Exception e) {
                     log.error("搜索TMDb剧集信息失败", e);
@@ -219,10 +178,4 @@ public class MaoyanRssFetcher {
         return matchedItems;
     }
 
-    private static String normalizeString(String s) {
-        if (s == null || s.isEmpty()) {
-            return "";
-        }
-        return s.replaceAll("[\\s:：·\\-*'!,?.。]+", "").toLowerCase();
-    }
 }

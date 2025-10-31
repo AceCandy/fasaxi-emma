@@ -2,8 +2,8 @@ package cn.acecandy.fasaxi.emma.sao.proxy;
 
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.config.MaoyanConfig;
+import cn.acecandy.fasaxi.emma.utils.HtmlUtil;
 import cn.hutool.v7.core.text.StrUtil;
-import cn.hutool.v7.core.util.RandomUtil;
 import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.client.engine.ClientEngine;
@@ -15,8 +15,8 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.Map;
+
 
 /**
  * 猫眼 代理服务
@@ -33,18 +33,6 @@ public class MaoyanProxy {
 
     @Resource
     private MaoyanConfig maoyanConfig;
-
-    /**
-     * 用户代理
-     */
-    private static final List<String> USER_AGENTS = List.of(
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0",
-            "Mozilla/5.0 (X11; Linux x86_64) " +
-                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
-    );
 
     /**
      * 电视类型
@@ -68,7 +56,7 @@ public class MaoyanProxy {
     public JSONArray getMovieTop() {
         String url = maoyanConfig.getHost() + maoyanConfig.getMovieUrl();
         try (Response res = httpClient.send(Request.of(url).method(Method.GET)
-                .header("User-Agent", RandomUtil.randomEle(USER_AGENTS)))) {
+                .header("User-Agent", HtmlUtil.randomUserAgent()))) {
             if (!res.isOk()) {
                 throw new BaseException(StrUtil.format("返回码异常: {}", res.getStatus()));
             }
@@ -92,7 +80,7 @@ public class MaoyanProxy {
     public JSONArray getTvTop(Integer seriesType, Integer platformType) {
         String url = maoyanConfig.getHost() + maoyanConfig.getTvUrl();
         try (Response res = httpClient.send(Request.of(url).method(Method.GET)
-                .header("User-Agent", RandomUtil.randomEle(USER_AGENTS))
+                .header("User-Agent", HtmlUtil.randomUserAgent())
                 .form(Map.of("showDate", 2,
                         "seriesType", seriesType, "platformType", platformType)))) {
             if (!res.isOk()) {

@@ -5,13 +5,10 @@ import cn.acecandy.fasaxi.emma.service.OriginReqService;
 import cn.acecandy.fasaxi.emma.service.PicRedirectService;
 import cn.acecandy.fasaxi.emma.service.VideoRedirectService;
 import cn.acecandy.fasaxi.emma.service.VirtualService;
-import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.hutool.v7.core.date.DateUtil;
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.text.StrUtil;
-import cn.hutool.v7.http.server.servlet.ServletUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.AsyncContext;
 import jakarta.servlet.Filter;
@@ -39,7 +36,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_416;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_500;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_504;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.非图片;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getPicType;
@@ -138,8 +134,8 @@ public class EmbyProxyFilter implements Filter {
                 }
             }
         } catch (Exception e) {
-            log.warn("转发请求失败[{}]: {}?{},e:{}", req.getMethod(),
-                    reqWrapper.getRequestURI(), reqWrapper.getQueryString(), ExceptUtil.getSimpleMessage(e));
+            log.warn("转发请求失败[{}]: {}?{},e:", req.getMethod(),
+                    reqWrapper.getRequestURI(), reqWrapper.getQueryString(), e);
             res.setStatus(CODE_504);
             return;
             /*if (ServletUtil.isGetMethod(req)) {
@@ -151,7 +147,7 @@ public class EmbyProxyFilter implements Filter {
             // originReqService.forwardOriReq(reqWrapper, res);
         } finally {
             accessLog.log(reqWrapper.getMethod(), reqWrapper.getRequestURI(), reqWrapper.getIp(),
-                    req.getQueryString(), reqWrapper.getCachedHeader(), reqWrapper.getApikey(),
+                    req.getQueryString(), reqWrapper.getCachedHeader(), reqWrapper.getApiKey(),
                     res.getStatus(), start);
         }
     }

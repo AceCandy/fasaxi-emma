@@ -3,15 +3,16 @@ package cn.acecandy.fasaxi.emma.sao.proxy;
 import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.config.DoubanConfig;
+import cn.acecandy.fasaxi.emma.sao.entity.MatchedItem;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
+import cn.acecandy.fasaxi.emma.utils.HtmlUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.hutool.v7.core.collection.CollUtil;
-import cn.hutool.v7.core.lang.Console;
+import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.UnicodeUtil;
 import cn.hutool.v7.core.util.RandomUtil;
-import cn.hutool.v7.http.HttpUtil;
 import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.client.engine.ClientEngine;
@@ -21,7 +22,6 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -41,18 +41,76 @@ public class DoubanProxy {
     @Resource
     private DoubanConfig doubanConfig;
 
-    public static void main(String[] args) {
-        String imdbId = "tt6718170"; // Example IMDb ID for "The Shawshank Redemption"
-        String doubanUrl = StrUtil.format("https://api.douban.com/v2/movie/imdb/tt6718170");
+    private static final int MAX_PAGES = 50;
+    private static final int ITEMS_PER_PAGE = 25;
 
-        String url = "https://api.douban.com/v2/movie/imdb/tt6718170";
+    /**
+     * 获取豆列
+     *
+     * @param url url
+     * @return {@link String }
+     */
+    public List<MatchedItem.Doulist> getAllDoulist(String url) {
+        if (StrUtil.isBlank(url)) {
+            return null;
+        }
+        List<MatchedItem.Doulist> allItems = ListUtil.of();
+        try {
+            for (int page = 0; page < MAX_PAGES; page++) {
+                int currentStart = page * ITEMS_PER_PAGE;
+                String pageUrl = StrUtil.format("{}?start={}&sort=seq&playable=0&sub_type=",
+                        url, currentStart);
+                log.info("[豆列数据获取]➜ 正在获取第 {} 页: {}", (page + 1), pageUrl);
 
-        Map<String, Object> paramMap = new HashMap<>();
-        paramMap.put("apikey", "0ac44ae016490db2204ce0a042db2916");
-        String result = HttpUtil.post(url, paramMap);
-        Console.log(result);
-        Console.log(ReUtil.findDouBanIdByJson(result));
+                try (Response res = httpClient.send(Request.of(pageUrl).method(Method.GET)
+                        .form(Map.of("start", currentStart, "sort", "seq",
+                                "playable", 0))
+                        .header("User-Agent", HtmlUtil.randomUserAgent()))) {
+                    if (!res.isOk()) {
+                        throw new BaseException(StrUtil.format("返回码异常: {}", res.getStatus()));
+                    }
+                    String resBody = res.bodyStr();
+                    List<MatchedItem.Doulist> doulistItems = HtmlUtil.parseDoulist(resBody);
+                    // 如果当前页没有找到任何条目，说明到达了最后一页
+                    if (CollUtil.isEmpty(doulistItems)) {
+                        break;
+                    }
+                    allItems.addAll(doulistItems);
+                } catch (Exception e) {
+                    throw new BaseException(StrUtil.format("获取豆列数据异常, url: {} ", pageUrl, e));
+                }
+            }
+            return allItems;
+        } catch (Exception e) {
+            log.warn("getAllDoulist 网络请求异常: ", e);
+        }
+        return null;
     }
+
+    /**
+     * 获取豆瓣rss
+     *
+     * @param url url
+     * @return {@link String }
+     */
+    public List<MatchedItem.Doulist> getDoubanRss(String url) {
+        if (StrUtil.isBlank(url)) {
+            return null;
+        }
+        log.info("[豆瓣RSS数据获取]➜ 正在获取: {}", url);
+
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常: {}", res.getStatus()));
+            }
+            String resBody = res.bodyStr();
+            return HtmlUtil.parseDoubanRss(resBody);
+        } catch (Exception e) {
+            log.warn("getDoubanRss 网络请求异常: ", e);
+        }
+        return null;
+    }
+
 
     /**
      * 按id获取豆瓣配置

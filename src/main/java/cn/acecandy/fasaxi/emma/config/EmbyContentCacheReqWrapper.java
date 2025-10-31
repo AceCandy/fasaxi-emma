@@ -8,7 +8,6 @@ import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
 import cn.hutool.v7.http.HttpUtil;
 import cn.hutool.v7.http.server.servlet.ServletUtil;
-import cn.hutool.v7.json.JSONArray;
 import cn.hutool.v7.json.JSONObject;
 import cn.hutool.v7.json.JSONUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -58,11 +57,9 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
     @Getter
     private String deviceId;
     @Getter
-    private String apikey;
+    private String apiKey;
     @Getter
     private String ip;
-    @Getter
-    private JSONArray toolkitView;
     @Getter
     private String requestURI;
 
@@ -77,39 +74,31 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         cacheParam(request);
     }
 
-    public void buildToolKit(String toolkitView) {
-        if (!JSONUtil.isTypeJSON(toolkitView) || StrUtil.equals(toolkitView, "{}" )) {
-            return;
-        }
-        JSONObject viewJn = JSONUtil.parseObj(toolkitView);
-        this.toolkitView = viewJn.getJSONArray("Items" );
-    }
-
     private void parseFormData(String formData) {
         if (StrUtil.isBlank(formData)) {
             return;
         }
         if (JSONUtil.isTypeJSON(formData)) {
             JSONObject jsonData = JSONUtil.parseObj(formData);
-            if (jsonData.containsKey("ItemId" )) {
-                mediaSourceId = jsonData.getStr("ItemId" );
+            if (jsonData.containsKey("ItemId")) {
+                mediaSourceId = jsonData.getStr("ItemId");
             }
-            if (jsonData.containsKey("ParentId" )) {
-                parentId = jsonData.getStr("ParentId" );
+            if (jsonData.containsKey("ParentId")) {
+                parentId = jsonData.getStr("ParentId");
             }
             return;
         }
-        for (String pair : SplitUtil.splitTrim(formData, "&" )) {
-            List<String> entrys = SplitUtil.splitTrim(pair, "=" );
+        for (String pair : SplitUtil.splitTrim(formData, "&")) {
+            List<String> entrys = SplitUtil.splitTrim(pair, "=");
             if (CollUtil.size(entrys) < 2) {
                 continue;
             }
             String key = CollUtil.getFirst(entrys);
             String value = CollUtil.getLast(entrys);
-            if (StrUtil.equalsIgnoreCase(key, "ItemId" )) {
+            if (StrUtil.equalsIgnoreCase(key, "ItemId")) {
                 mediaSourceId = key;
             }
-            if (StrUtil.equalsIgnoreCase(key, "ParentId" )) {
+            if (StrUtil.equalsIgnoreCase(key, "ParentId")) {
                 parentId = key;
             }
             paramMap.computeIfAbsent(key, v -> value);
@@ -121,43 +110,43 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
         List<String> headerNameList = ListUtil.of(request.getHeaderNames());
         headerNameList.forEach(headerName -> {
             if (StrUtil.equalsAnyIgnoreCase(headerName, "Connection", "Keep-Alive", "Proxy-Connection",
-                    "Transfer-Encoding", "Host", "Upgrade", "TE", "Trailer" )) {
+                    "Transfer-Encoding", "Host", "Upgrade", "TE", "Trailer")) {
                 return;
             }
             // if (StrUtil.equalsAnyIgnoreCase(headerName, "Host", "Referer")) {
             //     return;
             // }
             String headerValue = request.getHeader(headerName);
-            if (StrUtil.equalsIgnoreCase(headerName, "User-Agent" )) {
+            if (StrUtil.equalsIgnoreCase(headerName, "User-Agent")) {
                 this.ua = headerValue;
             }
             /*if (StrUtil.equalsIgnoreCase(headerName, "Accept-Encoding")) {
                 headerValue = "gzip";
             }*/
-            if (StrUtil.equalsIgnoreCase(headerName, "Range" )) {
+            if (StrUtil.equalsIgnoreCase(headerName, "Range")) {
                 this.range = headerValue;
             }
-            if (StrUtil.equalsIgnoreCase(headerName, "X-Emby-Token" )) {
-                this.apikey = headerValue;
+            if (StrUtil.equalsIgnoreCase(headerName, "X-Emby-Token")) {
+                this.apiKey = headerValue;
             }
-            if (StrUtil.equalsAnyIgnoreCase(headerName, "X-Emby-Authorization", "Authorization" )) {
-                for (String auth : SplitUtil.splitTrim(headerValue, "," )) {
-                    List<String> authParts = SplitUtil.splitTrim(auth, "=" );
+            if (StrUtil.equalsAnyIgnoreCase(headerName, "X-Emby-Authorization", "Authorization")) {
+                for (String auth : SplitUtil.splitTrim(headerValue, ",")) {
+                    List<String> authParts = SplitUtil.splitTrim(auth, "=");
                     if (CollUtil.size(authParts) < 2) {
                         continue;
                     }
                     String key = CollUtil.getFirst(authParts);
-                    String value = StrUtil.strip(CollUtil.getLast(authParts), "\"" );
-                    if (StrUtil.equalsIgnoreCase(key, "DeviceId" )) {
+                    String value = StrUtil.strip(CollUtil.getLast(authParts), "\"");
+                    if (StrUtil.equalsIgnoreCase(key, "DeviceId")) {
                         this.deviceId = value;
-                    } else if (StrUtil.equalsAnyIgnoreCase(key, "Token" )) {
-                        this.apikey = value;
+                    } else if (StrUtil.equalsAnyIgnoreCase(key, "Token")) {
+                        this.apiKey = value;
                     }
                 }
             }
             headerMap.put(ReUtil.capitalizeWords(headerName), headerValue);
         });
-        String xffHeader = request.getHeader("X-Forwarded-For" );
+        String xffHeader = request.getHeader("X-Forwarded-For");
         if (StrUtil.isNotBlank(xffHeader)) {
             ip = CollUtil.getFirst(SplitUtil.splitTrim(xffHeader, COMMA));
         } else {
@@ -168,16 +157,16 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
 
     private void cacheParam(HttpServletRequest request) {
         String uri = request.getRequestURI().toLowerCase();
-        if (StrUtil.containsAnyIgnoreCase(uri, "/images/primary" )) {
-            cachedParam.put("tag", request.getParameter("tag" ));
-            cachedParam.put("maxWidth", "342" );
+        if (StrUtil.containsAnyIgnoreCase(uri, "/images/primary")) {
+            cachedParam.put("tag", request.getParameter("tag"));
+            cachedParam.put("maxWidth", "342");
             // cachedParam.put("quality", "90");
-        } else if (StrUtil.containsAnyIgnoreCase(uri, "/images/logo" )) {
-            cachedParam.put("tag", request.getParameter("tag" ));
-            cachedParam.put("maxWidth", "154" );
-        } else if (StrUtil.containsAnyIgnoreCase(uri, "/images/backdrop" )) {
-            cachedParam.put("tag", request.getParameter("tag" ));
-            cachedParam.put("maxWidth", "780" );
+        } else if (StrUtil.containsAnyIgnoreCase(uri, "/images/logo")) {
+            cachedParam.put("tag", request.getParameter("tag"));
+            cachedParam.put("maxWidth", "154");
+        } else if (StrUtil.containsAnyIgnoreCase(uri, "/images/backdrop")) {
+            cachedParam.put("tag", request.getParameter("tag"));
+            cachedParam.put("maxWidth", "780");
         } else {
             List<String> itemUrlGroup = ReUtil.isSimilarItemUrl(uri);
             if (CollUtil.isNotEmpty(itemUrlGroup)) {
@@ -191,32 +180,32 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
             if (MapUtil.isNotEmpty(paramMap)) {
                 cachedParam.putAll(paramMap);
                 // if (cachedParam.containsKey("searchterm")) {
-                if (cachedParam.containsKey("IncludeItemTypes" )) {
+                if (cachedParam.containsKey("IncludeItemTypes")) {
                     cachedParam.put("IncludeItemTypes", StrUtil.replaceIgnoreCase(
-                            cachedParam.get("IncludeItemTypes" ).toString(), ",BoxSet", "" ));
+                            cachedParam.get("IncludeItemTypes").toString(), ",BoxSet", ""));
                 }
-                if (cachedParam.containsKey("MediaSourceId" )) {
+                if (cachedParam.containsKey("MediaSourceId")) {
                     mediaSourceId = StrUtil.removePrefixIgnoreCase(
-                            cachedParam.get("MediaSourceId" ).toString(), "mediasource_" );
+                            cachedParam.get("MediaSourceId").toString(), "mediasource_");
                 }
-                if (cachedParam.containsKey("UserId" )) {
-                    userId = MapUtil.getStr(cachedParam, "UserId" );
+                if (cachedParam.containsKey("UserId")) {
+                    userId = MapUtil.getStr(cachedParam, "UserId");
                 }
-                if (cachedParam.containsKey("X-Emby-Device-Id" )) {
+                if (cachedParam.containsKey("X-Emby-Device-Id")) {
                     if (StrUtil.isBlank(deviceId)) {
-                        deviceId = MapUtil.getStr(cachedParam, "X-Emby-Device-Id" );
+                        deviceId = MapUtil.getStr(cachedParam, "X-Emby-Device-Id");
                     }
                 }
-                if (cachedParam.containsKey("DeviceId" )) {
+                if (cachedParam.containsKey("DeviceId")) {
                     if (StrUtil.isBlank(deviceId)) {
-                        deviceId = MapUtil.getStr(cachedParam, "DeviceId" );
+                        deviceId = MapUtil.getStr(cachedParam, "DeviceId");
                     }
                 }
-                if (cachedParam.containsKey("X-Emby-Token" )) {
-                    apikey = MapUtil.getStr(cachedParam, "X-Emby-Token" );
+                if (cachedParam.containsKey("X-Emby-Token")) {
+                    apiKey = MapUtil.getStr(cachedParam, "X-Emby-Token");
                 }
-                if (cachedParam.containsKey("ParentId" )) {
-                    parentId = MapUtil.getStr(cachedParam, "ParentId" );
+                if (cachedParam.containsKey("ParentId")) {
+                    parentId = MapUtil.getStr(cachedParam, "ParentId");
                 }
             }
         }

@@ -11,13 +11,13 @@ import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.LockUtil;
-import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
 import cn.hutool.v7.core.array.ArrayUtil;
 import cn.hutool.v7.core.date.StopWatch;
 import cn.hutool.v7.core.exception.ExceptionUtil;
-import cn.hutool.v7.core.math.NumberUtil;
 import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.util.CharsetUtil;
+import cn.hutool.v7.http.HttpUtil;
 import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.client.engine.ClientEngine;
@@ -108,9 +108,11 @@ public class OriginReqService {
         stopPlay(req);
         try {
             String url = embyConfig.getHost() + req.getParamUri();
+            String apiKey = "api_key=" + embyConfig.getApiKey();
+            url = HttpUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
             Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod()))
                     .body(req.getCachedBody());
-            ServletUtil.getHeadersMap(req).forEach((k, v) -> {
+            /*ServletUtil.getHeadersMap(req).forEach((k, v) -> {
                 // if (!EmbyProxyUtil.isAllowedReqHeader(k)) {
                 if (EmbyProxyUtil.isNotAllowedHeader(k)) {
                     return;
@@ -118,7 +120,7 @@ public class OriginReqService {
                 for (String value : v) {
                     originalRequest.header(ReUtil.capitalizeWords(k), value, true);
                 }
-            });
+            });*/
             // try (Response res = ClientEngineFactory.createEngine("OkHttp").send(originalRequest)) {
             try (Response res = httpClient.send(originalRequest)) {
                 response.setStatus(res.getStatus());
@@ -197,11 +199,6 @@ public class OriginReqService {
         cached = new EmbyCachedResp();
         try (Response res = sendOriginReq(request)) {
             cached = embyProxy.transferResp(res, request);
-            /*if (!cached.getStatusCode().equals(CODE_200)) {
-                try (Response res1 = sendOriginToolkitReq(request)) {
-                    cached = embyProxy.transferResp(res1, request);
-                }
-            }*/
             writeCacheResponse(request, response, cached);
         } catch (Throwable e) {
             httpClient5WarningCatch(request, response, e, cached);
@@ -256,17 +253,11 @@ public class OriginReqService {
     public Response sendOriginReq(EmbyContentCacheReqWrapper request) {
         String host = embyConfig.getHost();
         String uri = request.getParamUri();
-        boolean isVirtual = (NumberUtil.parseInt(request.getMediaSourceId(), 1) < 0 ||
-                NumberUtil.parseInt(request.getParentId(), 1) < 0);
-        if (isVirtual) {
-            host = embyConfig.getEmbyToolkitHost();
-            uri = StrUtil.replace(uri, "&MediaTypes=Video", "");
-            uri = StrUtil.replace(uri, "&limit=", "&Limit=");
-        }
+        // String apiKey = "api_key=" + embyConfig.getApiKey();
+        // uri = HttpUtil.urlWithForm(host + uri, apiKey, CharsetUtil.defaultCharset(), false);
         Request originalRequest = Request.of(host + uri)
                 .method(Method.valueOf(request.getMethod()))
-                .body(request.getCachedBody());
-        request.getCachedHeader().forEach((k, v) -> originalRequest.header(k, v, true));
+                .body(request.getCachedBody()).header(request.getCachedHeader());
         return httpClient.send(originalRequest);
     }
 

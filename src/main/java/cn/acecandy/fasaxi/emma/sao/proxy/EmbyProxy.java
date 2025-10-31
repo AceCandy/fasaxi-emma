@@ -38,8 +38,6 @@ import cn.hutool.v7.http.client.body.ResponseBody;
 import cn.hutool.v7.http.client.engine.ClientEngine;
 import cn.hutool.v7.http.meta.Method;
 import cn.hutool.v7.http.server.servlet.ServletUtil;
-import cn.hutool.v7.json.JSONArray;
-import cn.hutool.v7.json.JSONObject;
 import cn.hutool.v7.json.JSONUtil;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
@@ -105,45 +103,6 @@ public class EmbyProxy {
                 request.getCachedParam().get("SearchTerm").toString());
         itemInfo.setItems(items);
         return JSONUtil.toJsonStr(itemInfo);
-    }
-
-    /**
-     * 重建虚拟视图
-     *
-     * @param request 要求
-     * @param bodyStr 身体str
-     * @return {@link String }
-     */
-    private static String reBuildView(EmbyContentCacheReqWrapper request, String bodyStr) {
-        if (request.getToolkitView() == null) {
-            return bodyStr;
-        }
-        JSONObject viewJn = JSONUtil.parseObj(bodyStr);
-        JSONArray items = viewJn.getJSONArray("Items");
-        items.addAll(0, request.getToolkitView());
-        items.removeIf(item -> {
-            JSONObject jn = item.asJSONObject();
-            return StrUtil.equalsAny(jn.getStr("Name"), "🎬 华语电影", "🎬 外语电影", "🐦 动画电影",
-                    "🐧 动漫", "🐧 国漫", "📺 国产剧", "📺 欧美剧", "📺 日韩剧", "🎭 综艺", "🦉 记录电影", "🦉 纪录片");
-        });
-        return viewJn.toString();
-    }
-
-    /**
-     * 重建虚拟视图
-     *
-     * @param request 要求
-     * @param bodyStr 身体str
-     * @return {@link String }
-     */
-    private static String reBuildLatest(EmbyContentCacheReqWrapper request, String bodyStr) {
-        if (!StrUtil.containsIgnoreCase(request.getRequestURI(), "Items/Latest")) {
-            return bodyStr;
-        }
-        if (!JSONUtil.isTypeJSONObject(bodyStr)) {
-            return bodyStr;
-        }
-        return JSONUtil.parseObj(bodyStr).getStr("Items");
     }
 
     /**
@@ -671,36 +630,12 @@ public class EmbyProxy {
             // embyCachedResp.getHeaders().remove("Content-Length");
             String content = "";
             byte[] bodyBytes = body.getBytes();
-            /*if (StrUtil.equalsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "br")) {
-                String bodyStr = new String(CompressUtil.decode(bodyBytes));
-                content = changeRespBody(request, bodyStr);
-                embyCachedResp.setContent(content.getBytes());
-                embyCachedResp.getHeaders().remove("Content-Encoding");
-                log.info("br解码: {}", bodyStr);
-            } else if (StrUtil.containsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "deflate")) {
-                String bodyStr = new String(ZipUtil.unZlib(bodyBytes));
-                content = changeRespBody(request, bodyStr);
-                embyCachedResp.setContent(ZipUtil.zlib(content.getBytes(), 5));
-                log.info("deflate解码: {}", bodyStr);
-            } else if (StrUtil.containsIgnoreCase(embyCachedResp.getHeaders().get("Content-Encoding"), "gzip")) {
-                String bodyStr = new String(ZipUtil.unGzip(bodyBytes));
-                content = changeRespBody(request, bodyStr);
-                embyCachedResp.setContent(ZipUtil.gzip(content.getBytes()));
-                log.info("gzip解码: {}", bodyStr);
-            } else {*/
             String bodyStr = new String(bodyBytes);
             if (!JSONUtil.isTypeJSON(bodyStr)) {
                 log.warn("非json: {}", bodyStr);
             }
             content = changeRespBody(request, bodyStr);
             embyCachedResp.setContent(content.getBytes());
-            // }
-
-            // 禁用缓存（防止客户端缓存未替换的内容）
-            // embyCachedResp.getHeaders().put("Cache-Control", "no-cache, no-store, must-revalidate");
-            // embyCachedResp.getHeaders().put("Pragma", "no-cache");
-            // embyCachedResp.getHeaders().put("Expires", "0");
-            // embyCachedResp.getHeaders().put("Content-Length", content.getBytes().length + "");
         } else {
             embyCachedResp.setContent(body.getBytes());
         }
@@ -711,8 +646,6 @@ public class EmbyProxy {
     private String changeRespBody(EmbyContentCacheReqWrapper request, String bodyStr) {
         refreshItem(request, bodyStr);
         bodyStr = searchItem(request, bodyStr);
-        bodyStr = reBuildView(request, bodyStr);
-        bodyStr = reBuildLatest(request, bodyStr);
         return StrUtil.replaceIgnoreCase(bodyStr, "micu", "REDMT");
     }
 

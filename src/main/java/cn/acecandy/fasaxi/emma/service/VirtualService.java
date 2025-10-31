@@ -27,7 +27,6 @@ import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
 import cn.hutool.v7.core.util.ObjUtil;
 import cn.hutool.v7.crypto.SecureUtil;
-import cn.hutool.v7.http.HttpUtil;
 import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.client.engine.ClientEngine;
@@ -43,7 +42,6 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,6 +51,7 @@ import java.util.concurrent.Executor;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_308;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_401;
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_500;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.集合文件夹;
 import static cn.acecandy.fasaxi.emma.dao.toolkit.entity.table.MediaMetadataTableDef.MEDIA_METADATA;
 
@@ -183,8 +182,12 @@ public class VirtualService {
     public void handleShowNext(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
         String userId = request.getUserId();
         if (StrUtil.isBlank(userId)) {
-            response.setStatus(CODE_401);
-            return;
+            String token = request.getApiKey();
+            if (StrUtil.isBlank(token)) {
+                response.setStatus(CODE_401);
+                return;
+            }
+            userId = "token_" + token;
         }
         String cacheKey = CacheUtil.buildOriginShowNextCacheKey(userId);
         EmbyItemsInfoOut embyItems = redisClient.getBean(cacheKey);
@@ -207,19 +210,23 @@ public class VirtualService {
         }
 
         // 缓存不存在，同步构建
-        embyItems = JSONUtil.toBean(buildShowNext(request.getRequestURI(), request.getCachedParam(),
-                embyConfig.getApiKey()), EmbyItemsInfoOut.class);
+        embyItems = JSONUtil.toBean(buildShowNext(request), EmbyItemsInfoOut.class);
         redisClient.set(cacheKey, embyItems, CacheConstant.DAY_30_S);
+        if (null == embyItems) {
+            response.setStatus(CODE_500);
+            return;
+        }
         response.setStatus(200);
         ServletUtil.write(response, JSONUtil.toJsonStr(embyItems),
                 "application/json;charset=UTF-8");
     }
 
     @SneakyThrows
-    private String buildShowNext(String uri, Map<String, Object> cachedParam, String apiKey) {
-        String url = embyConfig.getHost() + HttpUtil.urlWithFormUrlEncoded(uri,
-                cachedParam, Charset.defaultCharset()) + "&api_key=" + apiKey;
-        try (Response res = httpClient.send(Request.of(url).method(Method.GET))) {
+    private String buildShowNext(EmbyContentCacheReqWrapper request) {
+        String url = embyConfig.getHost() + request.getParamUri();
+
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET)
+                .header(request.getCachedHeader()))) {
             if (CODE_200.equals(res.getStatus())) {
                 return res.bodyStr();
             }
@@ -230,15 +237,14 @@ public class VirtualService {
     /**
      * 刷新缓存异步
      *
-     * @param cachedParam 缓存参数
-     * @param userId      用户ID
+     * @param request 请求
+     * @param userId  用户ID
      */
     private void refreshShowCacheAsync(EmbyContentCacheReqWrapper request, String userId) {
         CompletableFuture.runAsync(() -> {
             String cacheKey = CacheUtil.buildOriginShowNextCacheKey(userId);
             try {
-                EmbyItemsInfoOut freshData = JSONUtil.toBean(buildShowNext(request.getRequestURI(),
-                        request.getCachedParam(), embyConfig.getApiKey()), EmbyItemsInfoOut.class);
+                EmbyItemsInfoOut freshData = JSONUtil.toBean(buildShowNext(request), EmbyItemsInfoOut.class);
                 redisClient.set(cacheKey, freshData, CacheConstant.DAY_30_S);
 
                 ThreadUtil.execVirtual(() -> cloudUtil.mkdirDeviceTmpDir(request.getDeviceId()));
@@ -411,8 +417,7 @@ public class VirtualService {
         String parentId = request.getParentId();
 
         if (!StrUtil.startWith(parentId, "-")) {
-            List<EmbyItem> items = JSONUtil.toList(buildShowNext(request.getRequestURI(),
-                    cachedParam, embyConfig.getApiKey()), EmbyItem.class);
+            List<EmbyItem> items = JSONUtil.toList(buildShowNext(request), EmbyItem.class);
             return EmbyItemsInfoOut.builder().items(items).totalRecordCount(items.size()).build();
         }
         Long realId = fromMimickedId(parentId);

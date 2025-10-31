@@ -1,8 +1,10 @@
 package cn.acecandy.fasaxi.emma.sao.out;
 
 import cn.hutool.v7.core.annotation.Alias;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 import java.util.Map;
@@ -14,6 +16,8 @@ import java.util.Map;
  * @since 2025/4/16
  */
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 @Data
 public class EmbyView {
     /**

@@ -5,6 +5,7 @@ import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.lang.mutable.MutablePair;
+import cn.hutool.v7.core.math.NumberUtil;
 import cn.hutool.v7.core.regex.PatternPool;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
@@ -32,8 +33,13 @@ public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
     /**
      * 匹配标题中的标点符号进行分割
      */
+    // public static final Pattern REGEX_DOUBAN_JSON_ID = PatternPool.get(
+    //         "movie\\\\/subject\\\\/(\\d+)", Pattern.DOTALL);
     public static final Pattern REGEX_DOUBAN_JSON_ID = PatternPool.get(
-            "movie\\\\/subject\\\\/(\\d+)", Pattern.DOTALL);
+            "(/movie/|/subject/)(\\d+)", Pattern.DOTALL);
+
+    public static final Pattern YEAR_PATTERN =
+            PatternPool.get("\\b(19\\d{2}|20\\d{2})\\b", Pattern.DOTALL);
     /**
      * "爱奇艺第一季",
      * "爱奇艺第2季",
@@ -50,7 +56,8 @@ public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
      * 提取中间的名字和季号
      */
     public static final Pattern REGEX_TV_SEASON = PatternPool.get(
-            "(.+?)(?:\\s*第?)\\s*(\\d+)(?:季)?", Pattern.DOTALL);
+            "(.+?)(?:\\s*第?)?\\s*([\\d一二三四五六七八九十百千万廿卅〇]+)(?:季)?$", Pattern.DOTALL);
+    // "(.+?)(?:\\s*第?)\\s*(\\d+)(?:季)?", Pattern.DOTALL);
     /**
      * 匹配类似 /emby/Users/656fcefa283149708880b416786e5fde/Items/1417552/Delete
      */
@@ -89,16 +96,23 @@ public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
      * @param originName 原产地名称
      * @return {@link MutablePair }<{@link String }, {@link String }>
      */
-    public static MutablePair<String, String> parseMaoyanTvNameSeason(String originName) {
+    public static MutablePair<String, Integer> parseMaoyanTvNameSeason(String originName) {
         originName = StrUtil.trim(originName);
         if (StrUtil.isBlank(originName)) {
-            return null;
+            return MutablePair.of(null, null);
         }
         List<String> groups = getAllGroups(REGEX_TV_SEASON, originName);
         if (CollUtil.isEmpty(groups) || groups.size() < 3) {
-            return null;
+            return MutablePair.of(originName, null);
         }
-        return MutablePair.of(CollUtil.get(groups, 1), CollUtil.get(groups, 2));
+        String name = CollUtil.get(groups, 1);
+        String seasonPort = StrUtil.removeAll(
+                StrUtil.removePrefix(originName, name), "第", "季").trim();
+        int seasonNumber = 0;
+        if (PinYinUtil.isChinese(seasonPort)) {
+            seasonNumber = NumberUtil.parseInt(seasonPort);
+        }
+        return MutablePair.of(name, seasonNumber);
     }
 
     public static String findDouBanIdByHtml(String html) {
@@ -109,12 +123,20 @@ public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
         return ReUtil.getGroup1(REGEX_DOUBAN_HTML_ID, html);
     }
 
+    public static String parseYearByHtml(String html) {
+        html = StrUtil.trim(html);
+        if (StrUtil.isBlank(html)) {
+            return null;
+        }
+        return ReUtil.getGroup1(YEAR_PATTERN, html);
+    }
+
     public static String findDouBanIdByJson(String json) {
         json = StrUtil.trim(json);
         if (StrUtil.isBlank(json)) {
             return null;
         }
-        return ReUtil.getGroup1(REGEX_DOUBAN_JSON_ID, json);
+        return ReUtil.get(REGEX_DOUBAN_JSON_ID, json, 2);
     }
 
     public static String isPlaybackUrl(String url) {

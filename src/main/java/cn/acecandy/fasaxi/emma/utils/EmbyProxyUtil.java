@@ -47,14 +47,14 @@ public final class EmbyProxyUtil {
     public static EmbyPicType getPicType(HttpServletRequest req) {
         EmbyPicType type = 非图片;
         String url = req.getRequestURI().toLowerCase();
-        if (!StrUtil.contains(url, "/items/" )) {
+        if (!StrUtil.contains(url, "/items/")) {
             return type;
         }
-        if (StrUtil.contains(url, "/images/primary" )) {
+        if (StrUtil.contains(url, "/images/primary")) {
             type = 封面;
-        } else if (StrUtil.contains(url, "/images/backdrop" )) {
+        } else if (StrUtil.contains(url, "/images/backdrop")) {
             type = 背景图;
-        } else if (StrUtil.contains(url, "/images/logo" )) {
+        } else if (StrUtil.contains(url, "/images/logo")) {
             type = Logo;
         }
         return type;
@@ -67,7 +67,7 @@ public final class EmbyProxyUtil {
      * @return boolean
      */
     public static boolean needVideoRedirect(HttpServletRequest req) {
-        return StrUtil.containsAll(req.getRequestURI().toLowerCase(), "/emby/videos/", "/original" );
+        return StrUtil.containsAll(req.getRequestURI().toLowerCase(), "/emby/videos/", "/original");
     }
 
     /**
@@ -77,7 +77,8 @@ public final class EmbyProxyUtil {
      * @return boolean
      */
     public static boolean needClose(HttpServletRequest req) {
-        return StrUtil.contains(req.getRequestURI().toLowerCase(), "/embywebsocket" );
+        return StrUtil.containsAny(req.getRequestURI().toLowerCase(),
+                "/embywebsocket", "/.well-known");
     }
 
     /**
@@ -105,7 +106,7 @@ public final class EmbyProxyUtil {
         if (StrUtil.isBlank(path)) {
             return path;
         }
-        if (StrUtil.startWith(path, "http" )) {
+        if (StrUtil.startWith(path, "http")) {
             URI pathUrl = UrlUtil.toURI(path);
             if (StrUtil.containsIgnoreCase(pathUrl.getHost(), dbConfig.getImageStaticUrl())) {
                 int index = (path.hashCode() & Integer.MAX_VALUE) % CollUtil.size(dbConfig.getImageCdnUrl());
@@ -166,13 +167,13 @@ public final class EmbyProxyUtil {
      */
     public static boolean isCacheStaticReq(HttpServletRequest req) {
         String uri = req.getRequestURI().toLowerCase();
-        if (StrUtil.containsAny(uri, "/images/primary", "/images/backdrop", "/images/logo" )) {
+        if (StrUtil.containsAny(uri, "/images/primary", "/images/backdrop", "/images/logo")) {
             return true;
         }
-        if (StrUtil.containsIgnoreCase(uri, "/subtitles" )) {
+        if (StrUtil.containsIgnoreCase(uri, "/subtitles")) {
             return false;
         }
-        return uri.matches(".*\\.(js|css|woff2|png|jpg|gif|ico|json|html)$" );
+        return uri.matches(".*\\.(js|css|woff2|png|jpg|gif|ico|json|html)$");
     }
 
     /**
@@ -183,14 +184,14 @@ public final class EmbyProxyUtil {
      */
     public static boolean isCacheLongTimeReq(EmbyContentCacheReqWrapper req) {
         String uri = req.getRequestURI().toLowerCase();
-        if (!StrUtil.endWith(uri, "/items" )) {
+        if (!StrUtil.endWith(uri, "/items")) {
             return false;
         }
-        if (!StrUtil.containsAll(uri, "/users/" )) {
+        if (!StrUtil.containsAll(uri, "/users/")) {
             return false;
         }
         // 2个歌单长缓存
-        if (CollUtil.contains(ListUtil.of("1616570", "1616572" ), MapUtil.getStr(req.getCachedParam(), "parentid" ))) {
+        if (CollUtil.contains(ListUtil.of("1616570", "1616572"), MapUtil.getStr(req.getCachedParam(), "parentid"))) {
             return true;
         }
         return false;
@@ -226,7 +227,7 @@ public final class EmbyProxyUtil {
      */
     public static boolean isNotAllowedHeader(String headerName) {
         return StrUtil.equalsAnyIgnoreCase(headerName, "connection", "content-length", "transfer-encoding",
-                "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers", "upgrade", "Content-Encoding" );
+                "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers", "upgrade", "Content-Encoding");
     }
 
     /**
@@ -237,8 +238,8 @@ public final class EmbyProxyUtil {
      */
     public static boolean isAllowedReqHeader(String headerName) {
         return StrUtil.equalsAnyIgnoreCase(headerName, "content-type", "accept", "cache-control",
-                "pragma", "User-Agent" ) || StrUtil.startWithAnyIgnoreCase(headerName, "X-Emby-",
-                "X-MediaBrowser-", "X-Emby-Authorization", "Authorization" );
+                "pragma", "User-Agent") || StrUtil.startWithAnyIgnoreCase(headerName, "X-Emby-",
+                "X-MediaBrowser-", "X-Emby-Authorization", "Authorization");
     }
 
     public static boolean isHttpOk(int statusCode) {
@@ -260,8 +261,8 @@ public final class EmbyProxyUtil {
             return "";
         }
         mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath));
-        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby", "http://alist.rn238.worldline.space/p/pt/Emby" );
-        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby1", "http://alist.rn238.worldline.space/p/bt/Emby1" );
+        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby", "http://alist.rn238.worldline.space/p/pt/Emby");
+        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby1", "http://alist.rn238.worldline.space/p/bt/Emby1");
 
         // mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt",
         // "http://8.210.221.216:5244/p/bt/Emby1/");
@@ -275,11 +276,11 @@ public final class EmbyProxyUtil {
         if (null == totalSize || NumberUtil.isZero(totalSize)) {
             totalSize = Long.MAX_VALUE;
         }
-        if (StrUtil.isBlank(range) || !StrUtil.startWith(range, "bytes=" )) {
+        if (StrUtil.isBlank(range) || !StrUtil.startWith(range, "bytes=")) {
             return new Range(0, Math.min(chunk, totalSize) - 1, totalSize);
         }
-        range = StrUtil.removePrefixIgnoreCase(range, "bytes=" );
-        List<String> parts = SplitUtil.split(range, "-" );
+        range = StrUtil.removePrefixIgnoreCase(range, "bytes=");
+        List<String> parts = SplitUtil.split(range, "-");
         long start = NumberUtil.parseLong(CollUtil.getFirst(parts));
         if (start > totalSize - 1) {
             return null;

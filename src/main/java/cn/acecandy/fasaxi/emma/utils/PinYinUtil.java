@@ -4,6 +4,7 @@ import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
 import cn.hutool.v7.extra.pinyin.PinyinUtil;
+import com.github.stuxuhai.jpinyin.ChineseHelper;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -26,6 +27,13 @@ import static cn.hutool.v7.core.text.StrValidator.isBlank;
 public final class PinYinUtil extends PinyinUtil {
 
     private PinYinUtil() {
+    }
+
+    public static boolean isChinese(String str) {
+        if (isBlank(str)) {
+            return false;
+        }
+        return ChineseHelper.containsChinese(str);
     }
 
     /**

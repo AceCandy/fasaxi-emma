@@ -27,6 +27,7 @@
         <httpclient.version>5.5.1</httpclient.version>
         <hutool.version>7.0.0-M2</hutool.version>
         <jpinyin.version>1.1.8</jpinyin.version>
+        <jsoup.version>1.21.2</jsoup.version>
         <lombok.version>1.18.42</lombok.version>
         <mybatis-flex.version>1.11.3</mybatis-flex.version>
         <okhttp.version>4.12.0</okhttp.version>
@@ -76,15 +77,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jetty</artifactId>
         </dependency>
-        <!-- 添加Jetty HTTP/2支持 -->
-        <!--<dependency>
-            <groupId>org.eclipse.jetty.http2</groupId>
-            <artifactId>http2-server</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-alpn-server</artifactId>
-        </dependency>-->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
@@ -154,6 +146,12 @@
             <groupId>org.brotli</groupId>
             <artifactId>dec</artifactId>
             <version>${brotli.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jsoup</groupId>
+            <artifactId>jsoup</artifactId>
+            <version>${jsoup.version}</version>
         </dependency>
 
         <dependency>
