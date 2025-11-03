@@ -1,10 +1,11 @@
 package cn.acecandy.fasaxi.emma.service.rss;
 
 import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
+import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.dao.toolkit.entity.MediaMetadata;
 import cn.acecandy.fasaxi.emma.sao.entity.MatchedItem;
 import cn.hutool.v7.core.collection.CollUtil;
-import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.collection.set.SetUtil;
 import cn.hutool.v7.core.date.DateField;
 import cn.hutool.v7.core.date.DateTime;
 import cn.hutool.v7.core.date.DateUtil;
@@ -20,7 +21,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -35,23 +35,23 @@ import java.util.stream.Collectors;
 public class RuleFilterFetcher {
 
     /**
-     * 支持的列表字段
+     * 支持的列表字段 演员、导演、类型、国家/地区、工作室、标签、关键字
      */
     private final static Set<String> FIELDS_LIST = Set.of(
             "actors", "directors", "genres", "countries", "studios", "tags", "keywords");
 
     /**
-     * 支持的日期字段
+     * 支持的日期字段 上映于、入库于
      */
     private final static Set<String> FIELDS_DATE = Set.of("release_date", "date_added");
 
     /**
-     * 支持的分级字段
+     * 支持的分级字段 家长分级
      */
     private final static Set<String> FIELDS_RATING = Set.of("unified_rating");
 
     /**
-     * 支持的连载剧集状态字段
+     * 支持的连载剧集状态字段 追剧中
      */
     private final static Set<String> FIELDS_IN_PROGRESS = Set.of("is_in_progress");
 
@@ -60,6 +60,11 @@ public class RuleFilterFetcher {
      */
     private final static Set<String> FIELDS_TITLE = Set.of("title");
 
+    /**
+     * 支持的数字字段 年份、评分
+     */
+    private final static Set<String> FIELDS_NUMBER = Set.of("release_year", "rating");
+
 
     private Set<String> airingIds;
 
@@ -67,10 +72,10 @@ public class RuleFilterFetcher {
         this.airingIds = airingIds != null ? airingIds : new HashSet<>();
     }
 
-    public List<MatchedItem> exec(List<MediaMetadata> itemData, JSONObject definition) {
+    public Set<MatchedItem> exec(List<MediaMetadata> itemData, JSONObject definition) {
         List<MatchedItem.FilterRule> rules = definition.getBeanList("rules", MatchedItem.FilterRule.class);
         if (CollUtil.isEmpty(rules)) {
-            return ListUtil.of();
+            return SetUtil.of();
         }
         String logic = definition.getStr("logic", "AND");
 
@@ -80,8 +85,8 @@ public class RuleFilterFetcher {
         return itemData.parallelStream()
                 .filter(item -> checkRule(item, rules, logic))
                 .map(item -> new MatchedItem(
-                        Integer.parseInt(item.tmdbId()), item.itemType(), itemType))
-                .toList();
+                        Integer.parseInt(item.getTmdbId()), item.getTitle(), itemType))
+                .collect(Collectors.toSet());
     }
 
     /**
@@ -104,9 +109,10 @@ public class RuleFilterFetcher {
                 case String f when FIELDS_DATE.contains(f) -> handleDateField(item, f, operator, value);
 
                 case String f when FIELDS_RATING.contains(f) -> handleRatingField(item, f, operator, value);
-                case String f when FIELDS_IN_PROGRESS.contains(f) -> handleInProgressField(item, operator, value);
-                case String f when FIELDS_TITLE.contains(f) -> handleTitleField(item, operator, value);
-                default -> handleGeneralField(item, field, operator, value);
+                case String f when FIELDS_IN_PROGRESS.contains(f) -> handleInProgressField(item, f, operator, value);
+                case String f when FIELDS_TITLE.contains(f) -> handleTitleField(item, f, operator, value);
+                case String f when FIELDS_NUMBER.contains(f) -> handleGeneralField(item, f, operator, value);
+                default -> throw new BaseException("不支持的字段：" + field);
             };
         }).toList();
 
@@ -202,7 +208,8 @@ public class RuleFilterFetcher {
         };
     }
 
-    private boolean handleRatingField(MediaMetadata item, String field, String op, String value) {
+    private boolean handleRatingField(MediaMetadata item, String field,
+                                      String op, String value) {
         String rating = FieldUtil.getFieldValue(item, field).toString();
 
         return switch (op) {
@@ -219,7 +226,8 @@ public class RuleFilterFetcher {
         };
     }
 
-    private boolean handleInProgressField(MediaMetadata item, String field, String op, Object value) {
+    private boolean handleInProgressField(MediaMetadata item, String field,
+                                          String op, String value) {
         String itemType = item.getItemType();
         if (!StrUtil.equals("Series", itemType)) {
             return false;
@@ -229,75 +237,39 @@ public class RuleFilterFetcher {
         if (StrUtil.isBlank(tmdbId)) {
             return false;
         }
-
-        String rating = FieldUtil.getFieldValue(item, field).toString();
-
         boolean isItemAiring = airingIds.contains(tmdbId);
-        boolean targetValue = Boolean.parseBoolean(String.valueOf(value));
+        boolean targetValue = Boolean.parseBoolean(value);
 
-        switch (op) {
-            case "is":
-                return isItemAiring == targetValue;
-            case "is_not":
-                return isItemAiring != targetValue;
-            default:
-                return false;
-        }
+        return switch (op) {
+            case "is" -> isItemAiring == targetValue;
+            case "is_not" -> isItemAiring != targetValue;
+            default -> false;
+        };
     }
 
-    private boolean handleTitleField(Map<String, Object> itemMetadata, String op, Object value) {
-        Object titleObj = itemMetadata.get("title");
-        if (titleObj == null || value == null) {
-            return false;
-        }
+    private boolean handleTitleField(MediaMetadata item, String field,
+                                     String op, String value) {
+        String title = FieldUtil.getFieldValue(item, field).toString();
+        String searchValue = value.toLowerCase();
 
-        String title = String.valueOf(titleObj).toLowerCase();
-        String searchValue = String.valueOf(value).toLowerCase();
-
-        switch (op) {
-            case "contains":
-                return title.contains(searchValue);
-            case "does_not_contain":
-                return !title.contains(searchValue);
-            case "starts_with":
-                return title.startsWith(searchValue);
-            case "ends_with":
-                return title.endsWith(searchValue);
-            default:
-                return false;
-        }
+        return switch (op) {
+            case "contains" -> StrUtil.contains(title, searchValue);
+            case "does_not_contain" -> !StrUtil.contains(title, searchValue);
+            case "starts_with" -> StrUtil.startWith(title, searchValue);
+            case "ends_with" -> StrUtil.endWith(title, searchValue);
+            default -> false;
+        };
     }
 
-    private boolean handleGeneralField(Map<String, Object> itemMetadata, String field, String op, Object value) {
-        Object actualValueObj = itemMetadata.get(field);
-        if (actualValueObj == null || value == null) {
-            return false;
-        }
-
-        try {
-            switch (op) {
-                case "gte":
-                    return Double.parseDouble(String.valueOf(actualValueObj)) >= Double.parseDouble(String.valueOf(value));
-                case "lte":
-                    return Double.parseDouble(String.valueOf(actualValueObj)) <= Double.parseDouble(String.valueOf(value));
-                case "eq":
-                    return String.valueOf(actualValueObj).equals(String.valueOf(value));
-                default:
-                    return false;
-            }
-        } catch (NumberFormatException e) {
-            logger.warn("数值转换失败: field={}, actualValue={}, value={}, error={}",
-                    field, actualValueObj, value, e.getMessage());
-            return false;
-        }
+    private boolean handleGeneralField(MediaMetadata item, String field,
+                                       String op, String value) {
+        String filedValue = FieldUtil.getFieldValue(item, field).toString();
+        return switch (op) {
+            case "gte" -> Double.parseDouble(filedValue) >= Double.parseDouble(value);
+            case "lte" -> Double.parseDouble(filedValue) <= Double.parseDouble(value);
+            case "eq" -> StrUtil.equals(filedValue, value);
+            default -> false;
+        };
     }
 
-    // Getter and Setter for airingIds
-    public Set<String> getAiringIds() {
-        return airingIds;
-    }
-
-    public void setAiringIds(Set<String> airingIds) {
-        this.airingIds = airingIds;
-    }
 }

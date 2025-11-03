@@ -11,6 +11,7 @@ import cn.acecandy.fasaxi.emma.sao.proxy.TmdbProxy;
 import cn.acecandy.fasaxi.emma.utils.HtmlUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.collection.set.SetUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -51,7 +53,7 @@ public class DoulistRssFetcher {
      * @param url 路径
      * @return {@link List }<{@link MatchedItem }>
      */
-    public List<MatchedItem> exec(String url, EmbyMediaType itemType) {
+    public Set<MatchedItem> exec(String url, EmbyMediaType itemType) {
         List<MatchedItem.Doulist> allItems = ListUtil.of();
         if (StrUtil.contains(url, "douban.com/doulist")) {
             allItems = doubanProxy.getAllDoulist(url);
@@ -68,9 +70,9 @@ public class DoulistRssFetcher {
      * @param itemType 项目类型
      * @return {@link List }<{@link MatchedItem }>
      */
-    private List<MatchedItem> matchTitlesAndIdToTmdb(List<MatchedItem.Doulist> allItems,
-                                                     EmbyMediaType itemType) {
-        List<MatchedItem> matchedItems = ListUtil.of();
+    private Set<MatchedItem> matchTitlesAndIdToTmdb(List<MatchedItem.Doulist> allItems,
+                                                    EmbyMediaType itemType) {
+        Set<MatchedItem> matchedItems = SetUtil.of();
 
         // 查找db中所有有豆瓣id的tmdb记录
         List<String> doubanIds = allItems.stream().map(MatchedItem.Doulist::doubanId).toList();

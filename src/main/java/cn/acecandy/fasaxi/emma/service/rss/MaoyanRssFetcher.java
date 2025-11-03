@@ -8,7 +8,6 @@ import cn.acecandy.fasaxi.emma.sao.proxy.TmdbProxy;
 import cn.acecandy.fasaxi.emma.utils.HtmlUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.hutool.v7.core.collection.CollUtil;
-import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.collection.set.SetUtil;
 import cn.hutool.v7.core.lang.mutable.MutablePair;
 import cn.hutool.v7.core.map.MapUtil;
@@ -58,13 +57,13 @@ public class MaoyanRssFetcher {
      * @param url 网址
      * @return {@link List }<{@link MatchedItem }>
      */
-    public List<MatchedItem> exec(String url) {
+    public Set<MatchedItem> exec(String url) {
         if (StrUtil.isBlank(url)) {
-            return ListUtil.of();
+            return SetUtil.of();
         }
         List<String> keys = SplitUtil.splitTrim(StrUtil.removePrefix(url, "maoyan://"), COMMA);
         if (CollUtil.isNotEmpty(keys)) {
-            return ListUtil.of();
+            return SetUtil.of();
         }
         String platform = CollUtil.getLast(SplitUtil.splitTrim(CollUtil.getFirst(keys), "-"));
         if (!VALID_MAOYAN_PLATFORMS.contains(platform)) {
@@ -80,7 +79,7 @@ public class MaoyanRssFetcher {
         List<MatchedItem> matchedSeries = matchTitlesToTmdb(
                 topTitles.getRight(), "Series");
 
-        List<MatchedItem> allItems = ListUtil.of();
+        Set<MatchedItem> allItems = SetUtil.of();
         allItems.addAll(matchedMovies);
         allItems.addAll(matchedSeries);
         return allItems;
