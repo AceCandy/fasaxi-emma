@@ -4,6 +4,7 @@ import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.OpConfig;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
+import cn.acecandy.fasaxi.emma.sao.client.RedisLockClient;
 import cn.acecandy.fasaxi.emma.sao.dto.Rile;
 import cn.acecandy.fasaxi.emma.sao.out.R115Search;
 import cn.acecandy.fasaxi.emma.sao.out.R115SearchFileReq;
@@ -33,9 +34,9 @@ import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.Lock;
 
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
+import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildDeviceLock;
 import static cn.acecandy.fasaxi.emma.utils.CacheUtil.buildDeviceFileId115Key;
 
 /**
@@ -56,6 +57,8 @@ public final class CloudUtil {
     private R123ZongProxy r123ZongProxy;
     @Resource
     private RedisClient redisClient;
+    @Resource
+    private RedisLockClient redisLockClient;
     @Resource
     private OpProxy opProxy;
     @Resource
@@ -362,14 +365,14 @@ public final class CloudUtil {
         if (StrUtil.isBlank(deviceId)) {
             return;
         }
-        Lock lock = LockUtil.lockDeviceLock(deviceId);
-        if (LockUtil.isLock(lock)) {
+        String lockKey = buildDeviceLock(deviceId);
+        if (!redisLockClient.lock(lockKey)) {
             return;
         }
         try {
             getDeviceTmpDirByOpenlist(deviceId);
         } finally {
-            LockUtil.unlockDevice(lock, deviceId);
+            redisLockClient.unlock(lockKey);
         }
     }
 

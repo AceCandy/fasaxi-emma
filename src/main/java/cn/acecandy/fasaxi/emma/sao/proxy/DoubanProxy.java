@@ -23,7 +23,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 豆瓣 代理服务
@@ -54,17 +53,17 @@ public class DoubanProxy {
         if (StrUtil.isBlank(url)) {
             return null;
         }
+        if (!StrUtil.endWith(url, "/")) {
+            url += "/";
+        }
         List<MatchedItem.Doulist> allItems = ListUtil.of();
         try {
             for (int page = 0; page < MAX_PAGES; page++) {
                 int currentStart = page * ITEMS_PER_PAGE;
-                String pageUrl = StrUtil.format("{}?start={}&sort=seq&playable=0&sub_type=",
-                        url, currentStart);
-                log.info("[豆列数据获取]➜ 正在获取第 {} 页: {}", (page + 1), pageUrl);
+                String showUrl = StrUtil.format("{}?start={}&sort=seq&playable=0&sub_type=", url, currentStart);
+                log.info("[豆列数据获取]➜ 正在获取第 {} 页: {}", (page + 1), showUrl);
 
-                try (Response res = httpClient.send(Request.of(pageUrl).method(Method.GET)
-                        .form(Map.of("start", currentStart, "sort", "seq",
-                                "playable", 0))
+                try (Response res = httpClient.send(Request.of(showUrl).method(Method.GET)
                         .header("User-Agent", HtmlUtil.randomUserAgent()))) {
                     if (!res.isOk()) {
                         throw new BaseException(StrUtil.format("返回码异常: {}", res.getStatus()));
@@ -77,7 +76,7 @@ public class DoubanProxy {
                     }
                     allItems.addAll(doulistItems);
                 } catch (Exception e) {
-                    throw new BaseException(StrUtil.format("获取豆列数据异常, url: {} ", pageUrl, e));
+                    throw new BaseException(StrUtil.format("获取豆列数据异常, url: {} ", showUrl, e));
                 }
             }
             return allItems;

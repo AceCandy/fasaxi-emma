@@ -1,5 +1,8 @@
 package cn.acecandy.fasaxi.emma.dao.toolkit.entity;
 
+import cn.acecandy.fasaxi.emma.dao.toolkit.dto.GeneratedMediaInfo;
+import cn.acecandy.fasaxi.emma.dao.toolkit.handler.JsonbTypeHandler;
+import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
@@ -9,6 +12,7 @@ import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 自定义虚拟库
@@ -87,7 +91,8 @@ public class CustomCollections extends Model<CustomCollections> {
     /**
      * 构建的媒体信息 list
      */
-    private String generatedMediaInfoJson;
+    @Column(typeHandler = JsonbTypeHandler.class)
+    private List<GeneratedMediaInfo> generatedMediaInfoJson;
 
     /**
      * 封面图

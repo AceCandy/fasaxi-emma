@@ -62,7 +62,7 @@ public class MaoyanRssFetcher {
             return SetUtil.of();
         }
         List<String> keys = SplitUtil.splitTrim(StrUtil.removePrefix(url, "maoyan://"), COMMA);
-        if (CollUtil.isNotEmpty(keys)) {
+        if (CollUtil.isEmpty(keys)) {
             return SetUtil.of();
         }
         String platform = CollUtil.getLast(SplitUtil.splitTrim(CollUtil.getFirst(keys), "-"));
@@ -79,7 +79,7 @@ public class MaoyanRssFetcher {
         List<MatchedItem> matchedSeries = matchTitlesToTmdb(
                 topTitles.getRight(), "Series");
 
-        Set<MatchedItem> allItems = SetUtil.of();
+        Set<MatchedItem> allItems = SetUtil.ofLinked();
         allItems.addAll(matchedMovies);
         allItems.addAll(matchedSeries);
         return allItems;
@@ -140,14 +140,14 @@ public class MaoyanRssFetcher {
                     continue;
                 }
                 RTmdbMovie bestMatch = CollUtil.getFirst(results);
-                matchedItems.add(new MatchedItem(bestMatch.getId(), bestMatch.getTitle(), 电影));
+                matchedItems.add(new MatchedItem(bestMatch.getId(), bestMatch.getTitle(), 电影, bestMatch));
             } else if ("Series".equals(itemType)) {
-                MutablePair<String, Integer> tvInfo = ReUtil.parseMaoyanTvNameSeason(title);
+                MutablePair<String, Integer> tvInfo = ReUtil.parseTvNameSeason(title);
                 String showName = tvInfo.getLeft();
                 // TODO 暂时不知道用来干嘛
                 Integer seasonNumber = tvInfo.getRight();
                 try {
-                    List<RTmdbTv> results = tmdbProxy.getTvByName(showName, null);
+                    List<RTmdbTv> results = tmdbProxy.getTvByName(showName, seasonNumber, null);
                     if (CollUtil.isEmpty(results)) {
                         continue;
                     }
@@ -166,7 +166,7 @@ public class MaoyanRssFetcher {
                     if (null == seriesResult) {
                         seriesResult = CollUtil.getFirst(results);
                     }
-                    matchedItems.add(new MatchedItem(seriesResult.getId(), seriesResult.getName(), 电视剧));
+                    matchedItems.add(new MatchedItem(seriesResult.getId(), seriesResult.getName(), 电视剧, seriesResult));
 
                 } catch (Exception e) {
                     log.error("搜索TMDb剧集信息失败", e);

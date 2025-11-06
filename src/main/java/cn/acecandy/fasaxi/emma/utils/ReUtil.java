@@ -3,6 +3,7 @@ package cn.acecandy.fasaxi.emma.utils;
 
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.convert.ConvertUtil;
 import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.lang.mutable.MutablePair;
 import cn.hutool.v7.core.math.NumberUtil;
@@ -96,7 +97,7 @@ public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
      * @param originName 原产地名称
      * @return {@link MutablePair }<{@link String }, {@link String }>
      */
-    public static MutablePair<String, Integer> parseMaoyanTvNameSeason(String originName) {
+    public static MutablePair<String, Integer> parseTvNameSeason(String originName) {
         originName = StrUtil.trim(originName);
         if (StrUtil.isBlank(originName)) {
             return MutablePair.of(null, null);
@@ -110,8 +111,9 @@ public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
                 StrUtil.removePrefix(originName, name), "第", "季").trim();
         int seasonNumber = 0;
         if (PinYinUtil.isChinese(seasonPort)) {
-            seasonNumber = NumberUtil.parseInt(seasonPort);
+            seasonPort = ConvertUtil.chineseToNumber(seasonPort).toString();
         }
+        seasonNumber = NumberUtil.parseInt(seasonPort);
         return MutablePair.of(name, seasonNumber);
     }
 
@@ -250,12 +252,12 @@ public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
     }
 
     public static void main(String[] args) {
-        Console.log(parseMaoyanTvNameSeason("我不是药神2023"));
-        Console.log(parseMaoyanTvNameSeason("我不是药神第六季"));
-        Console.log(parseMaoyanTvNameSeason("我不是药神3"));
-        Console.log(parseMaoyanTvNameSeason("我不是药神"));
-        Console.log(parseMaoyanTvNameSeason("我不是药神第2季"));
-        Console.log(parseMaoyanTvNameSeason("我不是药神 第一季"));
-        Console.log(parseMaoyanTvNameSeason("我不是药神 第4季"));
+        Console.log(parseTvNameSeason("我不是药神2023"));
+        Console.log(parseTvNameSeason("我不是药神第六季"));
+        Console.log(parseTvNameSeason("我不是药神3"));
+        Console.log(parseTvNameSeason("我不是药神"));
+        Console.log(parseTvNameSeason("我不是药神第2季"));
+        Console.log(parseTvNameSeason("我不是药神 第一季"));
+        Console.log(parseTvNameSeason("我不是药神 第4季"));
     }
 }

@@ -31,6 +31,9 @@ public class RedisClient {
     @Resource
     private RedisTemplate<String, Object> redisTemplate;
 
+    // 默认key前缀（避免与其他Rediskey冲突，可自定义）
+    private static final String DEFAULT_KEY_PREFIX = "repeat_limit:";
+
     public boolean hasKey(String key) {
         try {
             return redisTemplate.hasKey(key);
@@ -402,4 +405,5 @@ public class RedisClient {
             return 0;
         }
     }
+
 }

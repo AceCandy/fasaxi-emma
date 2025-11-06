@@ -1,6 +1,7 @@
 package cn.acecandy.fasaxi.emma.sao.entity;
 
 import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
+import cn.acecandy.fasaxi.emma.sao.out.RTmdbMedia;
 
 /**
  * rss任务中匹配的结构
@@ -8,7 +9,7 @@ import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
  * @author tangningzhu
  * @since 2025/10/31
  */
-public record MatchedItem(Integer id, String name, EmbyMediaType type) {
+public record MatchedItem(Integer id, String name, EmbyMediaType type, RTmdbMedia bestMatch) {
     public record Doulist(String title, Integer year, String doubanLink, String doubanId, String imdbId) {
     }
 
@@ -25,4 +26,5 @@ public record MatchedItem(Integer id, String name, EmbyMediaType type) {
     public record ValuePerson(String department, String id, String known_for,
                               String name, String profile_path) {
     }
+
 }

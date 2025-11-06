@@ -3,7 +3,10 @@ package cn.acecandy.fasaxi.emma.task;
 import cn.acecandy.fasaxi.emma.task.impl.CollectionTaskService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * 自定义合集 定时任务
@@ -21,13 +24,12 @@ public class CollectionTask {
     /**
      * 同步自定义合集
      */
-    // @Scheduled(fixedDelay = 11 * 60, timeUnit = TimeUnit.MINUTES, initialDelay = 10)
-    public void syncCollection() {
+    @Scheduled(fixedDelay = 14 * 60, timeUnit = TimeUnit.MINUTES, initialDelay = 30)
+    public void syncQuickCollection() {
         try {
-            collectionTaskService.syncCollection();
+            collectionTaskService.syncQuickCollection();
         } catch (Exception e) {
-            log.error("执行异常-同步自定义合集 ", e);
+            log.error("执行异常-同步自定义合集(快速) ", e);
         }
     }
-
 }

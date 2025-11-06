@@ -49,9 +49,9 @@ public class GodConfig {
     @Bean("cacheRefreshExecutor")
     public Executor cacheRefreshExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(3);
-        executor.setMaxPoolSize(6);
-        executor.setQueueCapacity(200);
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("cache-refresh-");
         executor.initialize();
         return executor;

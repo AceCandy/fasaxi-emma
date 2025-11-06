@@ -9,14 +9,13 @@ import cn.acecandy.fasaxi.emma.config.TmdbConfig;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.EmbyItemPic;
 import cn.acecandy.fasaxi.emma.dao.embyboss.service.EmbyItemPicDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
+import cn.acecandy.fasaxi.emma.sao.client.RedisLockClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
-import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.math.NumberUtil;
-import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.http.client.engine.ClientEngine;
 import jakarta.annotation.Resource;
@@ -25,12 +24,10 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.locks.Lock;
-
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_308;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_404;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.非图片;
+import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildPicLock;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getCdnPicUrl;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getPic302Uri;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getPicUri;
@@ -70,6 +67,8 @@ public class PicRedirectService {
     private EmbyConfig embyConfig;
     @Resource
     private ClientEngine httpClient;
+    @Resource
+    private RedisLockClient redisLockClient;
 
     /**
      * 处理图片重定向请求
@@ -100,8 +99,8 @@ public class PicRedirectService {
         }
 
         // 获取或创建对应的锁
-        Lock lock = LockUtil.lockPic(itemId, picType);
-        if (LockUtil.isLock1s(lock)) {
+        String lockKey = buildPicLock(itemId, picType);
+        if (!redisLockClient.lock(lockKey)) {
             response.setStatus(CODE_204);
             return;
         }
@@ -111,7 +110,7 @@ public class PicRedirectService {
             }
             exec302Pic(request, response, itemId, picType, maxWidth);
         } finally {
-            LockUtil.unlockPic(lock, itemId, picType);
+            redisLockClient.unlock(lockKey);
         }
     }
 
@@ -129,7 +128,7 @@ public class PicRedirectService {
         String uri = getPic302Uri(itemPic, picType);
         if (StrUtil.isNotBlank(uri)) {
             String url = getCdnPicUrl(uri, doubanConfig, tmdbConfig, maxWidth);
-            return308(response, url);
+            originReqService.return308(response, url);
             log.info("{}-图片重定向(DB):[{}-{}] => {}", picType, itemId, maxWidth, url);
             redisClient.set(CacheUtil.buildPicCacheKey(itemId, picType), url, 2 * 24 * 60 * 60);
             return true;
@@ -148,7 +147,7 @@ public class PicRedirectService {
             response.setStatus(CODE_404);
         } else {
             String url = getCdnPicUrl(uri, doubanConfig, tmdbConfig, maxWidth);
-            return308(response, url);
+            originReqService.return308(response, url);
         }
         return true;
     }
@@ -165,7 +164,7 @@ public class PicRedirectService {
                             String itemId, EmbyPicType picType, String maxWidth) {
         EmbyRemoteImageOut.Img imageInfo = embyProxy.getRemoteImage(itemId, picType);
         if (null == imageInfo) {
-            return308(response, embyConfig.getOuterHost() + request.getParamUri());
+            originReqService.return308to200(response, request.getParamUri());
             // originReqService.forwardOriReq(request, response);
             return;
         } else if (StrUtil.equals(imageInfo.getUrl(), "undefined")) {
@@ -180,15 +179,9 @@ public class PicRedirectService {
             return;
         }
 
-        return308(response, url);
+        originReqService.return308(response, url);
         log.warn("{}-图片重定向(请求):[{}-{}] => {}", picType, itemId, maxWidth, url);
         asyncWriteItemPic(NumberUtil.parseInt(itemId), uri, picType);
-    }
-
-    public void return308(HttpServletResponse response, String url) {
-        response.setStatus(CODE_308);
-        response.setHeader("Location", url);
-        response.setHeader("Referer", UrlUtil.url(url).getHost());
     }
 
     /**

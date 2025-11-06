@@ -9,6 +9,7 @@ import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.TmdbProvider;
 import cn.acecandy.fasaxi.emma.dao.embyboss.service.TmdbProviderDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
+import cn.acecandy.fasaxi.emma.sao.client.RedisLockClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItemsInfoOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyMediaSource;
@@ -18,7 +19,6 @@ import cn.acecandy.fasaxi.emma.sao.out.EmbyViewOut;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
-import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.acecandy.fasaxi.emma.utils.SortUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
@@ -47,13 +47,14 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.Lock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_302;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电影;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧_集;
+import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildItemsLock;
+import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildRefreshMediaLock;
 import static cn.hutool.v7.core.text.StrPool.COMMA;
 
 /**
@@ -74,6 +75,9 @@ public class EmbyProxy {
 
     @Resource
     private RedisClient redisClient;
+
+    @Resource
+    private RedisLockClient redisLockClient;
 
     @Resource
     private TmdbProviderDao tmdbProviderDao;
@@ -103,6 +107,81 @@ public class EmbyProxy {
                 request.getCachedParam().get("SearchTerm").toString());
         itemInfo.setItems(items);
         return JSONUtil.toJsonStr(itemInfo);
+    }
+
+    /**
+     * 获取合集items
+     *
+     * @param collectionId 合集ID
+     * @return {@link List<EmbyItem> }
+     */
+    public List<EmbyItem> getItemsByCollections(Long collectionId) {
+        String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET)
+                .form(Map.of("api_key", embyConfig.getApiKey(),
+                        "ParentId", collectionId)))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+            return JSONUtil.toBean(resBody, EmbyItemsInfoOut.class).getItems();
+        } catch (Exception e) {
+            log.warn("getItemsByCollections 网络请求异常: ", e);
+        }
+        return null;
+    }
+
+    /**
+     * 往合集中新增items
+     *
+     * @param collectionId 合集ID
+     * @param itemIds      项目ID
+     */
+    public void addItemsByCollections(Long collectionId, List<String> itemIds) {
+        if (CollUtil.isEmpty(itemIds)) {
+            log.info("addItemsByCollections 空项目ID, 合集ID: {}", collectionId);
+            return;
+        }
+        CollUtil.partition(itemIds, 200).forEach(i -> {
+            String itemIdsStr = StrUtil.join(COMMA, i);
+            String url = embyConfig.getHost() + StrUtil.format(embyConfig.getCollectionAddUrl(),
+                    collectionId, embyConfig.getApiKey(), itemIdsStr);
+            try (Response res = httpClient.send(Request.of(url).method(Method.POST))) {
+                if (!res.isOk()) {
+                    throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+                }
+            } catch (Exception e) {
+                log.warn("addItemsByCollections 网络请求异常: ", e);
+            }
+        });
+    }
+
+    /**
+     * 往合集中删除items
+     *
+     * @param collectionId 合集ID
+     * @param itemIds      项目ID
+     */
+    public void delItemsByCollections(Long collectionId, List<String> itemIds) {
+        if (CollUtil.isEmpty(itemIds)) {
+            log.info("delItemsByCollections 空项目ID, 合集ID: {}", collectionId);
+            return;
+        }
+        CollUtil.partition(itemIds, 200).forEach(i -> {
+            String itemIdsStr = StrUtil.join(COMMA, i);
+            String url = embyConfig.getHost() + StrUtil.format(embyConfig.getCollectionDelUrl(),
+                    collectionId, embyConfig.getApiKey(), itemIdsStr);
+            try (Response res = httpClient.send(Request.of(url).method(Method.POST))) {
+                if (!res.isOk()) {
+                    throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+                }
+            } catch (Exception e) {
+                log.warn("delItemsByCollections 网络请求异常: ", e);
+            }
+        });
     }
 
     /**
@@ -172,64 +251,14 @@ public class EmbyProxy {
     }
 
     /**
-     * 获取用户拥有权限的媒体项
-     *
-     * @param userId 用户ID
-     * @return {@link List<EmbyItem> }
-     */
-    public List<String> getUserPermsEmbyIdOnLock(String userId) {
-        Lock lock = LockUtil.lockUserPerms(userId);
-        if (LockUtil.isLock(lock)) {
-            return ListUtil.of();
-        }
-        String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
-
-        int start = 0;
-        int batchSize = 2000;
-
-        List<String> embyIds = ListUtil.of();
-        try {
-            while (true) {
-                try (Response res = httpClient.send(Request.of(url).method(Method.GET).form(Map.of(
-                        "api_key", embyConfig.getApiKey(), "Recursive", true,
-                        "IncludeItemTypes", "Movie,Series", "UserId", userId,
-                        "StartIndex", start, "Limit", batchSize,
-                        "Fields", "Id")))) {
-                    if (!res.isOk()) {
-                        throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
-                    }
-                    String resBody = res.bodyStr();
-                    if (!JSONUtil.isTypeJSON(resBody)) {
-                        throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
-                    }
-                    EmbyItemsInfoOut out = JSONUtil.toBean(resBody, EmbyItemsInfoOut.class);
-                    List<EmbyItem> itemList = out.getItems();
-                    embyIds.addAll(itemList.stream().map(EmbyItem::getItemId).toList());
-                    if (CollUtil.isEmpty(itemList) || CollUtil.size(itemList) < batchSize) {
-                        break;
-                    }
-                    start += CollUtil.size(itemList);
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        } catch (Exception e) {
-            log.warn("getUserPermsEmbyId 网络请求异常: ", e);
-        } finally {
-            LockUtil.unlockUserPerms(lock, userId);
-        }
-        return embyIds;
-    }
-
-    /**
      * 获取整库的媒体项
      *
      * @param parentId 库id
      * @return {@link List<EmbyItem> }
      */
     public List<EmbyItem> getItemsByParentIdOnLock(String parentId) {
-        Lock lock = LockUtil.lockItems(parentId);
-        if (LockUtil.isLock(lock)) {
+        String lockKey = buildItemsLock(parentId);
+        if (!redisLockClient.lock(lockKey, 600)) {
             return ListUtil.of();
         }
         String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
@@ -265,7 +294,7 @@ public class EmbyProxy {
         } catch (Exception e) {
             log.warn("getItemsByParentIdOnLock 网络请求异常: ", e);
         } finally {
-            LockUtil.unlockItems(lock, parentId);
+            redisLockClient.unlock(lockKey);
         }
         return items;
     }
@@ -659,43 +688,20 @@ public class EmbyProxy {
         if (CollUtil.isEmpty(ReUtil.isItemUrl(request.getRequestURI().toLowerCase()))) {
             return;
         }
-        /*ThreadUtil.execVirtual(() -> {
-            EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
-            if (item.getIsFolder() || !StrUtil.equalsAnyIgnoreCase(item.getType(), 电影.getEmbyName(),
-                    电视剧_集.getEmbyName(), 电视剧_季.getEmbyName(), 电视剧.getEmbyName())) {
-                return;
-            }
-            if (!StrUtil.containsAny(item.getUniqueKey(), "tmdb", "tt", "zh-CN-cf")
-                    || StrUtil.isNotBlank(item.getImageTags().getPrimary())
-                    || StrUtil.equalsIgnoreCase(item.getContainer(), "strm")
-                    || item.getSize() < 1024 * 1024L) {
-
-                return;
-            }
-            String lockKey = LockUtil.buildRefreshTmdbLock(item.getItemId());
-            if (redisClient.get(lockKey) != null) {
-                return;
-            }
-            try {
-                refresh(item.getItemId());
-            } finally {
-                redisClient.set(lockKey, "1", 2 * 60 * 60);
-            }
-        });*/
         ThreadUtil.execVirtual(() -> {
             EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
             if (item.getIsFolder() || !StrUtil.equalsAnyIgnoreCase(item.getType(), 电影.getEmbyName(),
                     电视剧_集.getEmbyName())) {
                 return;
             }
-            String lockKey = LockUtil.buildRefreshMediaLock(item.getItemId());
-            if (!redisClient.setnx(lockKey, 1, 5 * 60)) {
+            String lockKey = buildRefreshMediaLock(item.getItemId());
+            if (!redisLockClient.lock(lockKey, 120)) {
                 return;
             }
             try {
                 getPlayback(item.getItemId());
             } finally {
-                redisClient.del(lockKey);
+                redisLockClient.unlock(lockKey);
             }
         });
     }

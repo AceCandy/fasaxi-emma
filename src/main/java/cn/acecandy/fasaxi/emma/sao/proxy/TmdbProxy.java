@@ -7,7 +7,6 @@ import cn.acecandy.fasaxi.emma.sao.out.RTmdb;
 import cn.acecandy.fasaxi.emma.sao.out.RTmdbMovie;
 import cn.acecandy.fasaxi.emma.sao.out.RTmdbTv;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
-import cn.hutool.v7.core.bean.BeanUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.reflect.TypeReference;
@@ -86,11 +85,11 @@ public class TmdbProxy {
         if (StrUtil.isBlank(name)) {
             return null;
         }
-        List<String> result = getInfoByName(电影, name, year);
+        List<String> result = getInfoByName(电影, name, null, year);
         if (CollUtil.isEmpty(result)) {
             return null;
         }
-        return BeanUtil.copyToList(result, RTmdbMovie.class);
+        return result.stream().map(r -> JSONUtil.toBean(r, RTmdbMovie.class)).toList();
     }
 
     /**
@@ -100,15 +99,15 @@ public class TmdbProxy {
      * @param year 年
      * @return {@link List }<{@link RTmdbTv }>
      */
-    public List<RTmdbTv> getTvByName(String name, Integer year) {
+    public List<RTmdbTv> getTvByName(String name, Integer season, Integer year) {
         if (StrUtil.isBlank(name)) {
             return null;
         }
-        List<String> result = getInfoByName(电视剧, name, year);
+        List<String> result = getInfoByName(电视剧, name, season, year);
         if (CollUtil.isEmpty(result)) {
             return null;
         }
-        return BeanUtil.copyToList(result, RTmdbTv.class);
+        return result.stream().map(r -> JSONUtil.toBean(r, RTmdbTv.class)).toList();
     }
 
     /**
@@ -119,16 +118,22 @@ public class TmdbProxy {
      * @param year 年
      * @return {@link RTmdb }<{@link String }>
      */
-    public List<String> getInfoByName(EmbyMediaType type, String name, Integer year) {
+    public List<String> getInfoByName(EmbyMediaType type, String name, Integer season, Integer year) {
         if (StrUtil.isBlank(name)) {
             return null;
         }
         String url = tmdbConfig.getHost() + StrUtil.format(tmdbConfig.getSearchDetailInfoUrl(),
                 type.getTmdbName());
-        try (Response res = httpClient.send(Request.of(url).method(Method.GET)
-                .form(Map.of("api_key", tmdbConfig.getApiKey(), "language", "zh-CN",
-                        电影.equals(type) ? "year" : "first_air_date_year", year,
-                        "include_adult", true, "query", name)))) {
+        Map<String, Object> params = MapUtil.newHashMap();
+        params.put("api_key", tmdbConfig.getApiKey());
+        params.put("language", "zh-CN");
+        if (null != year) {
+            params.put((电影.equals(type) || null != season) ? "year" : "first_air_date_year", year);
+        }
+        params.put("include_adult", true);
+        params.put("query", name);
+
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET).form(params))) {
             if (!res.isOk()) {
                 throw new BaseException(StrUtil.format("返回码异常: {}", res.getStatus()));
             }

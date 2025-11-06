@@ -22,7 +22,6 @@ import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.collection.set.ConcurrentHashSet;
 import cn.hutool.v7.core.date.DateUtil;
 import cn.hutool.v7.core.map.MapUtil;
-import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
 import cn.hutool.v7.core.util.ObjUtil;
@@ -49,7 +48,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_308;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_401;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_500;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.集合文件夹;
@@ -94,6 +92,9 @@ public class VirtualService {
 
     @Resource
     private Executor cacheRefreshExecutor;
+
+    @Resource
+    private OriginReqService originReqService;
     /**
      * 元数据 排序字段映射
      */
@@ -512,9 +513,8 @@ public class VirtualService {
             return;
         }
         String realEmbyCollectionId = CollUtil.getFirst(SplitUtil.splitTrim(tag, "?"));
-        return308(response, StrUtil.format("{}/Items/{}/Images/Primary?maxWidth={}&quality=90",
-                embyConfig.getOuterHost(), realEmbyCollectionId,
-                MapUtil.getInt(request.getCachedParam(), "maxWidth")));
+        originReqService.return308to200(response, StrUtil.format("/Items/{}/Images/Primary?maxWidth={}&quality=90",
+                realEmbyCollectionId, MapUtil.getInt(request.getCachedParam(), "maxWidth")));
     }
 
     @SneakyThrows
@@ -539,12 +539,6 @@ public class VirtualService {
             ServletUtil.write(response, res.bodyStream(),
                     "application/json;charset=UTF-8");
         }
-    }
-
-    public void return308(HttpServletResponse response, String url) {
-        response.setStatus(CODE_308);
-        response.setHeader("Location", url);
-        response.setHeader("Referer", UrlUtil.url(url).getHost());
     }
 
     /**

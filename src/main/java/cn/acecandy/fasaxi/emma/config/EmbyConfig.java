@@ -82,6 +82,14 @@ public class EmbyConfig {
      */
     private String refreshUrl;
     /**
+     * 合集添加url
+     */
+    private String collectionAddUrl;
+    /**
+     * 合集删除url
+     */
+    private String collectionDelUrl;
+    /**
      * 缓存路径
      */
     private String cachePath;

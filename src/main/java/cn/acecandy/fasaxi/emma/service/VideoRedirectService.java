@@ -4,13 +4,13 @@ import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
+import cn.acecandy.fasaxi.emma.sao.client.RedisLockClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
-import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.PathUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
@@ -47,7 +47,6 @@ import java.nio.charset.Charset;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.Lock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_404;
@@ -55,6 +54,7 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_416;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_NC2O;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123_ZONG;
+import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildVideoLock;
 
 /**
  * 视频重定向服务
@@ -90,6 +90,9 @@ public class VideoRedirectService {
     @Resource
     private CloudUtil cloudUtil;
 
+    @Resource
+    private RedisLockClient redisLockClient;
+
     @SneakyThrows
     public void processVideo(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
         String mediaSourceId = request.getMediaSourceId();
@@ -103,8 +106,8 @@ public class VideoRedirectService {
         }
 
         // 获取或创建对应的锁
-        Lock lock = LockUtil.lockVideo(mediaSourceId);
-        if (LockUtil.isLock1s(lock)) {
+        String lockKey = buildVideoLock(mediaSourceId);
+        if (!redisLockClient.lock(lockKey)) {
             response.setStatus(CODE_204);
             return;
         }
@@ -114,7 +117,7 @@ public class VideoRedirectService {
             }
             exec302(request, response, mediaSourceId);
         } finally {
-            LockUtil.unlockVideo(lock, mediaSourceId);
+            redisLockClient.unlock(lockKey);
         }
     }
 

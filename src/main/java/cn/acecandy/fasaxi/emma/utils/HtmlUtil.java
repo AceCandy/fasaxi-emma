@@ -116,7 +116,11 @@ public final class HtmlUtil extends cn.hutool.v7.http.html.HtmlUtil {
             }
             String title = XPathUtil.getByXPath("title", itemNode, XPathConstants.STRING).toString().trim();
             // 会包含中文名和其他名字 所有按照空格分割之后取第一个 待观察 可能有bug
-            title = CollUtil.getFirst(SplitUtil.split(title, " "));
+
+            List<String> titleSplit = SplitUtil.split(title, " ");
+            if (CollUtil.size(titleSplit) > 1) {
+                title = StrUtil.join(" ", CollUtil.sub(titleSplit, 0, CollUtil.size(titleSplit)));
+            }
             String link = XPathUtil.getByXPath("link", itemNode, XPathConstants.STRING).toString().trim();
             String doubanId = ReUtil.findDouBanIdByJson(link);
             String description = XPathUtil.getByXPath("description",

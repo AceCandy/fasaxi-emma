@@ -4,17 +4,18 @@ import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
+import cn.acecandy.fasaxi.emma.sao.client.RedisLockClient;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
-import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
 import cn.hutool.v7.core.array.ArrayUtil;
 import cn.hutool.v7.core.date.StopWatch;
 import cn.hutool.v7.core.exception.ExceptionUtil;
+import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.util.CharsetUtil;
 import cn.hutool.v7.http.HttpUtil;
@@ -32,13 +33,15 @@ import org.brotli.dec.BrotliInputStream;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.concurrent.locks.Lock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
+import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_308;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_408;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_599;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_DELETE;
+import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildOriginLock;
+import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildSessionsLock;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheLongTimeReq;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheStaticReq;
 
@@ -69,6 +72,9 @@ public class OriginReqService {
 
     @Resource
     private FileCacheUtil fileCacheUtil;
+
+    @Resource
+    private RedisLockClient redisLockClient;
     @Resource
     private ThreadLimitUtil threadLimitUtil;
 
@@ -88,15 +94,15 @@ public class OriginReqService {
         }
 
         // 获取或创建对应的锁
-        Lock lock = LockUtil.lockOrigin(request);
-        if (LockUtil.isLock1s(lock)) {
+        String lockKey = buildOriginLock(request);
+        if (!redisLockClient.lock(lockKey)) {
             response.setStatus(CODE_204);
             return;
         }
         try {
             execOriginReq(request, response);
         } finally {
-            LockUtil.unlockOrigin(lock, request);
+            redisLockClient.unlock(lockKey);
         }
     }
 
@@ -106,57 +112,60 @@ public class OriginReqService {
             return false;
         }
         stopPlay(req);
+
+        boolean isPlayingSession = StrUtil.containsIgnoreCase(req.getParamUri(), "Sessions/Playing/");
+        if (isPlayingSession) {
+            if (!redisLockClient.lock(buildSessionsLock(req), 15)) {
+                log.info("lock sessions failed, key: {}", buildSessionsLock(req));
+                response.setStatus(CODE_204);
+                return true;
+            }
+        }
         try {
+            // === 提取公共的HTTP请求和响应转发逻辑 (开始) ===
             String url = embyConfig.getHost() + req.getParamUri();
             String apiKey = "api_key=" + embyConfig.getApiKey();
             url = HttpUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
-            Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod()))
-                    .body(req.getCachedBody());
-            /*ServletUtil.getHeadersMap(req).forEach((k, v) -> {
-                // if (!EmbyProxyUtil.isAllowedReqHeader(k)) {
-                if (EmbyProxyUtil.isNotAllowedHeader(k)) {
-                    return;
-                }
-                for (String value : v) {
-                    originalRequest.header(ReUtil.capitalizeWords(k), value, true);
-                }
-            });*/
-            // try (Response res = ClientEngineFactory.createEngine("OkHttp").send(originalRequest)) {
+            Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod())).body(req.getCachedBody());
+
             try (Response res = httpClient.send(originalRequest)) {
                 response.setStatus(res.getStatus());
                 if (StrUtil.containsIgnoreCase(res.header("Content-Type"), "application/json")) {
+                    // 转发响应头
                     res.headers().forEach((k, v) -> {
-                        if (EmbyProxyUtil.isNotAllowedHeader(k)) {
-                            return;
-                        }
-                        for (String value : v) {
-                            response.addHeader(k, value);
-                        }
+                        if (EmbyProxyUtil.isNotAllowedHeader(k)) return;
+                        for (String value : v) response.addHeader(k, value);
                     });
+                    // 处理响应体
                     byte[] data;
                     if (StrUtil.equalsIgnoreCase(res.header("Content-Encoding"), "br")) {
                         data = (new BrotliInputStream(res.bodyStream())).readAllBytes();
                     } else {
-                        // 非压缩内容直接转发
                         data = res.bodyBytes();
                     }
+                    // 写入响应
                     try (ServletOutputStream outputStream = response.getOutputStream()) {
                         outputStream.write(data);
                     } catch (IOException e) {
-                        if (!ExceptUtil.isConnectionTerminated(e)) {
-                            throw e;
-                        }
+                        if (!ExceptUtil.isConnectionTerminated(e)) throw e;
                     }
                 }
             }
         } finally {
-            if (StrUtil.equalsIgnoreCase(req.getMethod(), HTTP_DELETE)) {
-                redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheAllKey(req));
-            } else {
-                redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheKey(req));
-            }
+            clearCache(req);
         }
         return true;
+    }
+
+    /**
+     * 提取的缓存清理方法
+     */
+    private void clearCache(EmbyContentCacheReqWrapper req) {
+        if (StrUtil.equalsIgnoreCase(req.getMethod(), HTTP_DELETE)) {
+            redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheAllKey(req));
+        } else {
+            redisClient.delByPrefix(CacheUtil.buildOriginRefreshCacheKey(req));
+        }
     }
 
     public void stopPlay(EmbyContentCacheReqWrapper req) {
@@ -295,6 +304,22 @@ public class OriginReqService {
             }
         }
     }
+
+    public void return308(HttpServletResponse response, String url) {
+        response.setStatus(CODE_308);
+        response.setHeader("Location", url);
+        response.setHeader("Referer", UrlUtil.url(url).getHost());
+    }
+
+    public void return308to200(HttpServletResponse response, String url) {
+        try (Response res = httpClient.send(Request.of(embyConfig.getHost() + url).method(Method.GET))) {
+            response.setStatus(res.getStatus());
+            ServletUtil.write(response, res.bodyStream(), res.header("Content-Type"));
+        } catch (Exception e) {
+            return308(response, embyConfig.getOuterHost() + url);
+        }
+    }
+
 
     /**
      * 异步写入 实体

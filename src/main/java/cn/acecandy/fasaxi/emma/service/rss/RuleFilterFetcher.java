@@ -85,7 +85,7 @@ public class RuleFilterFetcher {
         return itemData.parallelStream()
                 .filter(item -> checkRule(item, rules, logic))
                 .map(item -> new MatchedItem(
-                        Integer.parseInt(item.getTmdbId()), item.getTitle(), itemType))
+                        Integer.parseInt(item.getTmdbId()), item.getTitle(), itemType, null))
                 .collect(Collectors.toSet());
     }
 
@@ -101,17 +101,19 @@ public class RuleFilterFetcher {
                               List<MatchedItem.FilterRule> rules, String logic) {
         List<Boolean> flagList = rules.parallelStream().map(rule -> {
             String field = rule.field();
+            String fieldCamel = StrUtil.toCamelCase(field);
             String operator = rule.operator();
             String value = rule.value();
 
             return switch (field) {
-                case String f when FIELDS_LIST.contains(f) -> handleListField(item, f, operator, value);
-                case String f when FIELDS_DATE.contains(f) -> handleDateField(item, f, operator, value);
+                case String f when FIELDS_LIST.contains(f) -> handleListField(item, fieldCamel, operator, value);
+                case String f when FIELDS_DATE.contains(f) -> handleDateField(item, fieldCamel, operator, value);
 
-                case String f when FIELDS_RATING.contains(f) -> handleRatingField(item, f, operator, value);
-                case String f when FIELDS_IN_PROGRESS.contains(f) -> handleInProgressField(item, f, operator, value);
-                case String f when FIELDS_TITLE.contains(f) -> handleTitleField(item, f, operator, value);
-                case String f when FIELDS_NUMBER.contains(f) -> handleGeneralField(item, f, operator, value);
+                case String f when FIELDS_RATING.contains(f) -> handleRatingField(item, fieldCamel, operator, value);
+                case String f when FIELDS_IN_PROGRESS.contains(f) ->
+                        handleInProgressField(item, fieldCamel, operator, value);
+                case String f when FIELDS_TITLE.contains(f) -> handleTitleField(item, fieldCamel, operator, value);
+                case String f when FIELDS_NUMBER.contains(f) -> handleGeneralField(item, fieldCamel, operator, value);
                 default -> throw new BaseException("不支持的字段：" + field);
             };
         }).toList();
@@ -121,7 +123,10 @@ public class RuleFilterFetcher {
     }
 
     private boolean handleListField(MediaMetadata item, String field, String op, String value) {
-        String itemValueStr = FieldUtil.getFieldValue(item, field + "_json").toString();
+        String itemValueStr = StrUtil.toStringOrNull(FieldUtil.getFieldValue(item, field + "_json"));
+        if (StrUtil.isBlank(itemValueStr)) {
+            return true;
+        }
         List<String> itemList = JSONUtil.toList(itemValueStr, String.class);
 
         // 处理is_primary操作符
@@ -182,10 +187,9 @@ public class RuleFilterFetcher {
     }
 
     private boolean handleDateField(MediaMetadata item, String field, String op, String value) {
-        String itemValueStr = FieldUtil.getFieldValue(item, field).toString();
-
-        if (!NumberUtil.isNumber(value)) {
-            return false;
+        String itemValueStr = StrUtil.toStringOrNull(FieldUtil.getFieldValue(item, field));
+        if (StrUtil.isBlank(itemValueStr) || !NumberUtil.isNumber(value)) {
+            return true;
         }
         int days = Integer.parseInt(value);
         // 前N天
@@ -210,18 +214,21 @@ public class RuleFilterFetcher {
 
     private boolean handleRatingField(MediaMetadata item, String field,
                                       String op, String value) {
-        String rating = FieldUtil.getFieldValue(item, field).toString();
+        String itemValueStr = StrUtil.toStringOrNull(FieldUtil.getFieldValue(item, field));
+        if (StrUtil.isBlank(itemValueStr)) {
+            return true;
+        }
 
         return switch (op) {
             case "is_one_of" -> {
                 List<String> valueList = JSONUtil.toList(value, String.class);
-                yield valueList.contains(rating);
+                yield valueList.contains(itemValueStr);
             }
             case "is_none_of" -> {
                 List<String> valueList = JSONUtil.toList(value, String.class);
-                yield !valueList.contains(rating);
+                yield !valueList.contains(itemValueStr);
             }
-            case "eq" -> StrUtil.equals(rating, value);
+            case "eq" -> StrUtil.equals(itemValueStr, value);
             default -> false;
         };
     }
@@ -249,25 +256,31 @@ public class RuleFilterFetcher {
 
     private boolean handleTitleField(MediaMetadata item, String field,
                                      String op, String value) {
-        String title = FieldUtil.getFieldValue(item, field).toString();
+        String itemValueStr = StrUtil.toStringOrNull(FieldUtil.getFieldValue(item, field));
+        if (StrUtil.isBlank(itemValueStr)) {
+            return true;
+        }
         String searchValue = value.toLowerCase();
 
         return switch (op) {
-            case "contains" -> StrUtil.contains(title, searchValue);
-            case "does_not_contain" -> !StrUtil.contains(title, searchValue);
-            case "starts_with" -> StrUtil.startWith(title, searchValue);
-            case "ends_with" -> StrUtil.endWith(title, searchValue);
+            case "contains" -> StrUtil.contains(itemValueStr, searchValue);
+            case "does_not_contain" -> !StrUtil.contains(itemValueStr, searchValue);
+            case "starts_with" -> StrUtil.startWith(itemValueStr, searchValue);
+            case "ends_with" -> StrUtil.endWith(itemValueStr, searchValue);
             default -> false;
         };
     }
 
     private boolean handleGeneralField(MediaMetadata item, String field,
                                        String op, String value) {
-        String filedValue = FieldUtil.getFieldValue(item, field).toString();
+        String itemValueStr = StrUtil.toStringOrNull(FieldUtil.getFieldValue(item, field));
+        if (StrUtil.isBlank(itemValueStr)) {
+            return true;
+        }
         return switch (op) {
-            case "gte" -> Double.parseDouble(filedValue) >= Double.parseDouble(value);
-            case "lte" -> Double.parseDouble(filedValue) <= Double.parseDouble(value);
-            case "eq" -> StrUtil.equals(filedValue, value);
+            case "gte" -> Double.parseDouble(itemValueStr) >= Double.parseDouble(value);
+            case "lte" -> Double.parseDouble(itemValueStr) <= Double.parseDouble(value);
+            case "eq" -> StrUtil.equals(itemValueStr, value);
             default -> false;
         };
     }

@@ -46,4 +46,28 @@ public class MediaMetadataDao extends ServiceImpl<MediaMetadataMapper, MediaMeta
         return mapper.selectListByQuery(wrapper);
     }
 
+    /**
+     * 按embyIds查找
+     *
+     * @param embyIds   emby ids
+     * @return {@link List }<{@link CustomCollections }>
+     */
+    public List<MediaMetadata> findByEmbyId(List<String> embyIds) {
+        QueryWrapper wrapper = QueryWrapper.create()
+                .where(MEDIA_METADATA.EMBY_ITEM_ID.in(embyIds));
+        return mapper.selectListByQuery(wrapper);
+    }
+
+    /**
+     * 按tmdbIds查找
+     *
+     * @param tmdbIds   emby ids
+     * @return {@link List }<{@link CustomCollections }>
+     */
+    public List<MediaMetadata> findByTmdbId(List<String> tmdbIds) {
+        QueryWrapper wrapper = QueryWrapper.create()
+                .where(MEDIA_METADATA.TMDB_ID.in(tmdbIds));
+        return mapper.selectListByQuery(wrapper);
+    }
+
 }

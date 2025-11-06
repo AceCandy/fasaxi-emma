@@ -9,9 +9,11 @@ import cn.acecandy.fasaxi.emma.sao.out.RTmdbTv;
 import cn.acecandy.fasaxi.emma.sao.proxy.DoubanProxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.TmdbProxy;
 import cn.acecandy.fasaxi.emma.utils.HtmlUtil;
+import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.collection.set.SetUtil;
+import cn.hutool.v7.core.lang.mutable.MutablePair;
 import cn.hutool.v7.core.text.StrUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -72,7 +74,10 @@ public class DoulistRssFetcher {
      */
     private Set<MatchedItem> matchTitlesAndIdToTmdb(List<MatchedItem.Doulist> allItems,
                                                     EmbyMediaType itemType) {
-        Set<MatchedItem> matchedItems = SetUtil.of();
+        Set<MatchedItem> matchedItems = SetUtil.ofLinked();
+        if (CollUtil.isEmpty(allItems)) {
+            return matchedItems;
+        }
 
         // 查找db中所有有豆瓣id的tmdb记录
         List<String> doubanIds = allItems.stream().map(MatchedItem.Doulist::doubanId).toList();
@@ -87,17 +92,22 @@ public class DoulistRssFetcher {
             Integer year = i.year();
             if (tmdbProviderMap.containsKey(doubanId)) {
                 matchedItems.add(new MatchedItem(Integer.parseInt(tmdbProviderMap.get(doubanId).getTmdbId()),
-                        title, itemType));
+                        title, itemType, null));
                 return;
             }
             if (电影.equals(itemType)) {
                 List<RTmdbMovie> results = tmdbProxy.getMovieByName(title, year);
                 if (CollUtil.isNotEmpty(results)) {
                     RTmdbMovie bestMatch = CollUtil.getFirst(results);
-                    matchedItems.add(new MatchedItem(bestMatch.getId(), bestMatch.getTitle(), itemType));
+                    matchedItems.add(new MatchedItem(bestMatch.getId(), bestMatch.getTitle(), itemType, bestMatch));
                 }
             } else if (电视剧.equals(itemType)) {
-                List<RTmdbTv> results = tmdbProxy.getTvByName(title, year);
+                MutablePair<String, Integer> tvInfo = ReUtil.parseTvNameSeason(title);
+                title = tvInfo.getLeft();
+                // TODO 暂时不知道用来干嘛
+                Integer seasonNumber = tvInfo.getRight();
+
+                List<RTmdbTv> results = tmdbProxy.getTvByName(title, seasonNumber, year);
                 if (CollUtil.isNotEmpty(results)) {
                     RTmdbTv bestMatch = null;
                     String normShowName = HtmlUtil.normalizeString(title);
@@ -113,7 +123,7 @@ public class DoulistRssFetcher {
                     if (null == bestMatch) {
                         bestMatch = CollUtil.getFirst(results);
                     }
-                    matchedItems.add(new MatchedItem(bestMatch.getId(), bestMatch.getName(), itemType));
+                    matchedItems.add(new MatchedItem(bestMatch.getId(), bestMatch.getName(), itemType, bestMatch));
                 }
             }
         });
