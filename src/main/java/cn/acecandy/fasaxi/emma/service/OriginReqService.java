@@ -113,7 +113,7 @@ public class OriginReqService {
         }
         stopPlay(req);
 
-        boolean isPlayingSession = StrUtil.containsIgnoreCase(req.getParamUri(), "Sessions/Playing/");
+        boolean isPlayingSession = StrUtil.containsIgnoreCase(req.getParamUri(), "Sessions/Playing/Progress");
         if (isPlayingSession) {
             if (!redisLockClient.lock(buildSessionsLock(req), 15)) {
                 log.info("lock sessions failed, key: {}", buildSessionsLock(req));
@@ -124,7 +124,7 @@ public class OriginReqService {
         try {
             // === 提取公共的HTTP请求和响应转发逻辑 (开始) ===
             String url = embyConfig.getHost() + req.getParamUri();
-            String apiKey = "api_key=" + embyConfig.getApiKey();
+            String apiKey = "api_key=" + req.getApiKey();
             url = HttpUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
             Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod())).body(req.getCachedBody());
 
