@@ -116,12 +116,15 @@ public class CollectionTaskService {
         }
         String collectionType = coll.getType();
         JSONObject definition = JSONUtil.parseObj(coll.getDefinitionJson());
+        List<String> itemTypeFromDb = JSONUtil.toList(definition.getStr("item_type"), String.class);
+        EmbyMediaType itemType = EmbyMediaType.fromEmby(CollUtil.getFirst(itemTypeFromDb));
+
         // Integer limit = definition.containsKey("limit") ? definition.getInt("limit") : 50;
         Set<MatchedItem> matchedItems = SetUtil.ofLinked();
         if (StrUtil.equals(collectionType, "list")) {
             matchedItems = handleCollectionList(definition);
         } else if (StrUtil.equals(collectionType, "filter")) {
-            matchedItems = handleCollectionFilter(definition);
+            matchedItems = handleCollectionFilter(definition,itemType);
         }
         // TODO 修正匹配逻辑
         if (CollUtil.isEmpty(matchedItems)) {
@@ -129,7 +132,7 @@ public class CollectionTaskService {
         }
         List<String> tmdbIds = matchedItems.stream().map(s -> String.valueOf(s.id())).toList();
         // 默认合集存在，如果不存在从页面进行创建
-        List<MediaMetadata> mediaMetadatas = mediaMetadataDao.findByTmdbId(tmdbIds);
+        List<MediaMetadata> mediaMetadatas = mediaMetadataDao.findByTmdbId(tmdbIds, itemType.getEmbyName());
         // 内存重排序为传入的顺序
         Map<String, MediaMetadata> metadataMap = mediaMetadatas.stream().collect(Collectors.toMap(
                 MediaMetadata::getTmdbId, Function.identity(), (_, v2) -> v2));
@@ -202,17 +205,14 @@ public class CollectionTaskService {
      * @param definition 定义
      * @return {@link List }<{@link MatchedItem }>
      */
-    private Set<MatchedItem> handleCollectionFilter(JSONObject definition) {
+    private Set<MatchedItem> handleCollectionFilter(JSONObject definition, EmbyMediaType itemType) {
         List<String> targetLibraryIds = JSONUtil.toList(definition.getStr("target_library_ids"), String.class);
         if (CollUtil.isEmpty(targetLibraryIds)) {
             return SetUtil.of();
         }
-        List<String> itemTypeFromDb = JSONUtil.toList(definition.getStr("item_type"), String.class);
-        EmbyMediaType itemType = EmbyMediaType.fromEmby(CollUtil.getFirst(itemTypeFromDb));
-
         List<String> allItemId = getAllItemIdByCache(targetLibraryIds);
         // 转成本地db中的item 一起查可能id太多 分成1000个一组查询
-        List<MediaMetadata> allItems = CollUtil.partition(allItemId, 1000).stream()
+        List<MediaMetadata> allItems = CollUtil.partition(allItemId, 4000).stream()
                 .map(i -> mediaMetadataDao.findByEmbyId(i, itemType.getEmbyName()))
                 .flatMap(Collection::stream).toList();
 

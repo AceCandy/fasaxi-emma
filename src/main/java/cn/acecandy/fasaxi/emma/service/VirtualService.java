@@ -41,6 +41,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -352,6 +353,15 @@ public class VirtualService {
     }
 
     @SneakyThrows
+    public void handle(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
+        if (ReUtil.isItemsUrl(request.getRequestURI())) {
+            handleItems(request, response);
+        } else {
+            handleOtherEndpoint(request, response);
+        }
+    }
+
+    @SneakyThrows
     public void handleLatest(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
         String userId = ReUtil.isLatestUrl(request.getRequestURI());
         if (StrUtil.isBlank(userId)) {
@@ -388,7 +398,7 @@ public class VirtualService {
         }
 
         // 缓存不存在，同步构建
-        embyItems = buildLibDetail(request);
+        embyItems = buildLibDetailNative(request);
         redisClient.set(cacheKey, embyItems, CacheConstant.DAY_30_S);
         return embyItems;
     }
@@ -401,7 +411,7 @@ public class VirtualService {
         CompletableFuture.runAsync(() -> {
             String cacheKey = CacheUtil.buildOriginLatestCacheKey(request);
             try {
-                EmbyItemsInfoOut freshData = buildLibDetail(request);
+                EmbyItemsInfoOut freshData = buildLibDetailNative(request);
                 redisClient.set(cacheKey, freshData, CacheConstant.DAY_30_S);
             } catch (Exception e) {
                 log.warn("异步刷新缓存失败: {}", cacheKey, e);
@@ -410,6 +420,35 @@ public class VirtualService {
                 libDetailFlag.remove(cacheKey);
             }
         }, cacheRefreshExecutor);
+    }
+
+    private EmbyItemsInfoOut buildLibDetailNative(EmbyContentCacheReqWrapper request) {
+        Map<String, Object> cachedParam = request.getCachedParam();
+        String userId = request.getUserId();
+        String parentId = request.getParentId();
+
+        if (!StrUtil.startWith(parentId, "-")) {
+            List<EmbyItem> items = JSONUtil.toList(buildShowNext(request), EmbyItem.class);
+            return EmbyItemsInfoOut.builder().items(items).totalRecordCount(items.size()).build();
+        }
+        Long realId = fromMimickedId(parentId);
+        CustomCollections coll = customCollectionsDao.getById(realId);
+        if (coll == null) {
+            return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
+        }
+        JSONArray generatedMediaInfoJson = JSONUtil.parseArray(coll.getGeneratedMediaInfoJson());
+        List<String> embyIds = generatedMediaInfoJson.stream().filter(g ->
+                        ObjUtil.isNotEmpty(g.getObjByPath("emby_id")))
+                .map(g -> g.getByPath("emby_id", String.class).toString()).toList();
+        if (CollUtil.isEmpty(embyIds)) {
+            return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
+        }
+        String realEmbyCollectionId = coll.getEmbyCollectionId();
+        cachedParam.put("ParentId", realEmbyCollectionId);
+        EmbyItemsInfoOut out = embyProxy.getUserItems(userId, cachedParam);
+        // out的items按照 List<String> embyIds 的顺序来排序
+        out.getItems().sort(Comparator.comparing(item -> embyIds.indexOf(item.getItemId())));
+        return out;
     }
 
     private EmbyItemsInfoOut buildLibDetail(EmbyContentCacheReqWrapper request) {

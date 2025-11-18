@@ -214,6 +214,32 @@ public class EmbyProxy {
      * @param userId 用户ID
      * @return {@link List<EmbyItem> }
      */
+    public EmbyItemsInfoOut getUserItems(String userId, Map<String, Object> cachedParam) {
+        String url = embyConfig.getHost() + StrUtil.format(embyConfig.getUserItemUrl(), userId);
+        cachedParam.put("api_key", embyConfig.getApiKey());
+        cachedParam.remove("Recursive");
+        cachedParam.remove("MediaTypes");
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET).form(cachedParam))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+            return JSONUtil.toBean(resBody, EmbyItemsInfoOut.class);
+        } catch (Exception e) {
+            log.warn("getUserItems 网络请求异常: ", e);
+        }
+        return null;
+    }
+
+    /**
+     * 获取视图
+     *
+     * @param userId 用户ID
+     * @return {@link List<EmbyItem> }
+     */
     public EmbyItemsInfoOut getUserItems(String userId, List<String> itemIds,
                                          List<String> sortBy, String sortOrder,
                                          Integer startIndex, Integer limit, String fields, String itemTypes) {

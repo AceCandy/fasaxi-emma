@@ -123,11 +123,7 @@ public class EmbyProxyFilter implements Filter {
                     } else if (StrUtil.endWithIgnoreCase(reqWrapper.getRequestURI(), "/Items/Latest")) {
                         virtualService.handleLatest(reqWrapper, res);
                     } else if (StrUtil.startWith(reqWrapper.getParentId(), "-")) {
-                        if (ReUtil.isItemsUrl(reqWrapper.getRequestURI())) {
-                            virtualService.handleItems(reqWrapper, res);
-                        } else {
-                            virtualService.handleOtherEndpoint(reqWrapper, res);
-                        }
+                        virtualService.handle(reqWrapper, res);
                     } else {
                         originReqService.forwardOriReq(reqWrapper, res);
                     }

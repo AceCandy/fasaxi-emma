@@ -3,6 +3,7 @@ package cn.acecandy.fasaxi.emma.dao.toolkit.service;
 import cn.acecandy.fasaxi.emma.dao.toolkit.entity.CustomCollections;
 import cn.acecandy.fasaxi.emma.dao.toolkit.entity.MediaMetadata;
 import cn.acecandy.fasaxi.emma.dao.toolkit.mapper.MediaMetadataMapper;
+import cn.hutool.v7.core.lang.Console;
 import com.mybatisflex.annotation.UseDataSource;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -52,11 +53,17 @@ public class MediaMetadataDao extends ServiceImpl<MediaMetadataMapper, MediaMeta
      * @return {@link List }<{@link CustomCollections }>
      */
     public List<MediaMetadata> findByEmbyId(List<String> embyIds, String itemType) {
-        String arrayLiteral = "{" + String.join(",", embyIds) + "}";
-        QueryWrapper wrapper = QueryWrapper.create()
-                .where("jsonb_exists_any(emby_item_ids_json,?::text[])", arrayLiteral)
-                .and(MEDIA_METADATA.ITEM_TYPE.eq(itemType));
-        return mapper.selectListByQuery(wrapper);
+        long start = System.currentTimeMillis();
+        try {
+            String arrayLiteral = "{" + String.join(",", embyIds) + "}";
+            QueryWrapper wrapper = QueryWrapper.create()
+                    .where("jsonb_exists_any(emby_item_ids_json,?::text[])", arrayLiteral)
+                    .and(MEDIA_METADATA.ITEM_TYPE.eq(itemType));
+            return mapper.selectListByQuery(wrapper);
+        } finally {
+            Console.log("findByEmbyId itemType: {}, cost: {}ms",
+                    itemType, System.currentTimeMillis() - start);
+        }
     }
 
     /**
@@ -65,9 +72,10 @@ public class MediaMetadataDao extends ServiceImpl<MediaMetadataMapper, MediaMeta
      * @param tmdbIds emby ids
      * @return {@link List }<{@link CustomCollections }>
      */
-    public List<MediaMetadata> findByTmdbId(List<String> tmdbIds) {
+    public List<MediaMetadata> findByTmdbId(List<String> tmdbIds, String itemType) {
         QueryWrapper wrapper = QueryWrapper.create()
-                .where(MEDIA_METADATA.TMDB_ID.in(tmdbIds));
+                .where(MEDIA_METADATA.TMDB_ID.in(tmdbIds))
+                .and(MEDIA_METADATA.ITEM_TYPE.eq(itemType));
         return mapper.selectListByQuery(wrapper);
     }
 
