@@ -107,11 +107,6 @@ public class CustomCollections extends Model<CustomCollections> {
     private Integer sortOrder;
 
     /**
-     * list
-     */
-    private String generatedEmbyIdsJson;
-
-    /**
      * 允许的用户id list
      */
     private String allowedUserIds;
