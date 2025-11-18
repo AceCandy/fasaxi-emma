@@ -72,15 +72,13 @@ public class RuleFilterFetcher {
         this.airingIds = airingIds != null ? airingIds : new HashSet<>();
     }
 
-    public Set<MatchedItem> exec(List<MediaMetadata> itemData, JSONObject definition) {
+    public Set<MatchedItem> exec(List<MediaMetadata> itemData, JSONObject definition,
+                                 EmbyMediaType itemType) {
         List<MatchedItem.FilterRule> rules = definition.getBeanList("rules", MatchedItem.FilterRule.class);
         if (CollUtil.isEmpty(rules)) {
             return SetUtil.of();
         }
         String logic = definition.getStr("logic", "AND");
-
-        List<String> itemTypeFromDb = JSONUtil.toList(definition.getStr("item_type"), String.class);
-        EmbyMediaType itemType = EmbyMediaType.fromEmby(CollUtil.getFirst(itemTypeFromDb));
 
         return itemData.parallelStream()
                 .filter(item -> checkRule(item, rules, logic))

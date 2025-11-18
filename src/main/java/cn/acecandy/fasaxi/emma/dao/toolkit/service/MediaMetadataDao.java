@@ -37,11 +37,10 @@ public class MediaMetadataDao extends ServiceImpl<MediaMetadataMapper, MediaMeta
     public List<MediaMetadata> findByEmbyIdOrder(List<String> embyIds,
                                                  List<QueryColumn> sortBy,
                                                  boolean sortOrder, int showLimit) {
+        String arrayLiteral = "{" + String.join(",", embyIds) + "}";
         QueryWrapper wrapper = QueryWrapper.create()
-                .where(MEDIA_METADATA.EMBY_ITEM_ID.in(embyIds));
-        sortBy.forEach(sort -> {
-            wrapper.orderBy(sort, sortOrder);
-        });
+                .where("jsonb_exists_any(emby_item_ids_json,?::text[])", arrayLiteral);
+        sortBy.forEach(sort -> wrapper.orderBy(sort, sortOrder));
         wrapper.limit(0, showLimit);
         return mapper.selectListByQuery(wrapper);
     }
@@ -49,19 +48,21 @@ public class MediaMetadataDao extends ServiceImpl<MediaMetadataMapper, MediaMeta
     /**
      * 按embyIds查找
      *
-     * @param embyIds   emby ids
+     * @param embyIds emby ids
      * @return {@link List }<{@link CustomCollections }>
      */
-    public List<MediaMetadata> findByEmbyId(List<String> embyIds) {
+    public List<MediaMetadata> findByEmbyId(List<String> embyIds, String itemType) {
+        String arrayLiteral = "{" + String.join(",", embyIds) + "}";
         QueryWrapper wrapper = QueryWrapper.create()
-                .where(MEDIA_METADATA.EMBY_ITEM_ID.in(embyIds));
+                .where("jsonb_exists_any(emby_item_ids_json,?::text[])", arrayLiteral)
+                .and(MEDIA_METADATA.ITEM_TYPE.eq(itemType));
         return mapper.selectListByQuery(wrapper);
     }
 
     /**
      * 按tmdbIds查找
      *
-     * @param tmdbIds   emby ids
+     * @param tmdbIds emby ids
      * @return {@link List }<{@link CustomCollections }>
      */
     public List<MediaMetadata> findByTmdbId(List<String> tmdbIds) {

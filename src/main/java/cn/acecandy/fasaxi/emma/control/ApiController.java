@@ -11,6 +11,7 @@ import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItemsInfoOut;
 import cn.acecandy.fasaxi.emma.sao.proxy.DoubanProxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
+import cn.acecandy.fasaxi.emma.task.impl.CollectionTaskService;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.date.DateTime;
@@ -50,10 +51,20 @@ public class ApiController {
     @Resource
     private RedisClient redisClient;
 
+    @Resource
+    private CollectionTaskService collectionTaskService;
+
     // 当前系统时间
     @GetMapping("/time")
     public Rsres<Object> health() {
         return Rsres.success(System.currentTimeMillis());
+    }
+
+    // 更新对应合集
+    @GetMapping("/obtainCollection")
+    public Rsres<Void> obtainCollection(Long collectionId) {
+        collectionTaskService.obtainCollection(collectionId);
+        return Rsres.success();
     }
 
     // 清除db无用图片

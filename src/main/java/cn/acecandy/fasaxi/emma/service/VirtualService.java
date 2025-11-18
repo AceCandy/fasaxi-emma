@@ -472,7 +472,9 @@ public class VirtualService {
             boolean dbSortOrder = !StrUtil.equals(sortOrder, "Descending");
             List<MediaMetadata> metadataList = mediaMetadataDao.findByEmbyIdOrder(
                     embyIds, dbSortStr, dbSortOrder, showLimit);
-            List<String> sortEmbyIds = metadataList.stream().map(MediaMetadata::getEmbyItemId).toList();
+            List<String> sortEmbyIds = metadataList.stream().map(MediaMetadata::getEmbyItemIdsJson)
+                    .filter(CollUtil::isNotEmpty).flatMap(List::stream).filter(StrUtil::isNotBlank)
+                    .toList();
             return embyProxy.getUserItems(userId, sortEmbyIds, null, null,
                     null, null, fields, null);
         }

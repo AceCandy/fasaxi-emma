@@ -105,7 +105,7 @@ public class CollectionTaskService {
         });
     }
 
-    private void obtainCollection(Long id) {
+    public void obtainCollection(Long id) {
         if (null == id) {
             return;
         }
@@ -137,7 +137,9 @@ public class CollectionTaskService {
                 .map(metadataMap::get).filter(Objects::nonNull).toList();
 
         List<String> newEmbyIds = mediaMetadatas.stream()
-                .map(MediaMetadata::getEmbyItemId).filter(Objects::nonNull).toList();
+                .map(MediaMetadata::getEmbyItemIdsJson).filter(CollUtil::isNotEmpty)
+                .flatMap(List::stream).filter(StrUtil::isNotBlank)
+                .toList();
 
         Long embyCollectionId = Long.parseLong(coll.getEmbyCollectionId());
         List<EmbyItem> items = embyProxy.getItemsByCollections(embyCollectionId);
@@ -152,10 +154,13 @@ public class CollectionTaskService {
         //
         // } else if (StrUtil.equals(collectionType, "filter")) {
         List<GeneratedMediaInfo> generatedMediaInfos = mediaMetadatas.stream()
-                .map(m -> GeneratedMediaInfo.builder().title(m.getTitle())
-                        .status(m.getInLibrary() ? "in_library" : "missing")
-                        .embyId(m.getEmbyItemId()).tmdbId(m.getTmdbId())
-                        .releaseDate(DateUtil.formatDate(m.getReleaseDate())).build()).toList();
+                .flatMap(m -> m.getEmbyItemIdsJson().stream().filter(StrUtil::isNotBlank)
+                        .map(embyId -> GeneratedMediaInfo.builder()
+                                .title(m.getTitle()).status(m.getInLibrary() ? "in_library" : "missing")
+                                .embyId(embyId).tmdbId(m.getTmdbId())
+                                .releaseDate(DateUtil.formatDate(m.getReleaseDate()))
+                                .build())
+                ).toList();
 
         CustomCollections.x().setId(id).setHealthStatus("ok").setMissingCount(0)
                 .setGeneratedMediaInfoJson(generatedMediaInfos)
@@ -202,12 +207,16 @@ public class CollectionTaskService {
         if (CollUtil.isEmpty(targetLibraryIds)) {
             return SetUtil.of();
         }
+        List<String> itemTypeFromDb = JSONUtil.toList(definition.getStr("item_type"), String.class);
+        EmbyMediaType itemType = EmbyMediaType.fromEmby(CollUtil.getFirst(itemTypeFromDb));
+
         List<String> allItemId = getAllItemIdByCache(targetLibraryIds);
         // 转成本地db中的item 一起查可能id太多 分成1000个一组查询
-        List<MediaMetadata> allItems = CollUtil.partition(allItemId, 8000).stream()
-                .map(i -> mediaMetadataDao.findByEmbyId(i)).flatMap(Collection::stream).toList();
+        List<MediaMetadata> allItems = CollUtil.partition(allItemId, 1000).stream()
+                .map(i -> mediaMetadataDao.findByEmbyId(i, itemType.getEmbyName()))
+                .flatMap(Collection::stream).toList();
 
-        Set<MatchedItem> matchedItems = ruleFilterFetcher.exec(allItems, definition);
+        Set<MatchedItem> matchedItems = ruleFilterFetcher.exec(allItems, definition, itemType);
         return matchedItems;
     }
 
