@@ -1,8 +1,12 @@
 package cn.acecandy.fasaxi.emma.service;
 
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
+import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
+import cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
+import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
+import cn.acecandy.fasaxi.emma.dao.embyboss.service.VideoPathRelationDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.client.RedisLockClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
@@ -14,11 +18,15 @@ import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.PathUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
-import cn.acecandy.fasaxi.emma.utils.VideoUtil;
 import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.date.DateTime;
 import cn.hutool.v7.core.date.DateUtil;
+import cn.hutool.v7.core.io.file.FileUtil;
+import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.lang.mutable.MutablePair;
+import cn.hutool.v7.core.lang.mutable.MutableTriple;
 import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.math.NumberUtil;
 import cn.hutool.v7.core.net.url.UrlDecoder;
 import cn.hutool.v7.core.net.url.UrlEncoder;
 import cn.hutool.v7.core.net.url.UrlQueryUtil;
@@ -30,6 +38,7 @@ import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.client.engine.ClientEngine;
 import cn.hutool.v7.http.meta.Method;
+import cn.hutool.v7.json.JSONUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
@@ -54,6 +63,7 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_416;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_NC2O;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123_ZONG;
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧_集;
 import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildVideoLock;
 
 /**
@@ -65,9 +75,6 @@ import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildVideoLock;
 @Slf4j
 @Component
 public class VideoRedirectService {
-
-    @Resource
-    private VideoUtil videoUtil;
 
     @Resource
     private ThreadLimitUtil threadLimitUtil;
@@ -92,6 +99,9 @@ public class VideoRedirectService {
 
     @Resource
     private RedisLockClient redisLockClient;
+
+    @Resource
+    private VideoPathRelationDao videoPathRelationDao;
 
     @SneakyThrows
     public void processVideo(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
@@ -312,7 +322,7 @@ public class VideoRedirectService {
      * @param mediaSourceId 媒体源id
      * @return {@link MediaInfo }
      */
-    private MediaInfo getMediaInfo(String mediaSourceId) {
+    /*private MediaInfo getMediaInfo(String mediaSourceId) {
         EmbyItem itemInfo = embyProxy.getItemInfoByCache(mediaSourceId);
         if (itemInfo == null || CollUtil.isEmpty(itemInfo.getMediaSources())) {
             return null;
@@ -322,6 +332,50 @@ public class VideoRedirectService {
         mediaPath = StrUtil.replace(UrlDecoder.decode(mediaPath), "(?<!http:|https:)/+", s -> "/");
 
         return new MediaInfo(mediaPath, itemInfo.getSize());
+    }*/
+    private MediaInfo getMediaInfo(String mediaSourceId) {
+        EmbyItem itemInfo = embyProxy.getItemInfoByCache(mediaSourceId);
+        if (itemInfo == null || CollUtil.isEmpty(itemInfo.getMediaSources())) {
+            return null;
+        }
+        ThreadUtil.execute(() -> asyncUpdateVideoPathRelation(itemInfo));
+
+        String mediaPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
+        mediaPath = StrUtil.replace(UrlDecoder.decode(mediaPath), "(?<!http:|https:)/+", s -> "/");
+
+        return new MediaInfo(mediaPath, itemInfo.getSize());
+    }
+
+    private void asyncUpdateVideoPathRelation(EmbyItem itemInfo) {
+        Integer itemId = NumberUtil.parseInt(itemInfo.getItemId());
+        String itemPath = itemInfo.getPath();
+        DateTime nowStrmTime = (DateTime) FileUtil.lastModifiedTime(itemPath);
+        EmbyMediaType itemType = EmbyMediaType.fromEmby(itemInfo.getType());
+
+        VideoPathRelation videoPathRelation = videoPathRelationDao.findById(itemId);
+        if (null != videoPathRelation && nowStrmTime.equals(videoPathRelation.getStrmTime())) {
+            return;
+        }
+        if (null == videoPathRelation) {
+            String itemName = itemType == 电视剧_集 ? StrUtil.format("{} {} {}",
+                    itemInfo.getSeriesName() + itemInfo.getSeasonName() + itemInfo.getName()) : itemInfo.getName();
+            videoPathRelation = VideoPathRelation.x().setItemName(itemName).setItemType(itemType.getEmbyName());
+        }
+
+        String realPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
+        MutableTriple<String, StrmPathPrefix, String> pathSplit = StrmPathPrefix.split(realPath);
+        String strmType = pathSplit.getMiddle().getType();
+        String path115 = "", path123 = "";
+        if (StrUtil.equalsIgnoreCase(strmType, "123")) {
+            path123 = realPath;
+        } else if (StrUtil.equalsIgnoreCase(strmType, "115")) {
+            path115 = realPath;
+        }
+        videoPathRelation.setItemId(itemId).setStrmTime(nowStrmTime).setEmbyTime(itemInfo.getDateModified())
+                .setStrmPath(itemPath).setRealPath(realPath).setStrmType(strmType)
+                .setPathPrefix(pathSplit.getMiddle().getValue()).setPurePath(pathSplit.getRight())
+                .setPath115(path115).setPath123(path123);
+        videoPathRelationDao.insertOrUpdate(videoPathRelation);
     }
 
     /**
@@ -452,5 +506,17 @@ public class VideoRedirectService {
     }
 
     record RedirectResult(String url, String storageType, int expireTime, String originalPath) {
+    }
+
+    static void main() {
+        String x = "{\n" +
+                "      \"Name\": \"捕风追影\",\n" +
+                "      \"ServerId\": \"eee6a81e370a4f039be517b686c462b0\",\n" +
+                "      \"Id\": \"3125374\",\n" +
+                "      \"DateCreated\": \"2025-09-22T16:31:52.0000000Z\",\n" +
+                "      \"DateModified\": \"2025-11-14T09:23:55.0000000Z\",\n" +
+                "      \"Container\": \"mp4\"}";
+        Console.log(JSONUtil.toBean(x, EmbyItem.class));
+
     }
 }

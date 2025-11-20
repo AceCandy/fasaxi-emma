@@ -1,6 +1,7 @@
 package cn.acecandy.fasaxi.emma.sao.out;
 
 import cn.hutool.v7.core.annotation.Alias;
+import cn.hutool.v7.core.date.DateTime;
 import lombok.Data;
 
 import java.util.List;
@@ -49,6 +50,12 @@ public class EmbyItem {
      */
     @Alias("FileName" )
     private String fileName;
+
+    /**
+     * 更新时间
+     */
+    @Alias("DateModified" )
+    private DateTime dateModified;
 
     /**
      * 类型

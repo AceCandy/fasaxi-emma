@@ -417,7 +417,7 @@ public class EmbyProxy {
         }
         String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
         try (Response res = httpClient.send(Request.of(url).method(Method.GET)
-                .form(MapUtil.<String, Object>builder("Fields", "Path,MediaSources,ProviderIds")
+                .form(MapUtil.<String, Object>builder("Fields", "Path,MediaSources,ProviderIds,DateModified")
                         .put("Ids", mediaSourceId).put("Limit", 1)
                         .put("api_key", embyConfig.getApiKey()).map()))) {
             if (!res.isOk()) {

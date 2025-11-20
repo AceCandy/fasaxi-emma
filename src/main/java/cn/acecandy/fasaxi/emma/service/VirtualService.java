@@ -369,8 +369,10 @@ public class VirtualService {
             return;
         }
         EmbyItemsInfoOut embyItems = buildLibDetailByCache(request);
+        List<EmbyItem> items = embyItems.getItems().stream().filter(item ->
+                !MapUtil.getBool(item.getUserData(), "Played", false)).toList();
         response.setStatus(CODE_200);
-        ServletUtil.write(response, JSONUtil.toJsonStr(embyItems.getItems()),
+        ServletUtil.write(response, JSONUtil.toJsonStr(items),
                 "application/json;charset=UTF-8");
     }
 
