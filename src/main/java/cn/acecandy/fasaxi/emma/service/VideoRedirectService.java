@@ -38,7 +38,6 @@ import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.client.engine.ClientEngine;
 import cn.hutool.v7.http.meta.Method;
-import cn.hutool.v7.json.JSONUtil;
 import jakarta.annotation.Resource;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
@@ -347,35 +346,40 @@ public class VideoRedirectService {
     }
 
     private void asyncUpdateVideoPathRelation(EmbyItem itemInfo) {
-        Integer itemId = NumberUtil.parseInt(itemInfo.getItemId());
-        String itemPath = itemInfo.getPath();
-        DateTime nowStrmTime = (DateTime) FileUtil.lastModifiedTime(itemPath);
-        EmbyMediaType itemType = EmbyMediaType.fromEmby(itemInfo.getType());
+        try {
+            Integer itemId = NumberUtil.parseInt(itemInfo.getItemId());
+            String itemPath = itemInfo.getPath();
+            DateTime nowStrmTime = DateUtil.date(FileUtil.lastModifiedTime(itemPath));
+            EmbyMediaType itemType = EmbyMediaType.fromEmby(itemInfo.getType());
 
-        VideoPathRelation videoPathRelation = videoPathRelationDao.findById(itemId);
-        if (null != videoPathRelation && nowStrmTime.equals(videoPathRelation.getStrmTime())) {
-            return;
-        }
-        if (null == videoPathRelation) {
-            String itemName = itemType == 电视剧_集 ? StrUtil.format("{} {} {}",
-                    itemInfo.getSeriesName() + itemInfo.getSeasonName() + itemInfo.getName()) : itemInfo.getName();
-            videoPathRelation = VideoPathRelation.x().setItemName(itemName).setItemType(itemType.getEmbyName());
-        }
+            VideoPathRelation videoPathRelation = videoPathRelationDao.findById(itemId);
+            if (null != videoPathRelation && nowStrmTime.equals(videoPathRelation.getStrmTime())) {
+                return;
+            }
+            if (null == videoPathRelation) {
+                String itemName = itemType == 电视剧_集 ? StrUtil.format("{}/{}/{}",
+                        itemInfo.getSeriesName(), itemInfo.getSeasonName(), itemInfo.getName())
+                        : itemInfo.getName();
+                videoPathRelation = VideoPathRelation.x().setItemName(itemName).setItemType(itemType.getEmbyName());
+            }
 
-        String realPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
-        MutableTriple<String, StrmPathPrefix, String> pathSplit = StrmPathPrefix.split(realPath);
-        String strmType = pathSplit.getMiddle().getType();
-        String path115 = "", path123 = "";
-        if (StrUtil.equalsIgnoreCase(strmType, "123")) {
-            path123 = realPath;
-        } else if (StrUtil.equalsIgnoreCase(strmType, "115")) {
-            path115 = realPath;
+            String realPath = UrlDecoder.decode(CollUtil.getFirst(itemInfo.getMediaSources()).getPath());
+            MutableTriple<String, StrmPathPrefix, String> pathSplit = StrmPathPrefix.split(realPath);
+            String strmType = pathSplit.getMiddle().getType();
+            String path115 = "", path123 = "";
+            if (StrUtil.equalsIgnoreCase(strmType, "123")) {
+                path123 = realPath;
+            } else if (StrUtil.equalsIgnoreCase(strmType, "115")) {
+                path115 = realPath;
+            }
+            videoPathRelation.setItemId(itemId).setStrmTime(nowStrmTime).setEmbyTime(itemInfo.getDateModified())
+                    .setStrmPath(itemPath).setRealPath(realPath).setStrmType(strmType)
+                    .setPathPrefix(pathSplit.getMiddle().getValue()).setPurePath(pathSplit.getRight())
+                    .setPath115(path115).setPath123(path123);
+            videoPathRelationDao.insertOrUpdate(videoPathRelation);
+        } catch (Exception e) {
+            log.error("[视频路径关系] 更新失败", e);
         }
-        videoPathRelation.setItemId(itemId).setStrmTime(nowStrmTime).setEmbyTime(itemInfo.getDateModified())
-                .setStrmPath(itemPath).setRealPath(realPath).setStrmType(strmType)
-                .setPathPrefix(pathSplit.getMiddle().getValue()).setPurePath(pathSplit.getRight())
-                .setPath115(path115).setPath123(path123);
-        videoPathRelationDao.insertOrUpdate(videoPathRelation);
     }
 
     /**
@@ -509,14 +513,6 @@ public class VideoRedirectService {
     }
 
     static void main() {
-        String x = "{\n" +
-                "      \"Name\": \"捕风追影\",\n" +
-                "      \"ServerId\": \"eee6a81e370a4f039be517b686c462b0\",\n" +
-                "      \"Id\": \"3125374\",\n" +
-                "      \"DateCreated\": \"2025-09-22T16:31:52.0000000Z\",\n" +
-                "      \"DateModified\": \"2025-11-14T09:23:55.0000000Z\",\n" +
-                "      \"Container\": \"mp4\"}";
-        Console.log(JSONUtil.toBean(x, EmbyItem.class));
-
+        Console.log(UrlDecoder.decode("http://192.168.1.249:5244/d/%2Fnew115%2Fother%2F9kg%2FIPZZ%2FIPZZ-701%2FIPZZ-701-C.mp4"));
     }
 }

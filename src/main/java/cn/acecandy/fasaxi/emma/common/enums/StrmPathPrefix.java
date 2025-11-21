@@ -24,7 +24,7 @@ public enum StrmPathPrefix {
      */
     PRE_MICU("/d/pt/", "micu"),
     PRE_123("/d/123/", "123"),
-    PRE_123_ZONG("/d/123_zong/", "123"),
+    PRE_ZONG123("/d/zong123/", "123"),
     PRE_NEW115("/d/new115/", "115"),
     PRE_115("/d/115/", "115"),
     PRE_LOCAL("vvvvvvvvv", "local"),
