@@ -27,11 +27,12 @@ public class RedisLockClient {
     /**
      * 播放session锁
      */
-    private static final String LOCK_SESSIONS_KEY = "lock:sessions:{}";
+    private static final String LOCK_SESSIONS_KEY = "lock:sessions:{}|{}";
 
     public static String buildSessionsLock(EmbyContentCacheReqWrapper request) {
         String body = request.getCachedBody();
-        return StrUtil.format(LOCK_SESSIONS_KEY, JSONUtil.parseObj(body).getStr("PlaySessionId"));
+        return StrUtil.format(LOCK_SESSIONS_KEY, request.getRequestURI(),
+                JSONUtil.parseObj(body).getStr("PlaySessionId"));
     }
 
     /**

@@ -34,6 +34,7 @@ import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrPool;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
+import cn.hutool.v7.http.HttpUtil;
 import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.client.engine.ClientEngine;
@@ -229,20 +230,20 @@ public class VideoRedirectService {
                 request.getDeviceId(), cloudTypePair.getRight());
 
         // 如果获取失败且不是115网盘，尝试使用115网盘
-        if (StrUtil.isBlank(real302Url) && cloudType.equals(R_123_ZONG)) {
+        /*if (StrUtil.isBlank(real302Url) && cloudType.equals(R_123_ZONG)) {
             real302Url = cloudUtil.getDownloadUrlOnCopyByOpenlist(R_115, request.getUa(),
                     request.getDeviceId(), cloudTypePair.getRight());
-        }
+        }*/
 
         if (StrUtil.isNotBlank(real302Url)) {
             int exTime = calculateExpireTime(real302Url);
 
             // 特殊路径处理：115转123
-            ThreadUtil.execute(() -> {
+            /*ThreadUtil.execute(() -> {
                 if (StrUtil.contains(mediaPath, "/d/new115/")) {
                     embyProxy.trans115To123(mediaPath);
                 }
-            });
+            });*/
             threadLimitUtil.setThreadCache(cloudType, request.getDeviceId());
             return new RedirectResult(real302Url, cloudType.getValue(), exTime, mediaInfo.path);
         }
@@ -350,6 +351,9 @@ public class VideoRedirectService {
             Integer itemId = NumberUtil.parseInt(itemInfo.getItemId());
             String itemPath = itemInfo.getPath();
             DateTime nowStrmTime = DateUtil.date(FileUtil.lastModifiedTime(itemPath));
+            if (null == nowStrmTime) {
+                return;
+            }
             EmbyMediaType itemType = EmbyMediaType.fromEmby(itemInfo.getType());
 
             VideoPathRelation videoPathRelation = videoPathRelationDao.findById(itemId);
@@ -361,9 +365,12 @@ public class VideoRedirectService {
                         itemInfo.getSeriesName(), itemInfo.getSeasonName(), itemInfo.getName())
                         : itemInfo.getName();
                 videoPathRelation = VideoPathRelation.x().setItemName(itemName).setItemType(itemType.getEmbyName());
+            } else {
+                videoPathRelation = VideoPathRelation.x();
             }
 
-            String realPath = UrlDecoder.decode(CollUtil.getFirst(itemInfo.getMediaSources()).getPath());
+            String realPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
+            // 只处理网络路径开头的标准化 本地格式保留
             MutableTriple<String, StrmPathPrefix, String> pathSplit = StrmPathPrefix.split(realPath);
             String strmType = pathSplit.getMiddle().getType();
             String path115 = "", path123 = "";
@@ -513,6 +520,10 @@ public class VideoRedirectService {
     }
 
     static void main() {
-        Console.log(UrlDecoder.decode("http://192.168.1.249:5244/d/%2Fnew115%2Fother%2F9kg%2FIPZZ%2FIPZZ-701%2FIPZZ-701-C.mp4"));
+        Console.log(UrlDecoder.decode("/1000/download-rss/9kg-硬链/9kg-已刮削/里番/Hentai/2024/[とるだ屋] ゴムをつけてといいましたよね...＃1 [DMM-467012].mkv"));
+        Console.log(UrlUtil.normalize("/1000/download-rss/9kg-硬链/9kg-已刮削/里番/Hentai/2024/[とるだ屋] ゴムをつけてといいましたよね...＃1 [DMM-467012].mkv", true, true));
+        Console.log(UrlUtil.normalize(UrlDecoder.decode("/1000/download-rss/9kg-硬链/9kg-已刮削/里番/Hentai/2024/[とるだ屋] ゴムをつけてといいましたよね...＃1 [DMM-467012].mkv")));
+        Console.log(UrlUtil.normalize(UrlDecoder.decode("/1000/download-rss/9kg-硬链/9kg-已刮削/里番/Hentai/2024/[とるだ屋] ゴムをつけてといいましたよね...＃1 [DMM-467012].mkv"), true, true));
+        Console.log(UrlUtil.normalize(UrlDecoder.decode("/1000/download-rss/9kg-硬链/9kg-已刮削/里番/Hentai/2024/[とるだ屋] ゴムをつけてといいましたよね...＃1 [DMM-467012].mkv"), true, true));
     }
 }

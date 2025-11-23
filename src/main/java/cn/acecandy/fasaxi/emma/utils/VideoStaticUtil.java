@@ -38,7 +38,7 @@ public class VideoStaticUtil {
     public static void main(String[] args) {
         try {
             // 示例：分析指定URL的MP4视频
-            String videoUrl = "http://alist.netcup-1o.worldline.space/p/pt/Emby1/综艺/我是歌手 (2013)/Season 10/我是歌手 - S10E02 - 第2集 - ADWeb.mp4";
+            String videoUrl = "http://alist.netcup-1o.worldline.fun/p/pt/Emby1/综艺/我是歌手 (2013)/Season 10/我是歌手 - S10E02 - 第2集 - ADWeb.mp4";
             VideoStaticUtil analyzer = new VideoStaticUtil();
 
             // 方法1：直接从HTTP请求分析（推荐）

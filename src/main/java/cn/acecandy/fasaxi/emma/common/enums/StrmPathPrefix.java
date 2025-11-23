@@ -3,8 +3,11 @@ package cn.acecandy.fasaxi.emma.common.enums;
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.lang.mutable.MutableTriple;
+import cn.hutool.v7.core.net.url.UrlDecoder;
+import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
+import cn.hutool.v7.http.HttpUtil;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -27,7 +30,8 @@ public enum StrmPathPrefix {
     PRE_ZONG123("/d/zong123/", "123"),
     PRE_NEW115("/d/new115/", "115"),
     PRE_115("/d/115/", "115"),
-    PRE_LOCAL("vvvvvvvvv", "local"),
+    PRE_LOCAL("/1000/", "local"),
+    PRE_UNKNOWN("vvvvvv", "unknown"),
     ;
 
     private final String value;
@@ -67,6 +71,8 @@ public enum StrmPathPrefix {
         if (StrUtil.isBlank(fullPath)) {
             throw new BaseException("fullPath不能为空");
         }
+        fullPath = HttpUtil.isHttp(fullPath) ?
+                UrlUtil.normalize(UrlDecoder.decode(fullPath), false, true) : fullPath;
         for (StrmPathPrefix prefix : values()) {
             if (StrUtil.contains(fullPath, prefix.value)) {
                 List<String> split = SplitUtil.splitTrim(fullPath, prefix.value);

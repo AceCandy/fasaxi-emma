@@ -12,6 +12,7 @@ import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
+import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.array.ArrayUtil;
 import cn.hutool.v7.core.date.StopWatch;
 import cn.hutool.v7.core.exception.ExceptionUtil;
@@ -113,20 +114,26 @@ public class OriginReqService {
         }
         stopPlay(req);
 
-        boolean isPlayingSession = StrUtil.containsIgnoreCase(req.getParamUri(), "Sessions/Playing/Progress");
-        if (isPlayingSession) {
-            if (!redisLockClient.lock(buildSessionsLock(req), 15)) {
-                log.info("lock sessions failed, key: {}", buildSessionsLock(req));
-                response.setStatus(CODE_204);
-                return true;
+        if (StrUtil.containsIgnoreCase(req.getParamUri(), "Sessions/Playing")) {
+            if (redisLockClient.lock(buildSessionsLock(req), 15)) {
+                String url = embyConfig.getHost() + req.getParamUri();
+                String apiKey = "api_key=" + req.getApiKey();
+                url = HttpUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
+                Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod())).body(req.getCachedBody());
+                ThreadUtil.execute(() -> httpClient.send(originalRequest));
             }
+            response.setStatus(CODE_204);
+            return true;
         }
         try {
             // === 提取公共的HTTP请求和响应转发逻辑 (开始) ===
             String url = embyConfig.getHost() + req.getParamUri();
-            String apiKey = "api_key=" + req.getApiKey();
-            url = HttpUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
-            Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod())).body(req.getCachedBody());
+            if(StrUtil.isNotBlank(req.getApiKey())){
+                String apiKey = "api_key=" + req.getApiKey();
+                url = HttpUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
+            }
+            Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod()))
+                    .body(req.getCachedBody()).header(req.getCachedHeader());
 
             try (Response res = httpClient.send(originalRequest)) {
                 response.setStatus(res.getStatus());

@@ -289,12 +289,12 @@ public final class CloudUtil {
         String decodedNormalizedPath = FileUtil.normalize(UrlDecoder.decode(filePath));
 
         // 单独处理 R_115 类型的云存储
-        if (cloudStorage.equals(R_115)) {
+        /*if (cloudStorage.equals(R_115)) {
             String real302Url = processR115Storage(cloudStorage, ua, deviceId, decodedNormalizedPath);
             if (StrUtil.isNotBlank(real302Url)) {
                 return real302Url;
             }
-        }
+        }*/
 
         // 构建默认的媒体路径（适用于所有类型，R_115已通过processedFilePath处理）
         String defaultMediaPath = cloudStorage.getPrefix() + decodedNormalizedPath;

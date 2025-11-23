@@ -9,6 +9,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
+import java.util.Date;
+
 /**
  * 视频路径关联表
  *
@@ -64,12 +66,12 @@ public class VideoPathRelation extends Model<VideoPathRelation> {
     /**
      * emby入库的更新时间
      */
-    private DateTime embyTime;
+    private Date embyTime;
 
     /**
      * strm创建的更新时间
      */
-    private DateTime strmTime;
+    private Date strmTime;
 
     /**
      * 对应115路径
@@ -86,10 +88,10 @@ public class VideoPathRelation extends Model<VideoPathRelation> {
     /**
      * 创建时间（默认当前时间戳）
      */
-    private DateTime createTime;
+    private Date createTime;
 
     /**
      * 更新时间（默认当前时间戳，更新时自动刷新）
      */
-    private DateTime updateTime;
+    private Date updateTime;
 }

@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.6</version>
+        <version>3.5.8</version>
         <relativePath/>
     </parent>
 
@@ -21,7 +21,7 @@
         <java.version>25</java.version>
 
         <brotli.version>0.1.2</brotli.version>
-        <common-compress.version>1.27.1</common-compress.version>
+        <common-compress.version>1.28.0</common-compress.version>
         <disruptor.version>4.0.0</disruptor.version>
         <guava.version>33.5.0-jre</guava.version>
         <httpclient.version>5.5.1</httpclient.version>
@@ -29,8 +29,8 @@
         <jpinyin.version>1.1.8</jpinyin.version>
         <jsoup.version>1.21.2</jsoup.version>
         <lombok.version>1.18.42</lombok.version>
-        <mybatis-flex.version>1.11.3</mybatis-flex.version>
-        <okhttp.version>4.12.0</okhttp.version>
+        <mybatis-flex.version>1.11.4</mybatis-flex.version>
+<!--        <okhttp.version>4.12.0</okhttp.version>-->
         <!--        <spring-cloud.version>2025.1.0-M1</spring-cloud.version>-->
         <spring-cloud.version>2025.0.0</spring-cloud.version>
     </properties>
