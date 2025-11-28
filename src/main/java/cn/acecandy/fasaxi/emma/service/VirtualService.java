@@ -368,6 +368,7 @@ public class VirtualService {
             response.setStatus(CODE_401);
             return;
         }
+        request.getCachedParam().put("Filters", "IsUnplayed");
         EmbyItemsInfoOut embyItems = buildLibDetailByCache(request);
         List<EmbyItem> items = embyItems.getItems().stream().filter(item ->
                 !MapUtil.getBool(item.getUserData(), "Played", false)).toList();

@@ -219,6 +219,7 @@ public class EmbyProxy {
         cachedParam.put("api_key", embyConfig.getApiKey());
         cachedParam.remove("Recursive");
         cachedParam.remove("MediaTypes");
+        cachedParam.put("IncludeItemTypes", "Series,Movie");
         try (Response res = httpClient.send(Request.of(url).method(Method.GET).form(cachedParam))) {
             if (!res.isOk()) {
                 throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
