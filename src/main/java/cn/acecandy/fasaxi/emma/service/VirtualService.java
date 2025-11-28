@@ -370,7 +370,8 @@ public class VirtualService {
         }
         request.getCachedParam().put("Filters", "IsUnplayed");
         EmbyItemsInfoOut embyItems = buildLibDetailByCache(request);
-        // List<EmbyItem> items = embyItems.getItems().stream().filter(item ->
+        List<EmbyItem> items = embyItems.getItems();
+        // .stream().filter(item ->
         //         !MapUtil.getBool(item.getUserData(), "Played", false)).toList();
         response.setStatus(CODE_200);
         ServletUtil.write(response, JSONUtil.toJsonStr(items),
