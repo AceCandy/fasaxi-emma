@@ -2,12 +2,15 @@ package cn.acecandy.fasaxi.emma.sao.proxy;
 
 import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
+import cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix;
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.TmdbProvider;
+import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
 import cn.acecandy.fasaxi.emma.dao.embyboss.service.TmdbProviderDao;
+import cn.acecandy.fasaxi.emma.dao.embyboss.service.VideoPathRelationDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.client.RedisLockClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
@@ -25,8 +28,12 @@ import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.date.DateTime;
+import cn.hutool.v7.core.date.DateUtil;
 import cn.hutool.v7.core.exception.ExceptionUtil;
+import cn.hutool.v7.core.io.file.FileUtil;
+import cn.hutool.v7.core.lang.mutable.MutableTriple;
 import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.math.NumberUtil;
 import cn.hutool.v7.core.net.url.UrlBuilder;
 import cn.hutool.v7.core.net.url.UrlDecoder;
 import cn.hutool.v7.core.net.url.UrlPath;
@@ -47,6 +54,7 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_302;
@@ -87,6 +95,9 @@ public class EmbyProxy {
 
     @Resource
     private TmdbProxy tmdbProxy;
+
+    @Resource
+    private VideoPathRelationDao videoPathRelationDao;
 
     /**
      * 返回结果个性化排序
@@ -409,17 +420,17 @@ public class EmbyProxy {
     /**
      * 获取项目信息
      *
-     * @param mediaSourceId 媒体源id
+     * @param mediaSourceIds 媒体源id
      * @return {@link TmdbImageInfoOut }
      */
-    public EmbyItem getItemInfo(String mediaSourceId) {
-        if (StrUtil.isBlank(mediaSourceId)) {
+    public List<EmbyItem> getItemInfo(String mediaSourceIds) {
+        if (StrUtil.isBlank(mediaSourceIds)) {
             return null;
         }
         String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
         try (Response res = httpClient.send(Request.of(url).method(Method.GET)
                 .form(MapUtil.<String, Object>builder("Fields", "Path,MediaSources,ProviderIds,DateModified")
-                        .put("Ids", mediaSourceId).put("Limit", 1)
+                        .put("Ids", mediaSourceIds)
                         .put("api_key", embyConfig.getApiKey()).map()))) {
             if (!res.isOk()) {
                 throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
@@ -428,8 +439,7 @@ public class EmbyProxy {
             if (!JSONUtil.isTypeJSON(resBody)) {
                 throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
             }
-            EmbyItem embyItem = CollUtil.getFirst(JSONUtil.toBean(resBody, EmbyItemsInfoOut.class).getItems());
-            return embyItem;
+            return JSONUtil.toBean(resBody, EmbyItemsInfoOut.class).getItems();
         } catch (Exception e) {
             log.warn("getItemInfo 网络请求异常: ", e);
         }
@@ -439,21 +449,21 @@ public class EmbyProxy {
     /**
      * 获取项目信息
      *
-     * @param mediaSourceId 媒体源id
+     * @param mediaSourceIds 媒体源id
      * @return {@link TmdbImageInfoOut }
      */
-    public EmbyItem getItemInfoByCache(String mediaSourceId) {
-        if (StrUtil.isBlank(mediaSourceId)) {
+    public List<EmbyItem> getItemInfoByCache(String mediaSourceIds) {
+        if (StrUtil.isBlank(mediaSourceIds)) {
             return null;
         }
-        String cacheKey = CacheUtil.buildThirdCacheKey("getItemInfo", mediaSourceId);
-        EmbyItem result = redisClient.getBean(cacheKey);
-        if (null != result) {
+        String cacheKey = CacheUtil.buildThirdCacheKey("getItemInfo", mediaSourceIds);
+        List<EmbyItem> result = redisClient.getBean(cacheKey);
+        if (CollUtil.isNotEmpty(result)) {
             return result;
         }
-        result = getItemInfo(mediaSourceId);
-        if (null != result && result.getSize() > 1024 * 1024L) {
-            redisClient.setBean(cacheKey, result, 2 * 60);
+        result = getItemInfo(mediaSourceIds);
+        if (CollUtil.isNotEmpty(result)) {
+            redisClient.setBean(cacheKey, result, 60);
         }
         return result;
     }
@@ -726,12 +736,68 @@ public class EmbyProxy {
                 return;
             }
             try {
+                asyncUpdateVideoPathRelation(item);
                 getPlayback(item.getItemId());
             } finally {
                 redisLockClient.unlock(lockKey);
             }
         });
     }
+
+    /**
+     * 异步更新视频路径关系
+     *
+     * @param item 物品信息
+     */
+    public void asyncUpdateVideoPathRelation(EmbyItem item) {
+        try {
+            List<EmbyMediaSource> mediaSources = item.getMediaSources();
+            String mediaSourceIds = mediaSources.stream().map(EmbyMediaSource::getItemId)
+                    .collect(Collectors.joining(","));
+            List<EmbyItem> items = getItemInfoByCache(mediaSourceIds);
+            items.forEach(itemInfo -> {
+                Integer itemId = NumberUtil.parseInt(itemInfo.getItemId());
+                String itemPath = itemInfo.getPath();
+                DateTime nowStrmTime = DateUtil.date(FileUtil.lastModifiedTime(itemPath));
+                if (null == nowStrmTime) {
+                    return;
+                }
+                EmbyMediaType itemType = EmbyMediaType.fromEmby(itemInfo.getType());
+
+                VideoPathRelation videoPathRelation = videoPathRelationDao.findById(itemId);
+                if (null != videoPathRelation && nowStrmTime.equals(videoPathRelation.getStrmTime())) {
+                    return;
+                }
+                if (null == videoPathRelation) {
+                    String itemName = itemType == 电视剧_集 ? StrUtil.format("{}/{}/{}",
+                            itemInfo.getSeriesName(), itemInfo.getSeasonName(), itemInfo.getName())
+                            : itemInfo.getName();
+                    videoPathRelation = VideoPathRelation.x().setItemName(itemName).setItemType(itemType.getEmbyName());
+                } else {
+                    videoPathRelation = VideoPathRelation.x();
+                }
+
+                String realPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
+                // 只处理网络路径开头的标准化 本地格式保留
+                MutableTriple<String, StrmPathPrefix, String> pathSplit = StrmPathPrefix.split(realPath);
+                String strmType = pathSplit.getMiddle().getType();
+                String path115 = "", path123 = "";
+                if (StrUtil.equalsIgnoreCase(strmType, "123")) {
+                    path123 = realPath;
+                } else if (StrUtil.equalsIgnoreCase(strmType, "115")) {
+                    path115 = realPath;
+                }
+                videoPathRelation.setItemId(itemId).setStrmTime(nowStrmTime).setEmbyTime(itemInfo.getDateModified())
+                        .setStrmPath(itemPath).setRealPath(realPath).setStrmType(strmType)
+                        .setPathPrefix(pathSplit.getMiddle().getValue()).setPurePath(pathSplit.getRight())
+                        .setPath115(path115).setPath123(path123);
+                videoPathRelationDao.insertOrUpdate(videoPathRelation);
+            });
+        } catch (Exception e) {
+            log.error("[视频路径关系] 更新失败", e);
+        }
+    }
+
 
     /**
      * 115离线至113

@@ -1,21 +1,35 @@
 package cn.acecandy.fasaxi.emma.service;
 
+import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
+import cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix;
 import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
+import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
+import cn.acecandy.fasaxi.emma.dao.embyboss.service.VideoPathRelationDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.client.RedisLockClient;
+import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
+import cn.acecandy.fasaxi.emma.sao.out.EmbyMediaSource;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
+import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.array.ArrayUtil;
+import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.date.DateTime;
+import cn.hutool.v7.core.date.DateUtil;
 import cn.hutool.v7.core.date.StopWatch;
 import cn.hutool.v7.core.exception.ExceptionUtil;
+import cn.hutool.v7.core.io.file.FileUtil;
+import cn.hutool.v7.core.lang.mutable.MutableTriple;
+import cn.hutool.v7.core.math.NumberUtil;
 import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.util.CharsetUtil;
@@ -34,6 +48,8 @@ import org.brotli.dec.BrotliInputStream;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
@@ -41,6 +57,7 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_308;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_408;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_599;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_DELETE;
+import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧_集;
 import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildOriginLock;
 import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildSessionsLock;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheLongTimeReq;
@@ -78,6 +95,9 @@ public class OriginReqService {
     private RedisLockClient redisLockClient;
     @Resource
     private ThreadLimitUtil threadLimitUtil;
+    @Resource
+    private VideoPathRelationDao videoPathRelationDao;
+
 
     /**
      * 转发原始请求
@@ -128,7 +148,7 @@ public class OriginReqService {
         try {
             // === 提取公共的HTTP请求和响应转发逻辑 (开始) ===
             String url = embyConfig.getHost() + req.getParamUri();
-            if(StrUtil.isNotBlank(req.getApiKey())){
+            if (StrUtil.isNotBlank(req.getApiKey())) {
                 String apiKey = "api_key=" + req.getApiKey();
                 url = HttpUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
             }
@@ -190,25 +210,6 @@ public class OriginReqService {
             writeCacheResponse(response, cached);
             return;
         }
-
-        /*if (StrUtil.containsIgnoreCase(request.getRequestURI(), "/Views")) {
-            String toolkitStr = redisClient.getStr(CACHE_VIEW_KEY);
-            if (!JSONUtil.isTypeJSON(toolkitStr)) {
-                try (Response toolkitResp = httpClient.send(Request.of(embyConfig.getEmbyToolkitHost()
-                                + request.getParamUri() + "&api_key=" + embyConfig.getApiKey())
-                        .method(Method.valueOf(request.getMethod())))) {
-                    toolkitStr = toolkitResp.bodyStr();
-
-                    if (JSONUtil.isTypeJSON(toolkitStr)) {
-                        redisClient.set(CACHE_VIEW_KEY, toolkitStr, 60 * 60);
-                    }
-                } catch (Throwable e) {
-                    log.warn("toolkit异常，请检查, e:", e);
-                    redisClient.set(CACHE_VIEW_KEY, "{}", 3 * 60);
-                }
-            }
-            request.buildToolKit(toolkitStr);
-        }*/
 
         StopWatch stopWatch = StopWatch.of("原始请求");
         stopWatch.start("转发");
@@ -354,4 +355,5 @@ public class OriginReqService {
         }
         redisClient.setBean(CacheUtil.buildOriginCacheKey(request), cached, exTime);
     }
+
 }

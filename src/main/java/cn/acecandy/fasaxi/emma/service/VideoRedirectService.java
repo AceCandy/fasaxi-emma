@@ -99,9 +99,8 @@ public class VideoRedirectService {
 
     @Resource
     private RedisLockClient redisLockClient;
-
     @Resource
-    private VideoPathRelationDao videoPathRelationDao;
+    private OriginReqService originReqService;
 
     @SneakyThrows
     public void processVideo(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
@@ -334,59 +333,17 @@ public class VideoRedirectService {
         return new MediaInfo(mediaPath, itemInfo.getSize());
     }*/
     private MediaInfo getMediaInfo(String mediaSourceId) {
-        EmbyItem itemInfo = embyProxy.getItemInfoByCache(mediaSourceId);
-        if (itemInfo == null || CollUtil.isEmpty(itemInfo.getMediaSources())) {
+        List<EmbyItem> itemInfos = embyProxy.getItemInfoByCache(mediaSourceId);
+        if (CollUtil.isEmpty(itemInfos)) {
             return null;
         }
-        ThreadUtil.execute(() -> asyncUpdateVideoPathRelation(itemInfo));
+        EmbyItem itemInfo = CollUtil.getFirst(itemInfos);
+        // ThreadUtil.execute(() -> originReqService.asyncUpdateVideoPathRelation(itemInfo));
 
         String mediaPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
         mediaPath = StrUtil.replace(UrlDecoder.decode(mediaPath), "(?<!http:|https:)/+", s -> "/");
 
         return new MediaInfo(mediaPath, itemInfo.getSize());
-    }
-
-    private void asyncUpdateVideoPathRelation(EmbyItem itemInfo) {
-        try {
-            Integer itemId = NumberUtil.parseInt(itemInfo.getItemId());
-            String itemPath = itemInfo.getPath();
-            DateTime nowStrmTime = DateUtil.date(FileUtil.lastModifiedTime(itemPath));
-            if (null == nowStrmTime) {
-                return;
-            }
-            EmbyMediaType itemType = EmbyMediaType.fromEmby(itemInfo.getType());
-
-            VideoPathRelation videoPathRelation = videoPathRelationDao.findById(itemId);
-            if (null != videoPathRelation && nowStrmTime.equals(videoPathRelation.getStrmTime())) {
-                return;
-            }
-            if (null == videoPathRelation) {
-                String itemName = itemType == 电视剧_集 ? StrUtil.format("{}/{}/{}",
-                        itemInfo.getSeriesName(), itemInfo.getSeasonName(), itemInfo.getName())
-                        : itemInfo.getName();
-                videoPathRelation = VideoPathRelation.x().setItemName(itemName).setItemType(itemType.getEmbyName());
-            } else {
-                videoPathRelation = VideoPathRelation.x();
-            }
-
-            String realPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
-            // 只处理网络路径开头的标准化 本地格式保留
-            MutableTriple<String, StrmPathPrefix, String> pathSplit = StrmPathPrefix.split(realPath);
-            String strmType = pathSplit.getMiddle().getType();
-            String path115 = "", path123 = "";
-            if (StrUtil.equalsIgnoreCase(strmType, "123")) {
-                path123 = realPath;
-            } else if (StrUtil.equalsIgnoreCase(strmType, "115")) {
-                path115 = realPath;
-            }
-            videoPathRelation.setItemId(itemId).setStrmTime(nowStrmTime).setEmbyTime(itemInfo.getDateModified())
-                    .setStrmPath(itemPath).setRealPath(realPath).setStrmType(strmType)
-                    .setPathPrefix(pathSplit.getMiddle().getValue()).setPurePath(pathSplit.getRight())
-                    .setPath115(path115).setPath123(path123);
-            videoPathRelationDao.insertOrUpdate(videoPathRelation);
-        } catch (Exception e) {
-            log.error("[视频路径关系] 更新失败", e);
-        }
     }
 
     /**
@@ -406,88 +363,88 @@ public class VideoRedirectService {
                 DateUtil.date((DateUtil.currentSeconds() + exTime) * 1000), mediaPath, UrlDecoder.decode(realUrl));
     }
 
-    private void originalVideoStream(EmbyContentCacheReqWrapper request,
-                                     HttpServletResponse response) {
-        String mediaSourceId = request.getMediaSourceId();
-        EmbyItem embyItem = embyProxy.getItemInfoByCache(mediaSourceId);
-        if (null == embyItem) {
-            response.setStatus(CODE_404);
-            return;
-        }
-        EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
-        if (null == range) {
-            response.setHeader("Content-Range", "bytes */" + embyItem.getSize());
-            response.setStatus(CODE_416);
-            return;
-        }
-        if (fileCacheUtil.readFile(response, embyItem, range)) {
-            return;
-        }
-        // range = new EmbyProxyUtil.Range(range.start(), embyItem.getSize() - 1, embyItem.getSize());
-        String rangeHeader = range.toHeader();
-        String ua = embyConfig.getCommonUa();
-        Map<String, String> headerMap = MapUtil.<String, String>builder()
-                .put("User-Agent", ua).put("range", rangeHeader).build();
-
-        // ThreadUtil.execVirtual(() -> fileCacheUtil.writeFile(request, embyItem, headerMap));
-        String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();
-        Request originalRequest = null;
-        if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
-            mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath));
-            if (StrUtil.containsAny(mediaPath, "pt/Emby", "bt/Emby")) {
-                // mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
-            } else {
-                mediaPath = get302RealUrl(mediaSourceId, request.getDeviceId(), mediaPath, headerMap);
-            }
-            log.warn("原始range:{} total:{}", request.getRange(), embyItem.getSize());
-            log.warn("视频拉取(远程):[{}-({})] => {}", mediaSourceId, rangeHeader, mediaPath);
-            originalRequest = Request.of(mediaPath).method(Method.GET).header(headerMap).setMaxRedirects(1);
-        } else {
-            originalRequest = Request.of(embyConfig.getHost() + request.getParamUri())
-                    .method(Method.valueOf(request.getMethod()))
-                    .body(request.getCachedBody()).header(request.getCachedHeader()).header(headerMap);
-            log.warn("视频拉取(本地):[{}-({})] => {}", mediaSourceId, rangeHeader, mediaPath);
-        }
-        try (Response res = httpClient.send(originalRequest)) {
-            response.setStatus(res.getStatus());
-            res.headers().forEach((name, values) ->
-                    response.setHeader(name, String.join(StrPool.COMMA, values)));
-            log.info("返回请求头:{}", res.headers());
-            // 使用虚拟线程池（非阻塞模式）
-            try (ServletOutputStream out = response.getOutputStream(); InputStream bodyStream = res.bodyStream();
-                 ReadableByteChannel inChannel = Channels.newChannel(bodyStream);
-                 WritableByteChannel outChannel = Channels.newChannel(out)) {
-                // 使用直接缓冲区提升性能（适用于大文件）
-                ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 128);
-                while (inChannel.read(buffer) != -1) {
-                    buffer.flip();
-                    while (buffer.hasRemaining()) {
-                        outChannel.write(buffer);
-                    }
-                    buffer.clear();
-
-                    // 响应客户端中断（关键！）
-                    if (Thread.currentThread().isInterrupted()) {
-                        throw new InterruptedException("Streaming interrupted");
-                    }
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt(); // 恢复中断状态
-                throw new RuntimeException("Video streaming interrupted", e);
-            }
-        } catch (IOException e) {
-            if (!response.isCommitted()) {
-                try {
-                    response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                } catch (IOException ex) {
-                    throw new RuntimeException(ex);
-                }
-            }
-        } catch (Exception e) {
-            Thread.currentThread().interrupt(); // 恢复中断状态
-            // throw new RuntimeException("Thread interrupted", e);
-        }
-    }
+    // private void originalVideoStream(EmbyContentCacheReqWrapper request,
+    //                                  HttpServletResponse response) {
+    //     String mediaSourceId = request.getMediaSourceId();
+    //     EmbyItem embyItem = embyProxy.getItemInfoByCache(mediaSourceId);
+    //     if (null == embyItem) {
+    //         response.setStatus(CODE_404);
+    //         return;
+    //     }
+    //     EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
+    //     if (null == range) {
+    //         response.setHeader("Content-Range", "bytes */" + embyItem.getSize());
+    //         response.setStatus(CODE_416);
+    //         return;
+    //     }
+    //     if (fileCacheUtil.readFile(response, embyItem, range)) {
+    //         return;
+    //     }
+    //     // range = new EmbyProxyUtil.Range(range.start(), embyItem.getSize() - 1, embyItem.getSize());
+    //     String rangeHeader = range.toHeader();
+    //     String ua = embyConfig.getCommonUa();
+    //     Map<String, String> headerMap = MapUtil.<String, String>builder()
+    //             .put("User-Agent", ua).put("range", rangeHeader).build();
+    //
+    //     // ThreadUtil.execVirtual(() -> fileCacheUtil.writeFile(request, embyItem, headerMap));
+    //     String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();
+    //     Request originalRequest = null;
+    //     if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
+    //         mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath));
+    //         if (StrUtil.containsAny(mediaPath, "pt/Emby", "bt/Emby")) {
+    //             // mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
+    //         } else {
+    //             mediaPath = get302RealUrl(mediaSourceId, request.getDeviceId(), mediaPath, headerMap);
+    //         }
+    //         log.warn("原始range:{} total:{}", request.getRange(), embyItem.getSize());
+    //         log.warn("视频拉取(远程):[{}-({})] => {}", mediaSourceId, rangeHeader, mediaPath);
+    //         originalRequest = Request.of(mediaPath).method(Method.GET).header(headerMap).setMaxRedirects(1);
+    //     } else {
+    //         originalRequest = Request.of(embyConfig.getHost() + request.getParamUri())
+    //                 .method(Method.valueOf(request.getMethod()))
+    //                 .body(request.getCachedBody()).header(request.getCachedHeader()).header(headerMap);
+    //         log.warn("视频拉取(本地):[{}-({})] => {}", mediaSourceId, rangeHeader, mediaPath);
+    //     }
+    //     try (Response res = httpClient.send(originalRequest)) {
+    //         response.setStatus(res.getStatus());
+    //         res.headers().forEach((name, values) ->
+    //                 response.setHeader(name, String.join(StrPool.COMMA, values)));
+    //         log.info("返回请求头:{}", res.headers());
+    //         // 使用虚拟线程池（非阻塞模式）
+    //         try (ServletOutputStream out = response.getOutputStream(); InputStream bodyStream = res.bodyStream();
+    //              ReadableByteChannel inChannel = Channels.newChannel(bodyStream);
+    //              WritableByteChannel outChannel = Channels.newChannel(out)) {
+    //             // 使用直接缓冲区提升性能（适用于大文件）
+    //             ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 128);
+    //             while (inChannel.read(buffer) != -1) {
+    //                 buffer.flip();
+    //                 while (buffer.hasRemaining()) {
+    //                     outChannel.write(buffer);
+    //                 }
+    //                 buffer.clear();
+    //
+    //                 // 响应客户端中断（关键！）
+    //                 if (Thread.currentThread().isInterrupted()) {
+    //                     throw new InterruptedException("Streaming interrupted");
+    //                 }
+    //             }
+    //         } catch (InterruptedException e) {
+    //             Thread.currentThread().interrupt(); // 恢复中断状态
+    //             throw new RuntimeException("Video streaming interrupted", e);
+    //         }
+    //     } catch (IOException e) {
+    //         if (!response.isCommitted()) {
+    //             try {
+    //                 response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+    //             } catch (IOException ex) {
+    //                 throw new RuntimeException(ex);
+    //             }
+    //         }
+    //     } catch (Exception e) {
+    //         Thread.currentThread().interrupt(); // 恢复中断状态
+    //         // throw new RuntimeException("Thread interrupted", e);
+    //     }
+    // }
 
     private String get302RealUrl(String mediaSourceId, String deviceId,
                                  String mediaPath, Map<String, String> headerMap) {

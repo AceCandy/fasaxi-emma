@@ -133,7 +133,7 @@ public class ApiController {
     }
 
     // 构建tmdb&豆瓣本地库
-    @GetMapping("/build/tmdb-douban")
+    /*@GetMapping("/build/tmdb-douban")
     public Rsres<Object> buildTmdbDouban(Integer min, Integer max) {
         String uniqueKey = "unique:tmdb-douban";
         // List<Integer> itemIds = embyItemPicDao.findAllItemId();
@@ -171,7 +171,7 @@ public class ApiController {
             log.warn("构建tmdb&豆瓣本地库==>执行完成, 共处理: {}条", i.get());
         });
         return Rsres.success("构建tmdb&豆瓣本地库==>执行中");
-    }
+    }*/
 
     // 构建tmdb&豆瓣本地库-补全豆瓣id
     @GetMapping("/build/completion-doubanId")
