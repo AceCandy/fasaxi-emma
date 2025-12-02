@@ -23,6 +23,7 @@ public enum CloudStorageType {
      * 本地
      */
     L_NC2O("nc2o", "", ""),
+    L_MICU("micu", "", ""),
     ;
 
     private final String value;

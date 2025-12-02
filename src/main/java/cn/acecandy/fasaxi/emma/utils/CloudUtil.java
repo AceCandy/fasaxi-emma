@@ -343,7 +343,7 @@ public final class CloudUtil {
      * @param newMediaPath 新媒体之路
      * @return {@link String }
      */
-    private String redirect302ByOpenlist(CloudStorageType cloudStorage,
+    public String redirect302ByOpenlist(CloudStorageType cloudStorage,
                                          String newMediaPath, String ua) {
         newMediaPath = StrUtil.replace(newMediaPath, "http://192.168.1.249:5244", opConfig.getHost());
         String real302Url = "";

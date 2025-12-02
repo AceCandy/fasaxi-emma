@@ -1,6 +1,5 @@
 package cn.acecandy.fasaxi.emma.dao.embyboss.entity;
 
-import cn.hutool.v7.core.date.DateTime;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.Table;
@@ -39,6 +38,11 @@ public class VideoPathRelation extends Model<VideoPathRelation> {
      * 媒体类型：Movie-电影/Episode-电视剧
      */
     private String itemType;
+
+    /**
+     * 备份状态 0-未备份 1-备份中 2-备份完成 默认0
+     */
+    private Integer bakStatus;
 
     /**
      * 对应数据中的Path字段

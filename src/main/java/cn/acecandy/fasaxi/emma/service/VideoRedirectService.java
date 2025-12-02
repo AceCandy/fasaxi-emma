@@ -1,57 +1,35 @@
 package cn.acecandy.fasaxi.emma.service;
 
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
-import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
-import cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
-import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
-import cn.acecandy.fasaxi.emma.dao.embyboss.service.VideoPathRelationDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.client.RedisLockClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
-import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.PathUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
-import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.collection.CollUtil;
-import cn.hutool.v7.core.date.DateTime;
 import cn.hutool.v7.core.date.DateUtil;
-import cn.hutool.v7.core.io.file.FileUtil;
 import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.lang.mutable.MutablePair;
-import cn.hutool.v7.core.lang.mutable.MutableTriple;
 import cn.hutool.v7.core.map.MapUtil;
-import cn.hutool.v7.core.math.NumberUtil;
 import cn.hutool.v7.core.net.url.UrlDecoder;
 import cn.hutool.v7.core.net.url.UrlEncoder;
 import cn.hutool.v7.core.net.url.UrlQueryUtil;
 import cn.hutool.v7.core.net.url.UrlUtil;
-import cn.hutool.v7.core.text.StrPool;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
-import cn.hutool.v7.http.HttpUtil;
-import cn.hutool.v7.http.client.Request;
-import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.client.engine.ClientEngine;
-import cn.hutool.v7.http.meta.Method;
 import jakarta.annotation.Resource;
-import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.WritableByteChannel;
 import java.nio.charset.Charset;
 import java.util.Comparator;
 import java.util.List;
@@ -59,11 +37,7 @@ import java.util.Map;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_404;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_416;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_NC2O;
-import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
-import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123_ZONG;
-import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧_集;
 import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildVideoLock;
 
 /**
@@ -99,8 +73,6 @@ public class VideoRedirectService {
 
     @Resource
     private RedisLockClient redisLockClient;
-    @Resource
-    private OriginReqService originReqService;
 
     @SneakyThrows
     public void processVideo(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
