@@ -1,8 +1,11 @@
 package cn.acecandy.fasaxi.emma.service;
 
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
+import cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
+import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
+import cn.acecandy.fasaxi.emma.dao.embyboss.service.VideoPathRelationDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.client.RedisLockClient;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
@@ -74,6 +77,9 @@ public class VideoRedirectService {
     @Resource
     private RedisLockClient redisLockClient;
 
+    @Resource
+    private VideoPathRelationDao videoPathRelationDao;
+
     @SneakyThrows
     public void processVideo(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
         String mediaSourceId = request.getMediaSourceId();
@@ -144,8 +150,26 @@ public class VideoRedirectService {
             response.setStatus(CODE_404);
             return;
         }
-        // 3. 根据路径类型分发处理
-        RedirectResult result = processMediaPath(mediaInfo, request);
+        RedirectResult result;
+        VideoPathRelation vpr = videoPathRelationDao.findById(Integer.parseInt(mediaSourceId));
+        if(vpr != null) {
+            String storageType = vpr.getStrmType();
+            String url302 = vpr.getRealPath();
+
+            String url123 = vpr.getPath123();
+            if(StrUtil.isNotBlank(url123)){
+                url302 = url123;
+                storageType = StrmPathPrefix.PRE_ZONG123.getType();
+            }else if(StrUtil.isNotBlank(vpr.getPath115())){
+                url302 = vpr.getPath115();
+                storageType = StrmPathPrefix.PRE_115.getType();
+            }
+            result = new RedirectResult(url302,
+                    storageType, getDefaultExpireTime(), vpr.getRealPath());
+        }else {
+            // 3. 根据路径类型分发处理
+            result = processMediaPath(mediaInfo, request);
+        }
         // 4. 执行重定向和缓存
         executeRedirect(response, result, mediaSourceId, request.getDeviceId());
     }
@@ -284,7 +308,7 @@ public class VideoRedirectService {
     }
 
     private int getDefaultExpireTime() {
-        return 24 * 60 * 60;
+        return 12 * 60 * 60;
     }
 
     /**

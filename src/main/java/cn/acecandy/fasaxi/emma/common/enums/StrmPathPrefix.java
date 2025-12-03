@@ -71,6 +71,9 @@ public enum StrmPathPrefix {
         if (StrUtil.isBlank(fullPath)) {
             throw new BaseException("fullPath不能为空");
         }
+        if (StrUtil.contains(fullPath, "+")) {
+            fullPath = StrUtil.replace(fullPath, "+", "%2B");
+        }
         fullPath = HttpUtil.isHttp(fullPath) ?
                 UrlUtil.normalize(UrlDecoder.decode(fullPath), false, true) : fullPath;
         for (StrmPathPrefix prefix : values()) {

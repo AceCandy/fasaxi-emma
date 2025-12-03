@@ -787,7 +787,8 @@ public class EmbyProxy {
                 } else if (StrUtil.equalsIgnoreCase(strmType, "115")) {
                     path115 = realPath;
                 }
-                videoPathRelation.setItemId(itemId).setStrmTime(nowStrmTime).setEmbyTime(itemInfo.getDateModified())
+                videoPathRelation.setItemId(itemId).setBakStatus(0)
+                        .setStrmTime(nowStrmTime).setEmbyTime(itemInfo.getDateModified())
                         .setStrmPath(itemPath).setRealPath(realPath).setStrmType(strmType)
                         .setPathPrefix(pathSplit.getMiddle().getValue()).setPurePath(pathSplit.getRight())
                         .setPath115(path115).setPath123(path123);
