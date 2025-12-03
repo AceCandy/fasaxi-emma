@@ -410,7 +410,7 @@ public class EmbyProxy {
         String url = embyConfig.getHost() + StrUtil.format(embyConfig.getEpisodesUrl(), mediaSourceId);
         try (Response res = httpClient.send(Request.of(url).method(Method.GET)
                 .form(MapUtil.<String, Object>builder("api_key", embyConfig.getApiKey())
-                        .put("fields", "Path,MediaSources,ProviderIds").put("seasonid", seasonId).map()))) {
+                        .put("fields", "Path,MediaSources,ProviderIds").put("SeasonId", seasonId).map()))) {
             if (!res.isOk()) {
                 throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
             }
@@ -425,6 +425,23 @@ public class EmbyProxy {
         return null;
     }
 
+    public List<EmbyItem> getEpisodesByCache(String mediaSourceIds, String seasonId) {
+        if (StrUtil.isBlank(mediaSourceIds) || StrUtil.isBlank(seasonId)) {
+            return null;
+        }
+        String cacheKey = CacheUtil.buildThirdCacheKey("getEpisodes",
+                mediaSourceIds + "_" + seasonId);
+        List<EmbyItem> result = redisClient.getBean(cacheKey);
+        if (CollUtil.isNotEmpty(result)) {
+            return result;
+        }
+        result = getEpisodes(mediaSourceIds, seasonId);
+        if (CollUtil.isNotEmpty(result)) {
+            redisClient.setBean(cacheKey, result, 60 * 20);
+        }
+        return result;
+    }
+
     /**
      * 刷新媒体信息
      * <p>
@@ -433,7 +450,7 @@ public class EmbyProxy {
      * @param mediaSourceId 媒体源id
      * @return {@link TmdbImageInfoOut }
      */
-    public List<EmbyItem> getEpisodesUser(String mediaSourceId, String seasonId, String userId) {
+    /*public List<EmbyItem> getEpisodesUser(String mediaSourceId, String seasonId, String userId) {
         if (StrUtil.isBlank(mediaSourceId) || StrUtil.isBlank(seasonId) || StrUtil.isBlank(userId)) {
             return null;
         }
@@ -453,7 +470,7 @@ public class EmbyProxy {
             log.warn("getEpisodes 网络请求异常: ", e);
         }
         return null;
-    }
+    }*/
 
     /**
      * 获取项目信息
@@ -801,7 +818,7 @@ public class EmbyProxy {
                 return;
             }
             String itemId = item.getItemId();
-            List<EmbyItem> seasonItem = getEpisodesUser(itemId, item.getSeasonId(), request.getUserId());
+            List<EmbyItem> seasonItem = getEpisodesByCache(itemId, item.getSeasonId());
             int index = -1;
             for (int i = 0; i < seasonItem.size(); i++) {
                 if (seasonItem.get(i).getItemId().equals(itemId)) {
