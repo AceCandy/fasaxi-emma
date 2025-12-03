@@ -425,8 +425,8 @@ public class EmbyProxy {
         return null;
     }
 
-    public List<EmbyItem> getEpisodesByCache(String mediaSourceIds, String seasonId) {
-        if (StrUtil.isBlank(mediaSourceIds) || StrUtil.isBlank(seasonId)) {
+    public List<EmbyItem> getEpisodesUserByCache(String mediaSourceIds, String seasonId, String userId) {
+        if (StrUtil.isBlank(mediaSourceIds) || StrUtil.isBlank(seasonId) || StrUtil.isBlank(userId)) {
             return null;
         }
         String cacheKey = CacheUtil.buildThirdCacheKey("getEpisodes",
@@ -435,7 +435,7 @@ public class EmbyProxy {
         if (CollUtil.isNotEmpty(result)) {
             return result;
         }
-        result = getEpisodes(mediaSourceIds, seasonId);
+        result = getEpisodesUser(mediaSourceIds, seasonId, userId);
         if (CollUtil.isNotEmpty(result)) {
             redisClient.setBean(cacheKey, result, 60 * 20);
         }
@@ -450,7 +450,7 @@ public class EmbyProxy {
      * @param mediaSourceId 媒体源id
      * @return {@link TmdbImageInfoOut }
      */
-    /*public List<EmbyItem> getEpisodesUser(String mediaSourceId, String seasonId, String userId) {
+    public List<EmbyItem> getEpisodesUser(String mediaSourceId, String seasonId, String userId) {
         if (StrUtil.isBlank(mediaSourceId) || StrUtil.isBlank(seasonId) || StrUtil.isBlank(userId)) {
             return null;
         }
@@ -470,7 +470,7 @@ public class EmbyProxy {
             log.warn("getEpisodes 网络请求异常: ", e);
         }
         return null;
-    }*/
+    }
 
     /**
      * 获取项目信息
@@ -818,7 +818,7 @@ public class EmbyProxy {
                 return;
             }
             String itemId = item.getItemId();
-            List<EmbyItem> seasonItem = getEpisodesByCache(itemId, item.getSeasonId());
+            List<EmbyItem> seasonItem = getEpisodesUserByCache(itemId, item.getSeasonId(), request.getUserId());
             int index = -1;
             for (int i = 0; i < seasonItem.size(); i++) {
                 if (seasonItem.get(i).getItemId().equals(itemId)) {
