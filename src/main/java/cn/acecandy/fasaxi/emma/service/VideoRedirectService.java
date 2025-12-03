@@ -4,6 +4,7 @@ import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
+import cn.acecandy.fasaxi.emma.config.OpConfig;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
 import cn.acecandy.fasaxi.emma.dao.embyboss.service.VideoPathRelationDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
@@ -80,6 +81,9 @@ public class VideoRedirectService {
     @Resource
     private VideoPathRelationDao videoPathRelationDao;
 
+    @Resource
+    private OpConfig opConfig;
+
     @SneakyThrows
     public void processVideo(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
         String mediaSourceId = request.getMediaSourceId();
@@ -150,23 +154,36 @@ public class VideoRedirectService {
             response.setStatus(CODE_404);
             return;
         }
-        RedirectResult result;
+        RedirectResult result = null;
         VideoPathRelation vpr = videoPathRelationDao.findById(Integer.parseInt(mediaSourceId));
-        if(vpr != null) {
+        if (vpr != null) {
             String storageType = vpr.getStrmType();
-            String url302 = vpr.getRealPath();
+            String urlOrigin = "";
+            String url302 = "";
+            if (StrUtil.equals(storageType, StrmPathPrefix.PRE_LOCAL.getType())) {
+                urlOrigin = vpr.getPurePath();
+                url302 = vpr.getPurePath();
+                if (embyConfig.isLocalPath(url302)) {
+                    result = processLocalPath(url302);
+                }
+            } else {
+                urlOrigin = opConfig.getHost() + vpr.getPathPrefix() + vpr.getPurePath();
+                url302 = opConfig.getHost() + vpr.getPathPrefix() + vpr.getPurePath();
 
-            String url123 = vpr.getPath123();
-            if(StrUtil.isNotBlank(url123)){
-                url302 = url123;
-                storageType = StrmPathPrefix.PRE_ZONG123.getType();
-            }else if(StrUtil.isNotBlank(vpr.getPath115())){
-                url302 = vpr.getPath115();
-                storageType = StrmPathPrefix.PRE_115.getType();
+                String url123 = vpr.getPath123();
+                if (StrUtil.isNotBlank(url123)) {
+                    url302 = url123;
+                    storageType = StrmPathPrefix.PRE_ZONG123.getType();
+                } else if (StrUtil.isNotBlank(vpr.getPath115())) {
+                    url302 = vpr.getPath115();
+                    storageType = StrmPathPrefix.PRE_115.getType();
+                }
+                url302 = cloudUtil.redirect302ByOpenlist(CloudStorageType.of(storageType), url302, request.getUa());
+
+                result = new RedirectResult(url302,
+                        storageType, getDefaultExpireTime(), urlOrigin);
             }
-            result = new RedirectResult(url302,
-                    storageType, getDefaultExpireTime(), vpr.getRealPath());
-        }else {
+        } else {
             // 3. 根据路径类型分发处理
             result = processMediaPath(mediaInfo, request);
         }
@@ -263,6 +280,24 @@ public class VideoRedirectService {
         }
 
         return new RedirectResult(mediaPath, "local", getDefaultExpireTime(), mediaInfo.path);
+    }
+
+    private RedirectResult processLocalPath(String mediaPath) {
+        Map<String, String> pathMap = embyConfig.getLocalPathMap();
+
+        // 找到最长匹配前缀的路径映射
+        String bestMatchKey = pathMap.keySet().stream()
+                .filter(prefix -> StrUtil.startWithIgnoreCase(mediaPath, prefix))
+                .max(Comparator.comparingInt(String::length))
+                .orElse(null);
+
+        if (bestMatchKey != null) {
+            String realUrl = StrUtil.replaceIgnoreCase(mediaPath, bestMatchKey, pathMap.get(bestMatchKey));
+            realUrl = UrlEncoder.encodeQuery(realUrl);
+            return new RedirectResult(realUrl, "local", 15 * 24 * 60 * 60, mediaPath);
+        }
+
+        return new RedirectResult(mediaPath, "local", getDefaultExpireTime(), mediaPath);
     }
 
     private void executeRedirect(HttpServletResponse response, RedirectResult result,
