@@ -20,7 +20,9 @@ import cn.acecandy.fasaxi.emma.sao.out.EmbyPlaybackOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyViewOut;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
+import cn.acecandy.fasaxi.emma.service.VideoRedirectService;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
+import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.acecandy.fasaxi.emma.utils.SortUtil;
@@ -58,6 +60,9 @@ import java.util.stream.Collectors;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_302;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_MICU;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电影;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧_集;
@@ -98,6 +103,9 @@ public class EmbyProxy {
 
     @Resource
     private VideoPathRelationDao videoPathRelationDao;
+
+    @Resource
+    private CloudUtil cloudUtil;
 
     /**
      * 返回结果个性化排序
@@ -418,6 +426,63 @@ public class EmbyProxy {
     }
 
     /**
+     * 刷新媒体信息
+     * <p>
+     * 媒体信息有 但是有问题的话需要进行强制刷新
+     *
+     * @param mediaSourceId 媒体源id
+     * @return {@link TmdbImageInfoOut }
+     */
+    public List<EmbyItem> getEpisodesUser(String mediaSourceId, String seasonId, String userId) {
+        if (StrUtil.isBlank(mediaSourceId) || StrUtil.isBlank(seasonId) || StrUtil.isBlank(userId)) {
+            return null;
+        }
+        String url = embyConfig.getHost() + StrUtil.format(embyConfig.getEpisodesUrl(), mediaSourceId);
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET)
+                .form(MapUtil.<String, Object>builder("api_key", embyConfig.getApiKey())
+                        .put("UserId", userId).put("SeasonId", seasonId).map()))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+            return JSONUtil.toBean(resBody, EmbyItemsInfoOut.class).getItems();
+        } catch (Exception e) {
+            log.warn("getEpisodes 网络请求异常: ", e);
+        }
+        return null;
+    }
+
+    /**
+     * 获取项目信息
+     *
+     * @param mediaSourceIds 媒体源id
+     * @return {@link TmdbImageInfoOut }
+     */
+    public EmbyItem getUserItemMedia(String userId, String mediaSourceIds) {
+        if (StrUtil.isBlank(userId) || StrUtil.isBlank(mediaSourceIds)) {
+            return null;
+        }
+        String url = embyConfig.getHost() + StrUtil.format(embyConfig.getUserItemMediaUrl(), userId, mediaSourceIds);
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET)
+                .form(MapUtil.<String, Object>builder("api_key", embyConfig.getApiKey()).map()))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+            return JSONUtil.toBean(resBody, EmbyItem.class);
+        } catch (Exception e) {
+            log.warn("getUserItemMedia 网络请求异常: ", e);
+        }
+        return null;
+    }
+
+    /**
      * 获取项目信息
      *
      * @param mediaSourceIds 媒体源id
@@ -722,26 +787,53 @@ public class EmbyProxy {
      * @param bodyStr 身体str
      */
     private void refreshItem(EmbyContentCacheReqWrapper request, String bodyStr) {
-        if (CollUtil.isEmpty(ReUtil.isItemUrl(request.getRequestURI().toLowerCase()))) {
+        List<String> reStr = ReUtil.isItemUrl(request.getRequestURI().toLowerCase());
+        if (CollUtil.isEmpty(reStr)) {
             return;
         }
+        EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
         ThreadUtil.execVirtual(() -> {
-            EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
-            if (item.getIsFolder() || !StrUtil.equalsAnyIgnoreCase(item.getType(), 电影.getEmbyName(),
-                    电视剧_集.getEmbyName())) {
-                return;
-            }
-            String lockKey = buildRefreshMediaLock(item.getItemId());
-            if (!redisLockClient.lock(lockKey, 120)) {
-                return;
-            }
-            try {
-                asyncUpdateVideoPathRelation(item);
-                getPlayback(item.getItemId());
-            } finally {
-                redisLockClient.unlock(lockKey);
-            }
+
+            currentItemHandle(request, item);
         });
+        ThreadUtil.execVirtual(() -> {
+            if (!StrUtil.equals(电视剧_集.getEmbyName(), item.getType())) {
+                return;
+            }
+            String itemId = item.getItemId();
+            List<EmbyItem> seasonItem = getEpisodesUser(itemId, item.getSeasonId(), request.getUserId());
+            int index = -1;
+            for (int i = 0; i < seasonItem.size(); i++) {
+                if (seasonItem.get(i).getItemId().equals(itemId)) {
+                    index = i;
+                    break;
+                }
+            }
+            if (index == -1 || index == seasonItem.size() - 1) {
+                // 没有找到符合条件或者已经最后一集了
+                return;
+            }
+            EmbyItem nexItem = getUserItemMedia(request.getUserId(),
+                    seasonItem.get(index + 1).getItemId());
+            currentItemHandle(request, nexItem);
+        });
+    }
+
+    private void currentItemHandle(EmbyContentCacheReqWrapper request, EmbyItem item) {
+        if (item.getIsFolder() || !StrUtil.equalsAnyIgnoreCase(item.getType(), 电影.getEmbyName(),
+                电视剧_集.getEmbyName())) {
+            return;
+        }
+        String lockKey = buildRefreshMediaLock(item.getItemId());
+        if (!redisLockClient.lock(lockKey, 120)) {
+            return;
+        }
+        try {
+            asyncUpdateVideoPathRelation(item, request.getUa(), request.getDeviceId());
+            getPlayback(item.getItemId());
+        } finally {
+            redisLockClient.unlock(lockKey);
+        }
     }
 
     /**
@@ -749,7 +841,7 @@ public class EmbyProxy {
      *
      * @param item 物品信息
      */
-    public void asyncUpdateVideoPathRelation(EmbyItem item) {
+    public void asyncUpdateVideoPathRelation(EmbyItem item, String ua, String deviceId) {
         try {
             List<EmbyMediaSource> mediaSources = item.getMediaSources();
             String mediaSourceIds = mediaSources.stream().map(EmbyMediaSource::getItemId)
@@ -757,42 +849,58 @@ public class EmbyProxy {
             List<EmbyItem> items = getItemInfoByCache(mediaSourceIds);
             items.forEach(itemInfo -> {
                 Integer itemId = NumberUtil.parseInt(itemInfo.getItemId());
-                String itemPath = itemInfo.getPath();
-                DateTime nowStrmTime = DateUtil.date(FileUtil.lastModifiedTime(itemPath));
-                if (null == nowStrmTime) {
-                    return;
-                }
-                EmbyMediaType itemType = EmbyMediaType.fromEmby(itemInfo.getType());
+                try {
+                    String itemPath = itemInfo.getPath();
+                    DateTime nowStrmTime = DateUtil.date(FileUtil.lastModifiedTime(itemPath));
+                    if (null == nowStrmTime) {
+                        return;
+                    }
+                    EmbyMediaType itemType = EmbyMediaType.fromEmby(itemInfo.getType());
 
-                VideoPathRelation videoPathRelation = videoPathRelationDao.findById(itemId);
-                if (null != videoPathRelation && nowStrmTime.equals(videoPathRelation.getStrmTime())) {
-                    return;
-                }
-                if (null == videoPathRelation) {
-                    String itemName = itemType == 电视剧_集 ? StrUtil.format("{}/{}/{}",
-                            itemInfo.getSeriesName(), itemInfo.getSeasonName(), itemInfo.getName())
-                            : itemInfo.getName();
-                    videoPathRelation = VideoPathRelation.x().setItemName(itemName).setItemType(itemType.getEmbyName());
-                } else {
-                    videoPathRelation = VideoPathRelation.x();
-                }
+                    VideoPathRelation videoPathRelation = videoPathRelationDao.findById(itemId);
+                    if (null != videoPathRelation && nowStrmTime.equals(videoPathRelation.getStrmTime())) {
+                        return;
+                    }
+                    if (null == videoPathRelation) {
+                        String itemName = itemType == 电视剧_集 ? StrUtil.format("{}/{}/{}",
+                                itemInfo.getSeriesName(), itemInfo.getSeasonName(), itemInfo.getName())
+                                : itemInfo.getName();
+                        videoPathRelation = VideoPathRelation.x().setItemName(itemName).setItemType(itemType.getEmbyName());
+                    } else {
+                        videoPathRelation = VideoPathRelation.x();
+                    }
 
-                String realPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
-                // 只处理网络路径开头的标准化 本地格式保留
-                MutableTriple<String, StrmPathPrefix, String> pathSplit = StrmPathPrefix.split(realPath);
-                String strmType = pathSplit.getMiddle().getType();
-                String path115 = "", path123 = "";
-                if (StrUtil.equalsIgnoreCase(strmType, "123")) {
-                    path123 = realPath;
-                } else if (StrUtil.equalsIgnoreCase(strmType, "115")) {
-                    path115 = realPath;
+                    String realPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
+                    // 只处理网络路径开头的标准化 本地格式保留
+                    MutableTriple<String, StrmPathPrefix, String> pathSplit = StrmPathPrefix.split(realPath);
+                    String strmType = pathSplit.getMiddle().getType();
+                    String path115 = "", path123 = "";
+                    if (StrUtil.equalsIgnoreCase(strmType, "123")) {
+                        path123 = realPath;
+                    } else if (StrUtil.equalsIgnoreCase(strmType, "115")) {
+                        path115 = realPath;
+                    }
+                    videoPathRelation.setItemId(itemId).setBakStatus(0)
+                            .setStrmTime(nowStrmTime).setEmbyTime(itemInfo.getDateModified())
+                            .setStrmPath(itemPath).setRealPath(realPath).setStrmType(strmType)
+                            .setPathPrefix(pathSplit.getMiddle().getValue()).setPurePath(pathSplit.getRight())
+                            .setPath115(path115).setPath123(path123);
+                    videoPathRelationDao.insertOrUpdate(videoPathRelation);
+                } finally {
+                    VideoPathRelation videoPathRelation = videoPathRelationDao.findById(itemId);
+                    if (null != videoPathRelation) {
+                        String path115 = videoPathRelation.getPath115();
+                        if (StrUtil.isNotBlank(path115)) {
+                            cloudUtil.reqAndCacheOpenList302Url(R_115, path115,
+                                    ua, String.valueOf(itemId), deviceId);
+                        }
+                        String path123 = videoPathRelation.getPath123();
+                        if (StrUtil.isNotBlank(path123)) {
+                            cloudUtil.reqAndCacheOpenList302Url(R_123, path123,
+                                    ua, String.valueOf(itemId), deviceId);
+                        }
+                    }
                 }
-                videoPathRelation.setItemId(itemId).setBakStatus(0)
-                        .setStrmTime(nowStrmTime).setEmbyTime(itemInfo.getDateModified())
-                        .setStrmPath(itemPath).setRealPath(realPath).setStrmType(strmType)
-                        .setPathPrefix(pathSplit.getMiddle().getValue()).setPurePath(pathSplit.getRight())
-                        .setPath115(path115).setPath123(path123);
-                videoPathRelationDao.insertOrUpdate(videoPathRelation);
             });
         } catch (Exception e) {
             log.error("[视频路径关系] 更新失败", e);

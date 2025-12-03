@@ -42,6 +42,7 @@ import java.util.Map;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_404;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_NC2O;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123;
 import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildVideoLock;
 
 /**
@@ -181,7 +182,7 @@ public class VideoRedirectService {
                 url302 = cloudUtil.redirect302ByOpenlist(CloudStorageType.of(storageType), url302, request.getUa());
 
                 result = new RedirectResult(url302,
-                        storageType, getDefaultExpireTime(), urlOrigin);
+                        storageType, CacheUtil.getVideoDefaultExpireTime(), urlOrigin);
             }
         } else {
             // 3. 根据路径类型分发处理
@@ -204,7 +205,7 @@ public class VideoRedirectService {
         }
 
         // 默认处理：本地路径直接返回
-        return new RedirectResult(mediaPath, "local", getDefaultExpireTime(), mediaInfo.path);
+        return new RedirectResult(mediaPath, "local", CacheUtil.getVideoDefaultExpireTime(), mediaInfo.path);
     }
 
     private RedirectResult processHttpPath(MediaInfo mediaInfo, EmbyContentCacheReqWrapper request) {
@@ -279,7 +280,7 @@ public class VideoRedirectService {
             return new RedirectResult(realUrl, "local", 15 * 24 * 60 * 60, mediaInfo.path);
         }
 
-        return new RedirectResult(mediaPath, "local", getDefaultExpireTime(), mediaInfo.path);
+        return new RedirectResult(mediaPath, "local", CacheUtil.getVideoDefaultExpireTime(), mediaInfo.path);
     }
 
     private RedirectResult processLocalPath(String mediaPath) {
@@ -297,7 +298,7 @@ public class VideoRedirectService {
             return new RedirectResult(realUrl, "local", 15 * 24 * 60 * 60, mediaPath);
         }
 
-        return new RedirectResult(mediaPath, "local", getDefaultExpireTime(), mediaPath);
+        return new RedirectResult(mediaPath, "local", CacheUtil.getVideoDefaultExpireTime(), mediaPath);
     }
 
     private void executeRedirect(HttpServletResponse response, RedirectResult result,
@@ -307,27 +308,13 @@ public class VideoRedirectService {
             return;
         }
 
-        // 构建缓存key
-        String cacheKey = buildCacheKey(result.storageType(), mediaSourceId, deviceId, result.url());
-
-        // 设置Redis缓存
-        String cacheValue = result.storageType() + "|" + result.url();
-        redisClient.set(cacheKey, cacheValue, result.expireTime());
+        cloudUtil.cacheOpenList302Url(result, mediaSourceId, deviceId);
 
         // 处理pt URL
         String redirectUrl = getPtUrl(result.url());
 
         // 执行重定向
         doRedirect(response, redirectUrl, result.expireTime(), result.originalPath());
-    }
-
-    private String buildCacheKey(String storageType, String mediaSourceId,
-                                 String deviceId, String url) {
-        if (StrUtil.equalsAnyIgnoreCase(storageType, "local", "micu")) {
-            return CacheUtil.buildVideoCacheKey(mediaSourceId);
-        } else {
-            return CacheUtil.buildVideoCacheKey(mediaSourceId, deviceId);
-        }
     }
 
     private int calculateExpireTime(String real302Url) {
@@ -340,10 +327,6 @@ public class VideoRedirectService {
             // 默认2小时
             return 2 * 60 * 60;
         }
-    }
-
-    private int getDefaultExpireTime() {
-        return 12 * 60 * 60;
     }
 
     /**
@@ -504,7 +487,7 @@ public class VideoRedirectService {
 
     }
 
-    record RedirectResult(String url, String storageType, int expireTime, String originalPath) {
+    public record RedirectResult(String url, String storageType, int expireTime, String originalPath) {
     }
 
     static void main() {

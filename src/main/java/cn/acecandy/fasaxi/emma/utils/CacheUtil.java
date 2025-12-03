@@ -149,6 +149,18 @@ public final class CacheUtil extends cn.hutool.v7.core.cache.CacheUtil {
         return StrUtil.format(VIDEO_UA_CACHE_KEY, mediaSourceId, deviceId);
     }
 
+    public static String buildVideoCacheKey(String storageType, String mediaSourceId, String deviceId) {
+        if (StrUtil.equalsAnyIgnoreCase(storageType, "local", "micu")) {
+            return buildVideoCacheKey(mediaSourceId);
+        } else {
+            return buildVideoCacheKey(mediaSourceId, deviceId);
+        }
+    }
+
+    public static int getVideoDefaultExpireTime() {
+        return 12 * 60 * 60;
+    }
+
     public static List<String> buildVideoCacheKeyList(String mediaSourceId,
                                                       String deviceId) {
         return ListUtil.of(buildVideoCacheKey(mediaSourceId, deviceId),

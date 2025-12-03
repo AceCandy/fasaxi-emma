@@ -13,6 +13,7 @@ import cn.acecandy.fasaxi.emma.sao.proxy.OpProxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R115Proxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123Proxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.R123ZongProxy;
+import cn.acecandy.fasaxi.emma.service.VideoRedirectService;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.date.DateUtil;
@@ -414,5 +415,41 @@ public final class CloudUtil {
                 DateUtil.formatToday(), deviceId))) {
             redisClient.set(cacheKey, 1, 60 * 60 * 24 * 2);
         }
+    }
+
+    /**
+     * 缓存302 url
+     *
+     * @param result        结果
+     * @param mediaSourceId 媒体源id
+     * @param deviceId      设备标识符
+     */
+    public void cacheOpenList302Url(VideoRedirectService.RedirectResult result, String mediaSourceId, String deviceId) {
+        // 构建缓存key
+        String cacheKey = CacheUtil.buildVideoCacheKey(result.storageType(), mediaSourceId, deviceId);
+
+        // 设置Redis缓存
+        String cacheValue = result.storageType() + "|" + result.url();
+        redisClient.set(cacheKey, cacheValue, result.expireTime());
+    }
+
+    /**
+     * 请求和缓存302 url
+     *
+     * @param cloudStorage  云存储
+     * @param newMediaPath  新媒体之路
+     * @param ua            ua
+     * @param mediaSourceId 媒体源id
+     * @param deviceId      设备标识符
+     */
+    public void reqAndCacheOpenList302Url(CloudStorageType cloudStorage, String newMediaPath, String ua,
+                                          String mediaSourceId, String deviceId) {
+        String cacheUrl = redisClient.getStrFindOne(CacheUtil.buildVideoCacheKeyList(mediaSourceId, deviceId));
+        if (StrUtil.isNotBlank(cacheUrl)) {
+            return;
+        }
+        String url302 = redirect302ByOpenlist(cloudStorage, newMediaPath, ua);
+        cacheOpenList302Url(new VideoRedirectService.RedirectResult(url302, cloudStorage.getValue(), CacheUtil.getVideoDefaultExpireTime(), newMediaPath),
+                mediaSourceId, deviceId);
     }
 }

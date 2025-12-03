@@ -70,6 +70,10 @@ public class EmbyConfig {
      */
     private String userItemUrl;
     /**
+     * 用户项目媒体url
+     */
+    private String userItemMediaUrl;
+    /**
      * 剧集信息url
      */
     private String episodesUrl;
