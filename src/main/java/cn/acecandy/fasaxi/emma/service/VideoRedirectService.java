@@ -41,6 +41,7 @@ import java.util.Map;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_404;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_MICU;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_NC2O;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123;
 import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildVideoLock;
@@ -121,7 +122,7 @@ public class VideoRedirectService {
             List<String> urlSeg = SplitUtil.splitTrim(cacheUrl, "|");
             CloudStorageType cloudStorageType = CloudStorageType.of(CollUtil.getFirst(urlSeg));
             cacheUrl = CollUtil.getLast(urlSeg);
-            cacheUrl = getPtUrl(cacheUrl);
+            cacheUrl = getPtUrl(cacheUrl, cloudStorageType.getValue());
             threadLimitUtil.setThreadCache(cloudStorageType, deviceId);
 
             response.setStatus(HttpServletResponse.SC_FOUND);
@@ -133,10 +134,15 @@ public class VideoRedirectService {
         return false;
     }
 
-    private String getPtUrl(String cacheUrl) {
-        if (!StrUtil.startWithIgnoreCase(cacheUrl, embyConfig.getOriginPt())) {
+    private String getPtUrl(String cacheUrl, String cloudStorageType) {
+        if (!StrUtil.startWithIgnoreCase(cacheUrl, embyConfig.getOriginPt())
+                && !StrUtil.equals(cloudStorageType, L_MICU.getValue())) {
             return cacheUrl;
         }
+        cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
+                opConfig.getHost(), embyConfig.getOriginPt());
+        cacheUrl = StrUtil.removeAll(cacheUrl, "/d/pt");
+
         int minute = DateUtil.thisMinute();
         if (minute % 2 == 0) {
             cacheUrl = StrUtil.replaceIgnoreCase(cacheUrl,
@@ -162,8 +168,8 @@ public class VideoRedirectService {
             String urlOrigin = "";
             String url302 = "";
             if (StrUtil.equals(storageType, StrmPathPrefix.PRE_LOCAL.getType())) {
-                urlOrigin = vpr.getPurePath();
-                url302 = vpr.getPurePath();
+                urlOrigin = vpr.getRealPath();
+                url302 = vpr.getRealPath();
                 if (embyConfig.isLocalPath(url302)) {
                     result = processLocalPath(url302);
                 }
@@ -179,7 +185,8 @@ public class VideoRedirectService {
                     url302 = vpr.getPath115();
                     storageType = StrmPathPrefix.PRE_115.getType();
                 }
-                url302 = cloudUtil.redirect302ByOpenlist(CloudStorageType.of(storageType), url302, request.getUa());
+                url302 = cloudUtil.reqAndCacheOpenList302Url(CloudStorageType.of(storageType), url302, request.getUa(),
+                        mediaSourceId, request.getDeviceId());
 
                 result = new RedirectResult(url302,
                         storageType, CacheUtil.getVideoDefaultExpireTime(), urlOrigin);
@@ -187,9 +194,21 @@ public class VideoRedirectService {
         } else {
             // 3. 根据路径类型分发处理
             result = processMediaPath(mediaInfo, request);
+
+            if (result == null) {
+                response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                return;
+            }
+            cloudUtil.cacheOpenList302Url(result, mediaSourceId, request.getDeviceId());
         }
+
+        // 异步处理下一集
+        embyProxy.nextHandle(request.getUserId(), request.getUa(), request.getDeviceId(), mediaInfo.itemInfo);
+
         // 4. 执行重定向和缓存
-        executeRedirect(response, result, mediaSourceId, request.getDeviceId());
+        String redirectUrl = getPtUrl(result.url(), result.storageType());
+        // 执行重定向
+        doRedirect(response, redirectUrl, result.expireTime(), result.originalPath());
     }
 
     private RedirectResult processMediaPath(MediaInfo mediaInfo, EmbyContentCacheReqWrapper request) {
@@ -301,22 +320,6 @@ public class VideoRedirectService {
         return new RedirectResult(mediaPath, "local", CacheUtil.getVideoDefaultExpireTime(), mediaPath);
     }
 
-    private void executeRedirect(HttpServletResponse response, RedirectResult result,
-                                 String mediaSourceId, String deviceId) {
-        if (result == null) {
-            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            return;
-        }
-
-        cloudUtil.cacheOpenList302Url(result, mediaSourceId, deviceId);
-
-        // 处理pt URL
-        String redirectUrl = getPtUrl(result.url());
-
-        // 执行重定向
-        doRedirect(response, redirectUrl, result.expireTime(), result.originalPath());
-    }
-
     private int calculateExpireTime(String real302Url) {
         try {
             long expireTime = MapUtil.getLong(UrlQueryUtil.decodeQuery(real302Url,
@@ -357,7 +360,7 @@ public class VideoRedirectService {
         String mediaPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
         mediaPath = StrUtil.replace(UrlDecoder.decode(mediaPath), "(?<!http:|https:)/+", s -> "/");
 
-        return new MediaInfo(mediaPath, itemInfo.getSize());
+        return new MediaInfo(itemInfo, mediaPath, itemInfo.getSize());
     }
 
     /**
@@ -483,7 +486,7 @@ public class VideoRedirectService {
      * @author AceCandy
      * @since 2025/09/28
      */
-    record MediaInfo(String path, long size) {
+    record MediaInfo(EmbyItem itemInfo, String path, long size) {
 
     }
 

@@ -18,6 +18,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_MICU;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
 import static cn.hutool.v7.core.text.StrPool.SLASH;
 
 /**
@@ -51,6 +52,11 @@ public class Webdav2CloudTaskService {
     private static final String COMMON_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0";
 
+    /**
+     * 通用ua
+     */
+    private static final String COMMON_DEVICEID = "zaijie996";
+
     public void uploadTo115() {
         List<VideoPathRelation> videoPathRelations = videoPathRelationDao
                 .findNoBak(StrmPathPrefix.PRE_MICU.getType());
@@ -69,7 +75,8 @@ public class Webdav2CloudTaskService {
                 String targetPathFull = StrUtil.format("/new115/worldline/{}", purePath);
 
                 String r115MediaPath = opConfig.getDHost() + targetPathFull;
-                String real302Url = cloudUtil.redirect302ByOpenlist(L_MICU, r115MediaPath, COMMON_UA);
+                String real302Url = cloudUtil.reqAndCacheOpenList302Url(R_115, r115MediaPath, COMMON_UA,
+                        String.valueOf(v.getItemId()), COMMON_DEVICEID);
                 if (StrUtil.isNotBlank(real302Url)) {
                     // 更新
                     videoPathRelationDao.updateByItemId(VideoPathRelation.x()

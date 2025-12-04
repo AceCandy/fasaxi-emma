@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123;
 import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildDeviceLock;
 import static cn.acecandy.fasaxi.emma.utils.CacheUtil.buildDeviceFileId115Key;
 
@@ -103,7 +104,7 @@ public final class CloudUtil {
         Rile file = null;
         for (CharSequence segment : segments) {
             List<Rile> findFileList = ListUtil.of();
-            if (cloudStorage.equals(CloudStorageType.R_123)) {
+            if (cloudStorage.equals(R_123)) {
                 findFileList = r123Proxy.listRiles(parentId, segment);
             } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
                 findFileList = r123ZongProxy.listRiles(parentId, segment);
@@ -138,7 +139,7 @@ public final class CloudUtil {
         CharSequence segment = CollUtil.getLast(segments);
 
         List<Rile> findFileList = ListUtil.of();
-        if (cloudStorage.equals(CloudStorageType.R_123)) {
+        if (cloudStorage.equals(R_123)) {
             findFileList = r123Proxy.listRiles(segment);
             findFileList = findFileList.stream().filter(item -> item.getFileSize() == size).toList();
         } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
@@ -217,7 +218,7 @@ public final class CloudUtil {
         }
         Long rileId = rile.getFileId();
         String downloadUrl = null;
-        if (cloudStorage.equals(CloudStorageType.R_123)) {
+        if (cloudStorage.equals(R_123)) {
             downloadUrl = r123Proxy.getDownloadUrl(ua, rileId);
         } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
             downloadUrl = r123ZongProxy.getDownloadUrl(ua, rileId);
@@ -240,7 +241,7 @@ public final class CloudUtil {
         if (null != rile) {
             Long rileId = rile.getFileId();
             String downloadUrl = null;
-            if (cloudStorage.equals(CloudStorageType.R_123)) {
+            if (cloudStorage.equals(R_123)) {
                 downloadUrl = r123Proxy.getDownloadUrl(ua, rileId);
             } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
                 downloadUrl = r123ZongProxy.getDownloadUrl(ua, rileId);
@@ -255,7 +256,7 @@ public final class CloudUtil {
         }
         Long rileId = rile.getFileId();
         String downloadUrl = null;
-        if (cloudStorage.equals(CloudStorageType.R_123)) {
+        if (cloudStorage.equals(R_123)) {
             downloadUrl = r123Proxy.getDownloadUrl(ua, rileId);
         } else if (cloudStorage.equals(CloudStorageType.R_123_ZONG)) {
             downloadUrl = r123ZongProxy.getDownloadUrl(ua, rileId);
@@ -442,14 +443,18 @@ public final class CloudUtil {
      * @param mediaSourceId 媒体源id
      * @param deviceId      设备标识符
      */
-    public void reqAndCacheOpenList302Url(CloudStorageType cloudStorage, String newMediaPath, String ua,
-                                          String mediaSourceId, String deviceId) {
+    public String reqAndCacheOpenList302Url(CloudStorageType cloudStorage, String newMediaPath, String ua,
+                                            String mediaSourceId, String deviceId) {
+        if (cloudStorage != R_115 && cloudStorage != R_123) {
+            return newMediaPath;
+        }
         String cacheUrl = redisClient.getStrFindOne(CacheUtil.buildVideoCacheKeyList(mediaSourceId, deviceId));
         if (StrUtil.isNotBlank(cacheUrl)) {
-            return;
+            return cacheUrl;
         }
         String url302 = redirect302ByOpenlist(cloudStorage, newMediaPath, ua);
         cacheOpenList302Url(new VideoRedirectService.RedirectResult(url302, cloudStorage.getValue(), CacheUtil.getVideoDefaultExpireTime(), newMediaPath),
                 mediaSourceId, deviceId);
+        return url302;
     }
 }

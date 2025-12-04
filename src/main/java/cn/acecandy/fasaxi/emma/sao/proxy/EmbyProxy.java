@@ -809,16 +809,28 @@ public class EmbyProxy {
             return;
         }
         EmbyItem item = JSONUtil.toBean(bodyStr, EmbyItem.class);
+        itemAndNextHandle(request.getUserId(), request.getUa(), request.getDeviceId(), item);
+    }
+
+    public void itemAndNextHandle(String userId, String ua, String deviceId, EmbyItem item) {
+        ThreadUtil.execVirtual(() -> {
+            currentItemHandle(ua, deviceId, item);
+        });
+        nextHandle(userId, ua, deviceId, item);
+    }
+
+    public void nextHandle(String userId, String ua, String deviceId, EmbyItem item) {
+        if (StrUtil.isBlank(userId)) {
+            userId = "9f711eef323044ed8fbc6e5531de0431";
+        }
+        String finalUserId = userId;
         ThreadUtil.execVirtual(() -> {
 
-            currentItemHandle(request, item);
-        });
-        ThreadUtil.execVirtual(() -> {
             if (!StrUtil.equals(电视剧_集.getEmbyName(), item.getType())) {
                 return;
             }
             String itemId = item.getItemId();
-            List<EmbyItem> seasonItem = getEpisodesUserByCache(itemId, item.getSeasonId(), request.getUserId());
+            List<EmbyItem> seasonItem = getEpisodesUserByCache(itemId, item.getSeasonId(), finalUserId);
             int index = -1;
             for (int i = 0; i < seasonItem.size(); i++) {
                 if (seasonItem.get(i).getItemId().equals(itemId)) {
@@ -830,13 +842,13 @@ public class EmbyProxy {
                 // 没有找到符合条件或者已经最后一集了
                 return;
             }
-            EmbyItem nexItem = getUserItemMedia(request.getUserId(),
+            EmbyItem nexItem = getUserItemMedia(finalUserId,
                     seasonItem.get(index + 1).getItemId());
-            currentItemHandle(request, nexItem);
+            currentItemHandle(ua, deviceId, nexItem);
         });
     }
 
-    private void currentItemHandle(EmbyContentCacheReqWrapper request, EmbyItem item) {
+    private void currentItemHandle(String ua, String deviceId, EmbyItem item) {
         if (item.getIsFolder() || !StrUtil.equalsAnyIgnoreCase(item.getType(), 电影.getEmbyName(),
                 电视剧_集.getEmbyName())) {
             return;
@@ -846,7 +858,7 @@ public class EmbyProxy {
             return;
         }
         try {
-            asyncUpdateVideoPathRelation(item, request.getUa(), request.getDeviceId());
+            asyncUpdateVideoPathRelation(item, ua, deviceId);
             getPlayback(item.getItemId());
         } finally {
             redisLockClient.unlock(lockKey);
