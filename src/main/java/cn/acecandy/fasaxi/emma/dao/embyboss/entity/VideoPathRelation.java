@@ -45,6 +45,11 @@ public class VideoPathRelation extends Model<VideoPathRelation> {
     private Integer bakStatus;
 
     /**
+     * 备份123状态 0-未备份 1-备份中 2-备份完成 默认0
+     */
+    private Integer bakStatus123;
+
+    /**
      * 对应数据中的Path字段
      */
     private String strmPath;
