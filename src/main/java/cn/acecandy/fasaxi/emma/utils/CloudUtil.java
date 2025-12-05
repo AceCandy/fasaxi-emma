@@ -453,6 +453,9 @@ public final class CloudUtil {
             return cacheUrl;
         }
         String url302 = redirect302ByOpenlist(cloudStorage, newMediaPath, ua);
+        if (StrUtil.isBlank(url302)) {
+            return "";
+        }
         cacheOpenList302Url(new VideoRedirectService.RedirectResult(url302, cloudStorage.getValue(), CacheUtil.getVideoDefaultExpireTime(), newMediaPath),
                 mediaSourceId, deviceId);
         return url302;
