@@ -47,6 +47,7 @@ import cn.hutool.v7.http.client.body.ResponseBody;
 import cn.hutool.v7.http.client.engine.ClientEngine;
 import cn.hutool.v7.http.meta.Method;
 import cn.hutool.v7.http.server.servlet.ServletUtil;
+import cn.hutool.v7.json.JSONObject;
 import cn.hutool.v7.json.JSONUtil;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
@@ -129,12 +130,44 @@ public class EmbyProxy {
     }
 
     /**
+     * 在合集中搜索
+     *
+     * @param collectionId 合集ID
+     * @return {@link List<EmbyItem> }
+     */
+    public List<EmbyItem> searchItemsByCollections(String searchTerm, String itemTypes, Integer collectionId) {
+        if (StrUtil.isBlank(searchTerm) || null == collectionId) {
+            return ListUtil.ofLinked();
+        }
+        String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET)
+                .form(Map.of("api_key", embyConfig.getApiKey(),
+                        "Recursive", true,
+                        "IncludeItemTypes", itemTypes,
+                        "SearchTerm", searchTerm,
+                        "Limit", 3,
+                        "ParentId", collectionId)))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+            return JSONUtil.toBean(resBody, EmbyItemsInfoOut.class).getItems();
+        } catch (Exception e) {
+            log.warn("getItemsByCollections 网络请求异常: ", e);
+        }
+        return null;
+    }
+
+    /**
      * 获取合集items
      *
      * @param collectionId 合集ID
      * @return {@link List<EmbyItem> }
      */
-    public List<EmbyItem> getItemsByCollections(Long collectionId) {
+    public List<EmbyItem> getItemsByCollections(String collectionId) {
         String url = embyConfig.getHost() + embyConfig.getItemInfoUrl();
         try (Response res = httpClient.send(Request.of(url).method(Method.GET)
                 .form(Map.of("api_key", embyConfig.getApiKey(),
@@ -154,12 +187,39 @@ public class EmbyProxy {
     }
 
     /**
+     * 创建合集
+     *
+     */
+    public String createCollections(String name, List<String> itemIds) {
+        if (CollUtil.isEmpty(itemIds)) {
+            log.info("createCollections 空项目ID, 合集名称: {}", name);
+            return null;
+        }
+        String ids = StrUtil.join(COMMA, itemIds);
+        String url = embyConfig.getHost() + StrUtil.format("/Collections?Name={}&Ids={}&api_key={}",
+                name, ids, embyConfig.getApiKey());
+        try (Response res = httpClient.send(Request.of(url).method(Method.POST))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+            return JSONUtil.parseObj(resBody).getStr("Id");
+        } catch (Exception e) {
+            log.warn("createCollections 网络请求异常: ", e);
+        }
+        return null;
+    }
+
+    /**
      * 往合集中新增items
      *
      * @param collectionId 合集ID
      * @param itemIds      项目ID
      */
-    public void addItemsByCollections(Long collectionId, List<String> itemIds) {
+    public void addItemsByCollections(String collectionId, List<String> itemIds) {
         if (CollUtil.isEmpty(itemIds)) {
             log.info("addItemsByCollections 空项目ID, 合集ID: {}", collectionId);
             return;
@@ -184,7 +244,7 @@ public class EmbyProxy {
      * @param collectionId 合集ID
      * @param itemIds      项目ID
      */
-    public void delItemsByCollections(Long collectionId, List<String> itemIds) {
+    public void delItemsByCollections(String collectionId, List<String> itemIds) {
         if (CollUtil.isEmpty(itemIds)) {
             log.info("delItemsByCollections 空项目ID, 合集ID: {}", collectionId);
             return;

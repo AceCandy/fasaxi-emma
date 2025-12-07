@@ -21,7 +21,9 @@ import cn.hutool.v7.core.io.file.FileNameUtil;
 import cn.hutool.v7.core.io.file.FileUtil;
 import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.net.url.UrlDecoder;
+import cn.hutool.v7.core.net.url.UrlEncoder;
 import cn.hutool.v7.core.net.url.UrlPath;
+import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.util.CharsetUtil;
 import cn.hutool.v7.http.client.Request;
@@ -40,6 +42,7 @@ import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123;
 import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildDeviceLock;
 import static cn.acecandy.fasaxi.emma.utils.CacheUtil.buildDeviceFileId115Key;
+import static cn.acecandy.fasaxi.emma.utils.CacheUtil.getVideoDefaultExpireTime;
 
 /**
  * 云盘工具类
@@ -431,7 +434,7 @@ public final class CloudUtil {
 
         // 设置Redis缓存
         String cacheValue = result.storageType() + "|" + result.url();
-        redisClient.set(cacheKey, cacheValue, result.expireTime());
+        redisClient.set(cacheKey, cacheValue, getVideoDefaultExpireTime());
     }
 
     /**
@@ -446,7 +449,7 @@ public final class CloudUtil {
     public String reqAndCacheOpenList302Url(CloudStorageType cloudStorage, String newMediaPath, String ua,
                                             String mediaSourceId, String deviceId) {
         if (cloudStorage != R_115 && cloudStorage != R_123) {
-            return newMediaPath;
+            return UrlEncoder.encodeQuery(newMediaPath);
         }
         String cacheUrl = redisClient.getStrFindOne(CacheUtil.buildVideoCacheKeyList(mediaSourceId, deviceId));
         if (StrUtil.isNotBlank(cacheUrl)) {

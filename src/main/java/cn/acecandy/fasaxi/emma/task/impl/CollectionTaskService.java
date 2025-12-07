@@ -11,6 +11,7 @@ import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.entity.MatchedItem;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
+import cn.acecandy.fasaxi.emma.service.rss.DataEyeRssFetcher;
 import cn.acecandy.fasaxi.emma.service.rss.DoulistRssFetcher;
 import cn.acecandy.fasaxi.emma.service.rss.MaoyanRssFetcher;
 import cn.acecandy.fasaxi.emma.service.rss.RuleFilterFetcher;
@@ -69,6 +70,9 @@ public class CollectionTaskService {
     @Resource
     private RuleFilterFetcher ruleFilterFetcher;
 
+    @Resource
+    private DataEyeRssFetcher dataEyeRssFetcher;
+
     public void syncQuickCollection() {
         List<CustomCollections> collections = customCollectionsDao.findAllByStatus("active");
         if (CollUtil.isEmpty(collections)) {
@@ -116,61 +120,99 @@ public class CollectionTaskService {
         }
         String collectionType = coll.getType();
         JSONObject definition = JSONUtil.parseObj(coll.getDefinitionJson());
-        List<String> itemTypeFromDb = JSONUtil.toList(definition.getStr("item_type"), String.class);
+        List<String> itemTypeFromDb = JSONUtil.toList(coll.getItemType(), String.class);
         EmbyMediaType itemType = EmbyMediaType.fromEmby(CollUtil.getFirst(itemTypeFromDb));
 
         // Integer limit = definition.containsKey("limit") ? definition.getInt("limit") : 50;
-        Set<MatchedItem> matchedItems = SetUtil.ofLinked();
-        if (StrUtil.equals(collectionType, "list")) {
-            matchedItems = handleCollectionList(definition);
-        } else if (StrUtil.equals(collectionType, "filter")) {
-            matchedItems = handleCollectionFilter(definition,itemType);
+        List<String> newEmbyIds = ListUtil.of();
+        List<GeneratedMediaInfo> generatedMediaInfos = ListUtil.of();
+        if (StrUtil.equals(collectionType, "emby-list")) {
+            newEmbyIds.addAll(handleEmbyCollectionList(definition));
+            if (CollUtil.isEmpty(newEmbyIds)) {
+                return;
+            }
+
+            generatedMediaInfos.addAll(newEmbyIds.stream()
+                    .map(m -> GeneratedMediaInfo.builder()
+                            .status("in_library").embyId(m).build()
+                    ).toList());
+        } else {
+            Set<MatchedItem> matchedItems = SetUtil.ofLinked();
+            if (StrUtil.equals(collectionType, "list")) {
+                matchedItems = handleCollectionList(definition);
+            } else if (StrUtil.equals(collectionType, "filter")) {
+                matchedItems = handleCollectionFilter(definition, itemType);
+            }
+            // TODO 修正匹配逻辑
+            if (CollUtil.isEmpty(matchedItems)) {
+                return;
+            }
+            List<String> tmdbIds = matchedItems.stream().map(s -> String.valueOf(s.id())).toList();
+            // 默认合集存在，如果不存在从页面进行创建
+            List<MediaMetadata> mediaMetadatas = mediaMetadataDao.findByTmdbId(tmdbIds, itemType.getEmbyName());
+            // 内存重排序为传入的顺序
+            Map<String, MediaMetadata> metadataMap = mediaMetadatas.stream().collect(Collectors.toMap(
+                    MediaMetadata::getTmdbId, Function.identity(), (_, v2) -> v2));
+            mediaMetadatas = tmdbIds.stream()
+                    .map(metadataMap::get).filter(Objects::nonNull).toList();
+
+            newEmbyIds.addAll(mediaMetadatas.stream()
+                    .map(MediaMetadata::getEmbyItemIdsJson).filter(CollUtil::isNotEmpty)
+                    .flatMap(List::stream).filter(StrUtil::isNotBlank)
+                    .toList());
+
+            generatedMediaInfos.addAll(mediaMetadatas.stream()
+                    .flatMap(m -> m.getEmbyItemIdsJson().stream().filter(StrUtil::isNotBlank)
+                            .map(embyId -> GeneratedMediaInfo.builder()
+                                    .title(m.getTitle()).status(m.getInLibrary() ? "in_library" : "missing")
+                                    .embyId(embyId).tmdbId(m.getTmdbId())
+                                    .releaseDate(DateUtil.formatDate(m.getReleaseDate()))
+                                    .build())
+                    ).toList());
         }
-        // TODO 修正匹配逻辑
-        if (CollUtil.isEmpty(matchedItems)) {
-            return;
+
+        String embyCollectionId = coll.getEmbyCollectionId();
+        if (StrUtil.isBlank(embyCollectionId)) {
+            embyCollectionId = embyProxy.createCollections(coll.getName(), newEmbyIds);
+            if (StrUtil.isBlank(embyCollectionId)) {
+                log.warn("[创建新合集-name:{}] 失败", coll.getName());
+                return;
+            }
+        } else {
+            List<EmbyItem> items = embyProxy.getItemsByCollections(embyCollectionId);
+            List<String> existEmbyIds = items.stream().map(EmbyItem::getItemId).toList();
+
+            List<String> needAddEmbyIds = CollUtil.subtract(newEmbyIds, existEmbyIds).stream().toList();
+            List<String> needDeleteEmbyIds = CollUtil.subtract(existEmbyIds, newEmbyIds).stream().toList();
+            embyProxy.delItemsByCollections(embyCollectionId, needDeleteEmbyIds);
+            embyProxy.addItemsByCollections(embyCollectionId, needAddEmbyIds);
         }
-        List<String> tmdbIds = matchedItems.stream().map(s -> String.valueOf(s.id())).toList();
-        // 默认合集存在，如果不存在从页面进行创建
-        List<MediaMetadata> mediaMetadatas = mediaMetadataDao.findByTmdbId(tmdbIds, itemType.getEmbyName());
-        // 内存重排序为传入的顺序
-        Map<String, MediaMetadata> metadataMap = mediaMetadatas.stream().collect(Collectors.toMap(
-                MediaMetadata::getTmdbId, Function.identity(), (_, v2) -> v2));
-        mediaMetadatas = tmdbIds.stream()
-                .map(metadataMap::get).filter(Objects::nonNull).toList();
-
-        List<String> newEmbyIds = mediaMetadatas.stream()
-                .map(MediaMetadata::getEmbyItemIdsJson).filter(CollUtil::isNotEmpty)
-                .flatMap(List::stream).filter(StrUtil::isNotBlank)
-                .toList();
-
-        Long embyCollectionId = Long.parseLong(coll.getEmbyCollectionId());
-        List<EmbyItem> items = embyProxy.getItemsByCollections(embyCollectionId);
-        List<String> existEmbyIds = items.stream().map(EmbyItem::getItemId).toList();
-
-        List<String> needAddEmbyIds = CollUtil.subtract(newEmbyIds, existEmbyIds).stream().toList();
-        List<String> needDeleteEmbyIds = CollUtil.subtract(existEmbyIds, newEmbyIds).stream().toList();
-        embyProxy.delItemsByCollections(embyCollectionId, needDeleteEmbyIds);
-        embyProxy.addItemsByCollections(embyCollectionId, needAddEmbyIds);
-        // 更新合集状态
-        // if (StrUtil.equals(collectionType, "list")) {
-        //
-        // } else if (StrUtil.equals(collectionType, "filter")) {
-        List<GeneratedMediaInfo> generatedMediaInfos = mediaMetadatas.stream()
-                .flatMap(m -> m.getEmbyItemIdsJson().stream().filter(StrUtil::isNotBlank)
-                        .map(embyId -> GeneratedMediaInfo.builder()
-                                .title(m.getTitle()).status(m.getInLibrary() ? "in_library" : "missing")
-                                .embyId(embyId).tmdbId(m.getTmdbId())
-                                .releaseDate(DateUtil.formatDate(m.getReleaseDate()))
-                                .build())
-                ).toList();
-
         CustomCollections.x().setId(id).setHealthStatus("ok").setMissingCount(0)
                 .setGeneratedMediaInfoJson(generatedMediaInfos)
                 .setInLibraryCount(CollUtil.size(newEmbyIds))
+                .setEmbyCollectionId(embyCollectionId)
                 .setLastSyncedAt(DateUtil.now()).updateById();
         // }
         // return;
+    }
+
+    /**
+     * 处理集合list（无tmdbid）
+     *
+     * @param definition 定义
+     * @return {@link List }<{@link MatchedItem }>
+     */
+    private Set<String> handleEmbyCollectionList(JSONObject definition) {
+        String url = definition.getStr("url");
+        if (StrUtil.isBlank(url)) {
+            return Set.of();
+        }
+        List<String> itemTypeFromDb = JSONUtil.toList(definition.getStr("item_type"), String.class);
+        EmbyMediaType itemType = EmbyMediaType.fromEmby(CollUtil.getFirst(itemTypeFromDb));
+        if (StrUtil.contains(url, "playlet-applet.dataeye.com")) {
+            return dataEyeRssFetcher.exec(url);
+        }
+        return Set.of();
     }
 
     /**
@@ -184,10 +226,10 @@ public class CollectionTaskService {
         if (StrUtil.isBlank(url)) {
             return Set.of();
         }
-        if (StrUtil.startWith(url, "http://192.168.1.249:11200")) {
+        /*if (StrUtil.startWith(url, "http://192.168.1.249:11200")) {
             url = StrUtil.replace(url, "http://192.168.1.249:11200",
                     "https://rss.acecandy.cn:880");
-        }
+        }*/
 
         List<String> itemTypeFromDb = JSONUtil.toList(definition.getStr("item_type"), String.class);
         EmbyMediaType itemType = EmbyMediaType.fromEmby(CollUtil.getFirst(itemTypeFromDb));

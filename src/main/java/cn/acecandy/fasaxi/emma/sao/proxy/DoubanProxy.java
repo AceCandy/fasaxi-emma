@@ -12,6 +12,7 @@ import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.UnicodeUtil;
+import cn.hutool.v7.core.text.split.SplitUtil;
 import cn.hutool.v7.core.util.RandomUtil;
 import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
@@ -49,7 +50,27 @@ public class DoubanProxy {
      * @param url url
      * @return {@link String }
      */
-    public List<MatchedItem.Doulist> getAllDoulist(String url) {
+    public List<MatchedItem.Doulist> getAllDoulist(String urls) {
+        if (StrUtil.isBlank(urls)) {
+            return null;
+        }
+        List<MatchedItem.Doulist> allItems = ListUtil.of();
+        SplitUtil.splitTrim(urls, ",").forEach(u -> {
+            List<MatchedItem.Doulist> items = getDoulist(u);
+            if (CollUtil.isNotEmpty(items)) {
+                allItems.addAll(items);
+            }
+        });
+        return allItems;
+    }
+
+    /**
+     * 获取豆列
+     *
+     * @param url url
+     * @return {@link String }
+     */
+    public List<MatchedItem.Doulist> getDoulist(String url) {
         if (StrUtil.isBlank(url)) {
             return null;
         }

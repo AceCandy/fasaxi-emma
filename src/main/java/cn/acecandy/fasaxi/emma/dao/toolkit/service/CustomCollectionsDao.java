@@ -37,4 +37,18 @@ public class CustomCollectionsDao extends ServiceImpl<CustomCollectionsMapper, C
         return mapper.selectListByQuery(wrapper);
     }
 
+    /**
+     * 按状态查找全部
+     *
+     * @param status 状态
+     * @return {@link List }<{@link CustomCollections }>
+     */
+    public List<CustomCollections> findAllByStatus(List<String> status) {
+        QueryWrapper wrapper = QueryWrapper.create()
+                .where(CUSTOM_COLLECTIONS.STATUS.in(status))
+                .orderBy(CUSTOM_COLLECTIONS.SORT_ORDER, true)
+                .orderBy(CUSTOM_COLLECTIONS.ID, true);
+        return mapper.selectListByQuery(wrapper);
+    }
+
 }

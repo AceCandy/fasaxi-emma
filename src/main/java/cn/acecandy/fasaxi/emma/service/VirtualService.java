@@ -288,7 +288,8 @@ public class VirtualService {
         if (CollUtil.isEmpty(originLibs)) {
             return originLibs;
         }
-        List<CustomCollections> customCollections = customCollectionsDao.findAllByStatus(null);
+        List<CustomCollections> customCollections =
+                customCollectionsDao.findAllByStatus(ListUtil.of("active", "paused"));
         if (CollUtil.isEmpty(customCollections)) {
             return originLibs;
         }
@@ -302,19 +303,20 @@ public class VirtualService {
                 continue;
             }
             // 2. 权限检查：用户在不在邀请函上？
-            List<String> allowedUsers = JSONUtil.toList(coll.getAllowedUserIds(), String.class);
+            /*List<String> allowedUsers = JSONUtil.toList(coll.getAllowedUserIds(), String.class);
             if (CollUtil.isNotEmpty(allowedUsers) && !CollUtil.contains(allowedUsers, userId)) {
                 log.warn("[虚拟库<{}>] 被隐藏: 用户不在可见列表中", coll.getName());
                 continue;
-            }
+            }*/
 
             // 生成虚拟库信息id
             String mimickedId = toMimickedId(coll.getId());
 
             JSONObject definition = JSONUtil.parseObj(coll.getDefinitionJson());
-            JSONArray mergedLibs = definition.getJSONArray("merged_libraries");
+            /*JSONArray mergedLibs = definition.getJSONArray("merged_libraries");
             String nameSuffix = JSONUtil.isEmpty(mergedLibs) ? "" :
-                    StrUtil.format(" (合并库: {}个)", mergedLibs.size());
+                    StrUtil.format(" (合并库: {}个)", mergedLibs.size());*/
+            String nameSuffix = "";
 
             List<String> itemTypeFromDb = JSONUtil.toList(definition.getStr("item_type"), String.class);
             String collectionType = "movies";
@@ -403,7 +405,9 @@ public class VirtualService {
 
         // 缓存不存在，同步构建
         embyItems = buildLibDetailNative(request);
-        redisClient.set(cacheKey, embyItems, CacheConstant.DAY_30_S);
+        if (null != embyItems && CollUtil.isNotEmpty(embyItems.getItems())) {
+            redisClient.set(cacheKey, embyItems, CacheConstant.DAY_30_S);
+        }
         return embyItems;
     }
 
@@ -444,14 +448,16 @@ public class VirtualService {
         List<String> embyIds = generatedMediaInfoJson.stream().filter(g ->
                         ObjUtil.isNotEmpty(g.getObjByPath("emby_id")))
                 .map(g -> g.getByPath("emby_id", String.class).toString()).toList();
-        if (CollUtil.isEmpty(embyIds)) {
-            return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
-        }
+
         String realEmbyCollectionId = coll.getEmbyCollectionId();
         cachedParam.put("ParentId", realEmbyCollectionId);
         EmbyItemsInfoOut out = embyProxy.getUserItems(userId, cachedParam);
         // out的items按照 List<String> embyIds 的顺序来排序
-        out.getItems().sort(Comparator.comparing(item -> embyIds.indexOf(item.getItemId())));
+        if (CollUtil.isNotEmpty(embyIds)) {
+            // return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
+            out.getItems().sort(Comparator.comparing(item -> embyIds.indexOf(item.getItemId())));
+        }
+
         return out;
     }
 

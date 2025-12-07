@@ -314,10 +314,10 @@ public class VideoRedirectService {
         if (bestMatchKey != null) {
             String realUrl = StrUtil.replaceIgnoreCase(mediaPath, bestMatchKey, pathMap.get(bestMatchKey));
             realUrl = UrlEncoder.encodeQuery(realUrl);
-            return new RedirectResult(realUrl, "local", 15 * 24 * 60 * 60, mediaPath);
+            return new RedirectResult(realUrl, "local", 30 * 60, mediaPath);
         }
 
-        return new RedirectResult(mediaPath, "local", CacheUtil.getVideoDefaultExpireTime(), mediaPath);
+        return new RedirectResult(mediaPath, "local", 2 * 60, mediaPath);
     }
 
     private int calculateExpireTime(String real302Url) {
