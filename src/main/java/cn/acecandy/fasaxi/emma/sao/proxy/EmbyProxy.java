@@ -20,7 +20,6 @@ import cn.acecandy.fasaxi.emma.sao.out.EmbyPlaybackOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyRemoteImageOut;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyViewOut;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
-import cn.acecandy.fasaxi.emma.service.VideoRedirectService;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
@@ -29,6 +28,7 @@ import cn.acecandy.fasaxi.emma.utils.SortUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.date.DateFormatPool;
 import cn.hutool.v7.core.date.DateTime;
 import cn.hutool.v7.core.date.DateUtil;
 import cn.hutool.v7.core.exception.ExceptionUtil;
@@ -47,7 +47,6 @@ import cn.hutool.v7.http.client.body.ResponseBody;
 import cn.hutool.v7.http.client.engine.ClientEngine;
 import cn.hutool.v7.http.meta.Method;
 import cn.hutool.v7.http.server.servlet.ServletUtil;
-import cn.hutool.v7.json.JSONObject;
 import cn.hutool.v7.json.JSONUtil;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
@@ -61,7 +60,6 @@ import java.util.stream.Collectors;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_302;
-import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_MICU;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电影;
@@ -947,7 +945,9 @@ public class EmbyProxy {
                     EmbyMediaType itemType = EmbyMediaType.fromEmby(itemInfo.getType());
 
                     VideoPathRelation videoPathRelation = videoPathRelationDao.findById(itemId);
-                    if (null != videoPathRelation && nowStrmTime.equals(videoPathRelation.getStrmTime())) {
+
+                    if (null != videoPathRelation && DateUtil.compare(nowStrmTime,
+                            videoPathRelation.getStrmTime(), DateFormatPool.PURE_DATETIME_PATTERN) == 0) {
                         return;
                     }
                     if (null == videoPathRelation) {
