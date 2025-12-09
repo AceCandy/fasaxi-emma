@@ -949,7 +949,7 @@ public class EmbyProxy {
                     VideoPathRelation videoPathRelation = videoPathRelationDao.findById(itemId);
 
                     if (null != videoPathRelation && DateUtil.compare(nowStrmTime,
-                            videoPathRelation.getStrmTime(), DateFormatPool.PURE_DATETIME_PATTERN) == 0) {
+                            videoPathRelation.getStrmTime(), "yyyyMMddHHmm") == 0) {
                         return;
                     }
                     if (null == videoPathRelation) {
@@ -971,7 +971,7 @@ public class EmbyProxy {
                     } else if (StrUtil.equalsIgnoreCase(strmType, "115")) {
                         path115 = realPath;
                     }
-                    videoPathRelation.setItemId(itemId).setBakStatus(0)
+                    videoPathRelation.setItemId(itemId).setBakStatus(0).setBakStatus123(0)
                             .setStrmTime(nowStrmTime).setEmbyTime(itemInfo.getDateModified())
                             .setStrmPath(itemPath).setRealPath(realPath).setStrmType(strmType)
                             .setPathPrefix(pathSplit.getMiddle().getValue()).setPurePath(pathSplit.getRight())
