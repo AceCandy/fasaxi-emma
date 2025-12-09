@@ -55,6 +55,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.Charset;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -939,7 +940,7 @@ public class EmbyProxy {
                 Integer itemId = NumberUtil.parseInt(itemInfo.getItemId());
                 try {
                     String itemPath = itemInfo.getPath();
-                    DateTime nowStrmTime = DateUtil.date(FileUtil.lastModifiedTime(itemPath));
+                    Date nowStrmTime = FileUtil.lastModifiedTime(itemPath);
                     if (null == nowStrmTime) {
                         return;
                     }
