@@ -26,7 +26,7 @@ public class Webdav2CloudTask {
      */
     @Scheduled(
             initialDelay = 1,       // 启动后1分钟执行第一次
-            fixedDelay = 5,         // 每次执行完后间隔5分钟再执行
+            fixedDelay = 2,         // 每次执行完后间隔5分钟再执行
             timeUnit = TimeUnit.MINUTES  // 时间单位为分钟
     )
     public void webdav2Cloud() {
