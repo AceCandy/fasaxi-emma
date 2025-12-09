@@ -33,6 +33,7 @@ import cn.hutool.v7.core.date.DateTime;
 import cn.hutool.v7.core.date.DateUtil;
 import cn.hutool.v7.core.exception.ExceptionUtil;
 import cn.hutool.v7.core.io.file.FileUtil;
+import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.lang.mutable.MutableTriple;
 import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.math.NumberUtil;
@@ -1062,4 +1063,17 @@ public class EmbyProxy {
             log.warn("trans115To123 网络请求异常: ", e);
         }
     }*/
+
+    static void main() {
+        String itemPath = "/Users/mac/Library/CloudStorage/OneDrive-个人/workspace/github/java/fasaxi-emma/src/main/java/cn/acecandy/fasaxi/emma/sao/proxy/EmbyProxy.java";
+        DateTime nowStrmTime = DateUtil.date(FileUtil.lastModifiedTime(itemPath));
+        VideoPathRelation videoPathRelation = VideoPathRelation.x().setStrmTime(FileUtil.lastModifiedTime(itemPath));
+
+        Console.log(DateUtil.compare(nowStrmTime,
+                videoPathRelation.getStrmTime(), DateFormatPool.PURE_DATETIME_PATTERN));
+        if (null != videoPathRelation && DateUtil.compare(nowStrmTime,
+                videoPathRelation.getStrmTime(), DateFormatPool.PURE_DATETIME_PATTERN) == 0) {
+            return;
+        }
+    }
 }

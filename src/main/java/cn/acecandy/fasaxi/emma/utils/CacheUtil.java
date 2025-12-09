@@ -158,7 +158,7 @@ public final class CacheUtil extends cn.hutool.v7.core.cache.CacheUtil {
     }
 
     public static int getVideoDefaultExpireTime() {
-        return 6 * 60 * 60;
+        return 2 * 60 * 60 - 60;
     }
 
     public static List<String> buildVideoCacheKeyList(String mediaSourceId,
