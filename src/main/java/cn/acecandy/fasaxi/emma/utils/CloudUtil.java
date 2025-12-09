@@ -23,7 +23,6 @@ import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.net.url.UrlDecoder;
 import cn.hutool.v7.core.net.url.UrlEncoder;
 import cn.hutool.v7.core.net.url.UrlPath;
-import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.util.CharsetUtil;
 import cn.hutool.v7.http.client.Request;
@@ -446,8 +445,9 @@ public final class CloudUtil {
      * @param mediaSourceId 媒体源id
      * @param deviceId      设备标识符
      */
-    public String reqAndCacheOpenList302Url(CloudStorageType cloudStorage, String newMediaPath, String ua,
-                                            String mediaSourceId, String deviceId) {
+    public String reqAndCacheOpenList302Url(CloudStorageType cloudStorage,
+                                            String newMediaPath,
+                                            String ua, String mediaSourceId, String deviceId) {
         if (cloudStorage != R_115 && cloudStorage != R_123) {
             return UrlEncoder.encodeQuery(newMediaPath);
         }

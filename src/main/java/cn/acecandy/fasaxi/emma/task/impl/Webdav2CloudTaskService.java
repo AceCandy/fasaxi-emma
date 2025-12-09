@@ -4,7 +4,6 @@ import cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix;
 import cn.acecandy.fasaxi.emma.config.OpConfig;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
 import cn.acecandy.fasaxi.emma.dao.embyboss.service.VideoPathRelationDao;
-import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.OpProxy;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.hutool.v7.core.collection.CollUtil;
@@ -17,7 +16,6 @@ import org.springframework.stereotype.Component;
 import java.util.Collections;
 import java.util.List;
 
-import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_MICU;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
 import static cn.hutool.v7.core.text.StrPool.SLASH;
 
@@ -33,9 +31,6 @@ public class Webdav2CloudTaskService {
 
     @Resource
     private VideoPathRelationDao videoPathRelationDao;
-
-    @Resource
-    private EmbyProxy embyProxy;
 
     @Resource
     private OpProxy opProxy;
@@ -65,43 +60,45 @@ public class Webdav2CloudTaskService {
         }
         videoPathRelations.forEach(v -> {
             try {
-                String purePath = v.getPurePath();
-                String fileName = FileNameUtil.getName(purePath);
-                String purePathDir = StrUtil.removeSuffix(purePath, SLASH + fileName);
-                String sourcePathDir = StrUtil.format("/pt/{}", purePathDir);
-                String sourcePathFull = StrUtil.format("/pt/{}", purePath);
-
-                String targetPathDir = StrUtil.format("/new115/worldline/{}", purePathDir);
-                String targetPathFull = StrUtil.format("/new115/worldline/{}", purePath);
-
-                String r115MediaPath = opConfig.getDHost() + targetPathFull;
-                String real302Url = cloudUtil.reqAndCacheOpenList302Url(R_115, r115MediaPath, COMMON_UA,
-                        String.valueOf(v.getItemId()), COMMON_DEVICEID);
-                if (StrUtil.isNotBlank(real302Url)) {
-                    // 更新
-                    videoPathRelationDao.updateByItemId(VideoPathRelation.x()
-                            .setItemId(v.getItemId()).setBakStatus(2)
-                            .setPath115(r115MediaPath));
-                    return;
-                }
-
-                if (v.getBakStatus() == 1) {
-                    // 如果是备份中就无需重复处理了
-                    return;
-                }
-                if (opProxy.mkdir(targetPathDir)) { // 先创建目录
-                    // 源文件目录（从原始路径中移除文件名）
-                    // String parentDir = CollUtil.getLast(SplitUtil.splitPath(sourcePathDir));
-                    // String parentSourceDir = StrUtil.removeSuffix(sourcePathDir, parentDir);
-                    // String parentTargetDir = StrUtil.removeSuffix(targetPathDir, parentDir);
-                    opProxy.copy(sourcePathDir, targetPathDir, Collections.singletonList(fileName));
-                    videoPathRelationDao.updateByItemId(VideoPathRelation.x()
-                            .setItemId(v.getItemId()).setBakStatus(1));
+                if (v.getBakStatus() == 0) {
+                    handleBakStatus0(v);
+                } else if (v.getBakStatus() == 1) {
+                    handleBakStatus1(v);
                 }
             } catch (Exception e) {
                 log.warn("关联关系处理上传到115失败:{}", v.getItemId(), e);
             }
         });
     }
+
+    private void handleBakStatus0(VideoPathRelation v) {
+        String purePath = v.getPurePath();
+        String fileName = FileNameUtil.getName(purePath);
+        String purePathDir = StrUtil.removeSuffix(purePath, SLASH + fileName);
+        String sourcePathDir = StrUtil.format("/pt/{}", purePathDir);
+        String sourcePathFull = StrUtil.format("/pt/{}", purePath);
+
+        String targetPathDir = StrUtil.format("/new115/worldline/{}", purePathDir);
+        if (opProxy.mkdir(targetPathDir)) {
+            opProxy.copy(sourcePathDir, targetPathDir, Collections.singletonList(fileName));
+            videoPathRelationDao.updateByItemId(VideoPathRelation.x()
+                    .setItemId(v.getItemId()).setBakStatus(1));
+        }
+    }
+
+    private void handleBakStatus1(VideoPathRelation v) {
+        String purePath = v.getPurePath();
+        String targetPathFull = StrUtil.format("/new115/worldline/{}", purePath);
+
+        String r115MediaPath = opConfig.getDHost() + targetPathFull;
+        String real302Url = cloudUtil.redirect302ByOpenlist(R_115, r115MediaPath, COMMON_UA);
+        if (StrUtil.isNotBlank(real302Url)) {
+            // 更新
+            videoPathRelationDao.updateByItemId(VideoPathRelation.x()
+                    .setItemId(v.getItemId()).setBakStatus(2)
+                    .setPath115(r115MediaPath));
+        }
+    }
+
 
 }
