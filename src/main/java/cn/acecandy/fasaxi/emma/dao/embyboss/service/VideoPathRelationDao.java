@@ -85,7 +85,22 @@ public class VideoPathRelationDao extends ServiceImpl<VideoPathRelationMapper, V
         }
         QueryWrapper wrapper = QueryWrapper.create()
                 .where(VIDEO_PATH_RELATION.STRM_TYPE.eq(strmType))
-                .and(VIDEO_PATH_RELATION.BAK_STATUS.in(0, 1));
+                .and(VIDEO_PATH_RELATION.BAK_STATUS.in(0, 1))
+                .limit(100);
+        return mapper.selectListByQuery(wrapper);
+    }
+
+    /**
+     * 查找对应类型未备份数据
+     *
+     * @return {@link VideoPathRelation }
+     */
+    public List<VideoPathRelation> findNoBak123() {
+        QueryWrapper wrapper = QueryWrapper.create()
+                .where(VIDEO_PATH_RELATION.PATH115.isNotNull())
+                .where(VIDEO_PATH_RELATION.PATH123.isNull())
+                .and(VIDEO_PATH_RELATION.BAK_STATUS.in(0, 1))
+                .limit(20);
         return mapper.selectListByQuery(wrapper);
     }
 }

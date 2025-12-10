@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
+import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123;
 import static cn.hutool.v7.core.text.StrPool.SLASH;
 
 /**
@@ -50,7 +51,9 @@ public class Webdav2CloudTaskService {
     /**
      * 通用ua
      */
-    private static final String COMMON_DEVICEID = "zaijie996";
+    private static final String PREFIX_MICU = "/pt/";
+    private static final String PREFIX_NEW115 = "/new115/worldline/";
+    private static final String PREFIX_ZONG123 = "/zong123/worldline/";
 
     public void uploadTo115() {
         List<VideoPathRelation> videoPathRelations = videoPathRelationDao
@@ -71,14 +74,31 @@ public class Webdav2CloudTaskService {
         });
     }
 
+    public void r115to123() {
+        List<VideoPathRelation> videoPathRelations = videoPathRelationDao.findNoBak123();
+        if (CollUtil.isEmpty(videoPathRelations)) {
+            return;
+        }
+        videoPathRelations.forEach(v -> {
+            try {
+                if (v.getBakStatus() == 0) {
+                    handleBak123Status0(v);
+                } else if (v.getBakStatus() == 1) {
+                    handleBak123Status1(v);
+                }
+            } catch (Exception e) {
+                log.warn("关联关系处理上传到123失败:{}", v.getItemId(), e);
+            }
+        });
+    }
+
     private void handleBakStatus0(VideoPathRelation v) {
         String purePath = v.getPurePath();
         String fileName = FileNameUtil.getName(purePath);
         String purePathDir = StrUtil.removeSuffix(purePath, SLASH + fileName);
-        String sourcePathDir = StrUtil.format("/pt/{}", purePathDir);
-        String sourcePathFull = StrUtil.format("/pt/{}", purePath);
+        String sourcePathDir = StrUtil.format(PREFIX_MICU + "{}", purePathDir);
 
-        String targetPathDir = StrUtil.format("/new115/worldline/{}", purePathDir);
+        String targetPathDir = StrUtil.format(PREFIX_NEW115 + "{}", purePathDir);
         if (opProxy.mkdir(targetPathDir)) {
             opProxy.copy(sourcePathDir, targetPathDir, Collections.singletonList(fileName));
             videoPathRelationDao.updateByItemId(VideoPathRelation.x()
@@ -88,17 +108,44 @@ public class Webdav2CloudTaskService {
 
     private void handleBakStatus1(VideoPathRelation v) {
         String purePath = v.getPurePath();
-        String targetPathFull = StrUtil.format("/new115/worldline/{}", purePath);
+        String targetPathFull = StrUtil.format(PREFIX_NEW115 + "{}", purePath);
 
-        String r115MediaPath = opConfig.getDHost() + targetPathFull;
-        String real302Url = cloudUtil.redirect302ByOpenlist(R_115, r115MediaPath, COMMON_UA);
+        String cloudPath = opConfig.getDHost() + targetPathFull;
+        String real302Url = cloudUtil.redirect302ByOpenlist(R_115, cloudPath, COMMON_UA);
         if (StrUtil.isNotBlank(real302Url)) {
             // 更新
             videoPathRelationDao.updateByItemId(VideoPathRelation.x()
                     .setItemId(v.getItemId()).setBakStatus(2)
-                    .setPath115(r115MediaPath));
+                    .setPath115(cloudPath));
         }
     }
 
+    private void handleBak123Status0(VideoPathRelation v) {
+        String purePath = v.getPurePath();
+        String fileName = FileNameUtil.getName(purePath);
+        String purePathDir = StrUtil.removeSuffix(purePath, SLASH + fileName);
+        String sourcePathDir = StrUtil.format(PREFIX_NEW115 + "{}", purePathDir);
+
+        String targetPathDir = StrUtil.format(PREFIX_ZONG123 + "{}", purePathDir);
+        if (opProxy.mkdir(targetPathDir)) {
+            opProxy.copy(sourcePathDir, targetPathDir, Collections.singletonList(fileName));
+            videoPathRelationDao.updateByItemId(VideoPathRelation.x()
+                    .setItemId(v.getItemId()).setBakStatus123(1));
+        }
+    }
+
+    private void handleBak123Status1(VideoPathRelation v) {
+        String purePath = v.getPurePath();
+        String targetPathFull = StrUtil.format(PREFIX_ZONG123 + "{}", purePath);
+
+        String cloudPath = opConfig.getDHost() + targetPathFull;
+        String real302Url = cloudUtil.redirect302ByOpenlist(R_123, cloudPath, COMMON_UA);
+        if (StrUtil.isNotBlank(real302Url)) {
+            // 更新
+            videoPathRelationDao.updateByItemId(VideoPathRelation.x()
+                    .setItemId(v.getItemId()).setBakStatus123(2)
+                    .setPath115(cloudPath));
+        }
+    }
 
 }

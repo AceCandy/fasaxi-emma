@@ -22,7 +22,7 @@ public class Webdav2CloudTask {
     private Webdav2CloudTaskService webdav2CloudTaskService;
 
     /**
-     * 同步库的媒体项
+     * micu上传到115
      */
     @Scheduled(
             initialDelay = 1,       // 启动后1分钟执行第一次
@@ -32,6 +32,22 @@ public class Webdav2CloudTask {
     public void webdav2Cloud() {
         try {
             webdav2CloudTaskService.uploadTo115();
+        } catch (Exception e) {
+            log.error("执行异常-同步库的媒体项 ", e);
+        }
+    }
+
+    /**
+     * 115上传到123
+     */
+    @Scheduled(
+            initialDelay = 1,       // 启动后1分钟执行第一次
+            fixedDelay = 2,         // 每次执行完后间隔5分钟再执行
+            timeUnit = TimeUnit.MINUTES  // 时间单位为分钟
+    )
+    public void r115to123() {
+        try {
+            webdav2CloudTaskService.r115to123();
         } catch (Exception e) {
             log.error("执行异常-同步库的媒体项 ", e);
         }
