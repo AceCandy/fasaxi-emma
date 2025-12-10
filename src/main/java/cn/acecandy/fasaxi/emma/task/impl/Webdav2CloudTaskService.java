@@ -49,8 +49,9 @@ public class Webdav2CloudTaskService {
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0";
 
     private static final String PREFIX_MICU = "/pt/";
-    private static final String PREFIX_NEW115 = "/new115/worldline/";
-    private static final String PREFIX_ZONG123 = "/zong123/worldline/";
+    private static final String PREFIX_NEW115_MICU = "/new115/worldline/";
+    private static final String PREFIX_NEW115 = "/new115/";
+    private static final String PREFIX_ZONG123 = "/zong123/";
 
     public void uploadTo115() {
         List<VideoPathRelation> relations = videoPathRelationDao.findNoBak(
@@ -94,13 +95,13 @@ public class Webdav2CloudTaskService {
     }
 
     private void handleBakStatus0(VideoPathRelation v) {
-        handleCopyOperation(v, PREFIX_MICU, PREFIX_NEW115, (relation, cloudPath) ->
+        handleCopyOperation(v, PREFIX_MICU, PREFIX_NEW115_MICU, (relation, cloudPath) ->
                 videoPathRelationDao.updateByItemId(
                         VideoPathRelation.x().setItemId(relation.getItemId()).setBakStatus(1)));
     }
 
     private void handleBakStatus1(VideoPathRelation v) {
-        handleUrlGeneration(v, PREFIX_NEW115, R_115, (relation, cloudPath) ->
+        handleUrlGeneration(v, PREFIX_NEW115_MICU, R_115, (relation, cloudPath) ->
                 videoPathRelationDao.updateByItemId(
                         VideoPathRelation.x().setItemId(relation.getItemId()).setBakStatus(2)
                                 .setPath115(cloudPath)));

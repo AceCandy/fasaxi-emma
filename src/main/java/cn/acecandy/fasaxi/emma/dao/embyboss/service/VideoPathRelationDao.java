@@ -3,6 +3,7 @@ package cn.acecandy.fasaxi.emma.dao.embyboss.service;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
 import cn.acecandy.fasaxi.emma.dao.embyboss.mapper.VideoPathRelationMapper;
 import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.text.StrUtil;
 import com.mybatisflex.annotation.UseDataSource;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -104,10 +105,12 @@ public class VideoPathRelationDao extends ServiceImpl<VideoPathRelationMapper, V
             status = List.of(0, 1);
         }
         QueryWrapper wrapper = QueryWrapper.create()
+                .and(VIDEO_PATH_RELATION.BAK_STATUS.in(status))
                 .where(VIDEO_PATH_RELATION.PATH115.isNotNull())
                 .where(VIDEO_PATH_RELATION.PATH123.isNull())
-                .and(VIDEO_PATH_RELATION.BAK_STATUS.in(status))
+                .or(VIDEO_PATH_RELATION.PATH123.eq(""))
                 .limit(20);
+        Console.log(mapper.selectListByQuery(wrapper));
         return mapper.selectListByQuery(wrapper);
     }
 }
