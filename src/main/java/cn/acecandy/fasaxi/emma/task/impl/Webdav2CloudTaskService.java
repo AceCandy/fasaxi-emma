@@ -1,14 +1,15 @@
 package cn.acecandy.fasaxi.emma.task.impl;
 
-import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix;
 import cn.acecandy.fasaxi.emma.config.OpConfig;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
 import cn.acecandy.fasaxi.emma.dao.embyboss.service.VideoPathRelationDao;
+import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.OpProxy;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.io.file.FileNameUtil;
+import cn.hutool.v7.core.lang.mutable.MutableTriple;
 import cn.hutool.v7.core.text.StrUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +46,9 @@ public class Webdav2CloudTaskService {
     @Resource
     private CloudUtil cloudUtil;
 
+    @Resource
+    private EmbyProxy embyProxy;
+
     private static final String COMMON_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0";
 
@@ -61,10 +65,11 @@ public class Webdav2CloudTaskService {
 
     public void r115to123() {
         List<VideoPathRelation> relations = videoPathRelationDao.findNoBak123(null);
-        processVideoRelations(relations, PRE_ZONG123, this::handleBak123Status0, this::handleBak123Status1);
+        processVideoRelations123(relations, PRE_ZONG123, this::handleBak123Status0, this::handleBak123Status1);
     }
 
-    private void processVideoRelations(List<VideoPathRelation> relations, StrmPathPrefix prefix,
+    private void processVideoRelations(List<VideoPathRelation> relations,
+                                       StrmPathPrefix prefix,
                                        StatusHandler status0Handler, StatusHandler status1Handler) {
         if (CollUtil.isEmpty(relations)) {
             return;
@@ -74,6 +79,25 @@ public class Webdav2CloudTaskService {
                 if (v.getBakStatus() == 0) {
                     status0Handler.handle(v);
                 } else if (v.getBakStatus() == 1) {
+                    status1Handler.handle(v);
+                }
+            } catch (Exception e) {
+                log.warn("[关联关系处理-备份至{}] 失败:itemId={}, purePath={}, error={}",
+                        prefix.getType(), v.getItemId(), v.getPurePath(), e.getMessage(), e);
+            }
+        });
+    }
+
+    private void processVideoRelations123(List<VideoPathRelation> relations, StrmPathPrefix prefix,
+                                          StatusHandler status0Handler, StatusHandler status1Handler) {
+        if (CollUtil.isEmpty(relations)) {
+            return;
+        }
+        relations.forEach(v -> {
+            try {
+                if (v.getBakStatus123() == 0) {
+                    status0Handler.handle(v);
+                } else if (v.getBakStatus123() == 1) {
                     status1Handler.handle(v);
                 }
             } catch (Exception e) {
@@ -95,66 +119,58 @@ public class Webdav2CloudTaskService {
     }
 
     private void handleBakStatus0(VideoPathRelation v) {
-        handleCopyOperation(v, PREFIX_MICU, PREFIX_NEW115_MICU, (relation, cloudPath) ->
-                videoPathRelationDao.updateByItemId(
-                        VideoPathRelation.x().setItemId(relation.getItemId()).setBakStatus(1)));
-    }
-
-    private void handleBakStatus1(VideoPathRelation v) {
-        handleUrlGeneration(v, PREFIX_NEW115_MICU, R_115, (relation, cloudPath) ->
-                videoPathRelationDao.updateByItemId(
-                        VideoPathRelation.x().setItemId(relation.getItemId()).setBakStatus(2)
-                                .setPath115(cloudPath)));
-    }
-
-    private void handleBak123Status0(VideoPathRelation v) {
-        handleCopyOperation(v, PREFIX_NEW115, PREFIX_ZONG123, (relation, cloudPath) ->
-                videoPathRelationDao.updateByItemId(
-                        VideoPathRelation.x().setItemId(relation.getItemId()).setBakStatus123(1)));
-    }
-
-    private void handleBak123Status1(VideoPathRelation v) {
-        handleUrlGeneration(v, PREFIX_ZONG123, R_123, (relation, cloudPath) ->
-                videoPathRelationDao.updateByItemId(
-                        VideoPathRelation.x().setItemId(relation.getItemId()).setBakStatus123(2)
-                                .setPath123(cloudPath)));
-    }
-
-    private void handleCopyOperation(VideoPathRelation v, String sourcePrefix,
-                                     String targetPrefix, StatusUpdater updater) {
         String purePath = v.getPurePath();
         String fileName = FileNameUtil.getName(purePath);
         String purePathDir = StrUtil.removeSuffix(purePath, SLASH + fileName);
-        String sourcePathDir = StrUtil.format(sourcePrefix + "{}", purePathDir);
-        String targetPathDir = StrUtil.format(targetPrefix + "{}", purePathDir);
+        String sourcePathDir = StrUtil.format(PREFIX_MICU + "{}", purePathDir);
+        String targetPathDir = StrUtil.format(PREFIX_NEW115_MICU + "{}", purePathDir);
 
         if (opProxy.mkdir(targetPathDir)) {
-            boolean copyResult = opProxy.copy(sourcePathDir, targetPathDir, Collections.singletonList(fileName));
-            if (copyResult) {
-                updater.update(v, null);
-            } else {
-                log.warn("文件复制失败: itemId={}, fileName={}", v.getItemId(), fileName);
+            if (opProxy.copy(sourcePathDir, targetPathDir, Collections.singletonList(fileName))) {
+                videoPathRelationDao.updateByItemId(
+                        VideoPathRelation.x().setItemId(v.getItemId()).setBakStatus(1));
             }
-        } else {
-            log.warn("创建目标目录失败: itemId={}, targetDir={}", v.getItemId(), targetPathDir);
         }
     }
 
-    private void handleUrlGeneration(VideoPathRelation v, String targetPrefix,
-                                     CloudStorageType storageType, StatusUpdater updater) {
+    private void handleBakStatus1(VideoPathRelation v) {
         String purePath = v.getPurePath();
-        String targetPathFull = StrUtil.format(targetPrefix + "{}", purePath);
+        String targetPathFull = StrUtil.format(PREFIX_NEW115_MICU + "{}", purePath);
         String cloudPath = opConfig.getDHost() + targetPathFull;
 
-        String real302Url = cloudUtil.redirect302ByOpenlist(storageType, cloudPath, COMMON_UA);
+        String real302Url = cloudUtil.redirect302ByOpenlist(R_115, cloudPath, COMMON_UA);
         if (StrUtil.isNotBlank(real302Url)) {
-            updater.update(v, cloudPath);
+            videoPathRelationDao.updateByItemId(VideoPathRelation.x()
+                    .setItemId(v.getItemId()).setBakStatus(2).setPath115(cloudPath));
         }
     }
 
-    @FunctionalInterface
-    private interface StatusUpdater {
-        void update(VideoPathRelation relation, String cloudPath);
+    private void handleBak123Status0(VideoPathRelation v) {
+        String path115 = v.getPath115();
+        MutableTriple<String, StrmPathPrefix, String> splitResult = StrmPathPrefix.split(path115);
+        String purePath = splitResult.getRight();
+
+        String fileName = FileNameUtil.getName(purePath);
+        String purePathDir = StrUtil.removeSuffix(purePath, SLASH + fileName);
+
+        embyProxy.trans115To123(purePathDir, purePath);
+        videoPathRelationDao.updateByItemId(
+                VideoPathRelation.x().setItemId(v.getItemId()).setBakStatus123(1));
+    }
+
+    private void handleBak123Status1(VideoPathRelation v) {
+        String path115 = v.getPath115();
+        MutableTriple<String, StrmPathPrefix, String> splitResult = StrmPathPrefix.split(path115);
+        String purePath = splitResult.getRight();
+        String targetPathFull = PRE_ZONG123 + purePath;
+        String cloudPath = opConfig.getDHost() + targetPathFull;
+
+        String real302Url = cloudUtil.redirect302ByOpenlist(R_123, cloudPath, COMMON_UA);
+        if (StrUtil.isNotBlank(real302Url)) {
+            videoPathRelationDao.updateByItemId(
+                    VideoPathRelation.x().setItemId(v.getItemId()).setBakStatus123(2)
+                            .setPath123(cloudPath));
+        }
     }
 
 }

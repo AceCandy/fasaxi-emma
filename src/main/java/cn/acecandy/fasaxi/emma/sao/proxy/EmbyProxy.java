@@ -1034,6 +1034,35 @@ public class EmbyProxy {
         }
     }
 
+
+    /**
+     * 115离线至113
+     *
+     * @param purePathDir 纯路径目录
+     * @param purePath    纯粹道路
+     */
+    public void trans115To123(String purePathDir, String purePath) {
+        if (StrUtil.isBlank(purePathDir) || StrUtil.isBlank(purePath)) {
+            return;
+        }
+        String url = embyConfig.getEmbyNginxHost() + "/api/v1/transfer_115_to_123";
+        try (Response res = httpClient.send(Request.of(url).method(Method.POST)
+                .body(JSONUtil.toJsonStr(MapUtil.<String, Object>builder("cookie_name_115", "115生活ios端")
+                        .put("path_in_115", purePath)
+                        .put("cookie_name_123", "123cookie").put("path_in_123", purePathDir)
+                        .put("is_clear_records", "1").map())))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSON(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
+            }
+        } catch (Exception e) {
+            log.warn("trans115To123 网络请求异常: ", e);
+        }
+    }
+
     /*public static void main(String[] args) {
 
         String strm = "http://192.168.1.249:5244/d/new115/emby2/电影/外语电影/侏罗纪世界：重生 (2025) [tmdbid=1234821]/侏罗纪世界：重生 (2025).2160p.DoVi.HDR.H.265.DDP Atmos 5.1.mkv" +
