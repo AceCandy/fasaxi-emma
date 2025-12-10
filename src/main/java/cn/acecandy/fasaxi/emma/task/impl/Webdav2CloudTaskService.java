@@ -9,6 +9,7 @@ import cn.acecandy.fasaxi.emma.sao.proxy.OpProxy;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.io.file.FileNameUtil;
+import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.lang.mutable.MutableTriple;
 import cn.hutool.v7.core.text.StrUtil;
 import jakarta.annotation.Resource;
@@ -162,8 +163,8 @@ public class Webdav2CloudTaskService {
         String path115 = v.getPath115();
         MutableTriple<String, StrmPathPrefix, String> splitResult = StrmPathPrefix.split(path115);
         String purePath = splitResult.getRight();
-        String targetPathFull = PRE_ZONG123 + purePath;
-        String cloudPath = opConfig.getDHost() + targetPathFull;
+        String targetPathFull = PRE_ZONG123.getValue() + purePath;
+        String cloudPath = opConfig.getHost() + targetPathFull;
 
         String real302Url = cloudUtil.redirect302ByOpenlist(R_123, cloudPath, COMMON_UA);
         if (StrUtil.isNotBlank(real302Url)) {
@@ -172,5 +173,4 @@ public class Webdav2CloudTaskService {
                             .setPath123(cloudPath));
         }
     }
-
 }
