@@ -7,6 +7,7 @@ import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
+import cn.acecandy.fasaxi.emma.config.OpConfig;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.TmdbProvider;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
 import cn.acecandy.fasaxi.emma.dao.embyboss.service.TmdbProviderDao;
@@ -52,6 +53,7 @@ import cn.hutool.v7.json.JSONUtil;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.Charset;
@@ -107,6 +109,9 @@ public class EmbyProxy {
 
     @Resource
     private CloudUtil cloudUtil;
+
+    @Resource
+    private OpConfig opConfig;
 
     /**
      * 返回结果个性化排序
@@ -967,9 +972,9 @@ public class EmbyProxy {
                     String strmType = pathSplit.getMiddle().getType();
                     String path115 = "", path123 = "";
                     if (StrUtil.equalsIgnoreCase(strmType, "123")) {
-                        path123 = realPath;
+                        path123 = opConfig.getHost() + pathSplit.getMiddle().getValue() + pathSplit.getRight();
                     } else if (StrUtil.equalsIgnoreCase(strmType, "115")) {
-                        path115 = realPath;
+                        path115 = opConfig.getHost() + pathSplit.getMiddle().getValue() + pathSplit.getRight();
                     }
                     videoPathRelation.setItemId(itemId).setBakStatus(0).setBakStatus123(0)
                             .setStrmTime(nowStrmTime).setEmbyTime(itemInfo.getDateModified())
@@ -1038,18 +1043,18 @@ public class EmbyProxy {
     /**
      * 115离线至113
      *
-     * @param purePathDir 纯路径目录
-     * @param purePath    纯粹道路
+     * @param purePathDir       纯路径目录
+     * @param purePathParentDir 纯路径父目录
      */
-    public void trans115To123(String purePathDir, String purePath) {
-        if (StrUtil.isBlank(purePathDir) || StrUtil.isBlank(purePath)) {
+    public void trans115To123(String purePathParentDir, String purePathDir) {
+        if (StrUtil.isBlank(purePathDir) || StrUtil.isBlank(purePathParentDir)) {
             return;
         }
         String url = embyConfig.getEmbyNginxHost() + "/api/v1/transfer_115_to_123";
         try (Response res = httpClient.send(Request.of(url).method(Method.POST)
                 .body(JSONUtil.toJsonStr(MapUtil.<String, Object>builder("cookie_name_115", "115生活ios端")
-                        .put("path_in_115", purePath)
-                        .put("cookie_name_123", "123cookie").put("path_in_123", purePathDir)
+                        .put("path_in_115", purePathDir)
+                        .put("cookie_name_123", "123cookie").put("path_in_123", purePathParentDir)
                         .put("is_clear_records", "1").map())))) {
             if (!res.isOk()) {
                 throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));

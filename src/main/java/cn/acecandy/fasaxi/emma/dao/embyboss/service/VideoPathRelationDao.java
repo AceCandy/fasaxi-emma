@@ -60,6 +60,20 @@ public class VideoPathRelationDao extends ServiceImpl<VideoPathRelationMapper, V
         return mapper.update(dto) > 0;
     }
 
+    public void update() {
+        QueryWrapper wrapper = QueryWrapper.create()
+                .where(VIDEO_PATH_RELATION.PATH123.like("\\%2F"));
+        List<VideoPathRelation> relations = mapper.selectListByQuery(wrapper);
+        if (CollUtil.isEmpty(relations) || CollUtil.size(relations) != 12) {
+            return;
+        }
+        relations.forEach(v -> {
+            VideoPathRelation vv = VideoPathRelation.x().setItemId(v.getItemId())
+                    .setPath123("http://192.168.1.249:5244" + v.getPathPrefix() + v.getPurePath());
+            updateByItemId(vv);
+        });
+    }
+
     /**
      * 按ID查找
      *

@@ -41,7 +41,7 @@ public class Webdav2CloudTask {
      * 115上传到123
      */
     @Scheduled(
-            initialDelay = 3,       // 启动后1分钟执行第一次
+            initialDelay = 2,       // 启动后1分钟执行第一次
             fixedDelay = 5,         // 每次执行完后间隔5分钟再执行
             timeUnit = TimeUnit.MINUTES  // 时间单位为分钟
     )
