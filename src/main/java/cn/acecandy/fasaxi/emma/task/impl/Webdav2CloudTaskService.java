@@ -1,5 +1,6 @@
 package cn.acecandy.fasaxi.emma.task.impl;
 
+import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix;
 import cn.acecandy.fasaxi.emma.config.OpConfig;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
@@ -18,6 +19,8 @@ import java.util.List;
 
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_115;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123;
+import static cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix.PRE_NEW115;
+import static cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix.PRE_ZONG123;
 import static cn.hutool.v7.core.text.StrPool.SLASH;
 
 /**
@@ -42,110 +45,115 @@ public class Webdav2CloudTaskService {
     @Resource
     private CloudUtil cloudUtil;
 
-    /**
-     * 通用ua
-     */
     private static final String COMMON_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0";
 
-    /**
-     * 通用ua
-     */
     private static final String PREFIX_MICU = "/pt/";
     private static final String PREFIX_NEW115 = "/new115/worldline/";
     private static final String PREFIX_ZONG123 = "/zong123/worldline/";
 
     public void uploadTo115() {
-        List<VideoPathRelation> videoPathRelations = videoPathRelationDao
-                .findNoBak(StrmPathPrefix.PRE_MICU.getType());
-        if (CollUtil.isEmpty(videoPathRelations)) {
-            return;
-        }
-        videoPathRelations.forEach(v -> {
-            try {
-                if (v.getBakStatus() == 0) {
-                    handleBakStatus0(v);
-                } else if (v.getBakStatus() == 1) {
-                    handleBakStatus1(v);
-                }
-            } catch (Exception e) {
-                log.warn("关联关系处理上传到115失败:{}", v.getItemId(), e);
-            }
-        });
+        List<VideoPathRelation> relations = videoPathRelationDao.findNoBak(
+                StrmPathPrefix.PRE_MICU.getType(), null);
+        processVideoRelations(relations, PRE_NEW115, this::handleBakStatus0, this::handleBakStatus1);
     }
 
     public void r115to123() {
-        List<VideoPathRelation> videoPathRelations = videoPathRelationDao.findNoBak123();
-        if (CollUtil.isEmpty(videoPathRelations)) {
+        List<VideoPathRelation> relations = videoPathRelationDao.findNoBak123(null);
+        processVideoRelations(relations, PRE_ZONG123, this::handleBak123Status0, this::handleBak123Status1);
+    }
+
+    private void processVideoRelations(List<VideoPathRelation> relations, StrmPathPrefix prefix,
+                                       StatusHandler status0Handler, StatusHandler status1Handler) {
+        if (CollUtil.isEmpty(relations)) {
             return;
         }
-        videoPathRelations.forEach(v -> {
+        relations.forEach(v -> {
             try {
                 if (v.getBakStatus() == 0) {
-                    handleBak123Status0(v);
+                    status0Handler.handle(v);
                 } else if (v.getBakStatus() == 1) {
-                    handleBak123Status1(v);
+                    status1Handler.handle(v);
                 }
             } catch (Exception e) {
-                log.warn("关联关系处理上传到123失败:{}", v.getItemId(), e);
+                log.warn("[关联关系处理-备份至{}] 失败:itemId={}, purePath={}, error={}",
+                        prefix.getType(), v.getItemId(), v.getPurePath(), e.getMessage(), e);
             }
         });
     }
 
-    private void handleBakStatus0(VideoPathRelation v) {
-        String purePath = v.getPurePath();
-        String fileName = FileNameUtil.getName(purePath);
-        String purePathDir = StrUtil.removeSuffix(purePath, SLASH + fileName);
-        String sourcePathDir = StrUtil.format(PREFIX_MICU + "{}", purePathDir);
+    @FunctionalInterface
+    private interface StatusHandler {
+        /**
+         * 备份处理
+         *
+         * @param relation 关系
+         * @throws Exception 例外
+         */
+        void handle(VideoPathRelation relation) throws Exception;
+    }
 
-        String targetPathDir = StrUtil.format(PREFIX_NEW115 + "{}", purePathDir);
-        if (opProxy.mkdir(targetPathDir)) {
-            opProxy.copy(sourcePathDir, targetPathDir, Collections.singletonList(fileName));
-            videoPathRelationDao.updateByItemId(VideoPathRelation.x()
-                    .setItemId(v.getItemId()).setBakStatus(1));
-        }
+    private void handleBakStatus0(VideoPathRelation v) {
+        handleCopyOperation(v, PREFIX_MICU, PREFIX_NEW115, (relation, cloudPath) ->
+                videoPathRelationDao.updateByItemId(
+                        VideoPathRelation.x().setItemId(relation.getItemId()).setBakStatus(1)));
     }
 
     private void handleBakStatus1(VideoPathRelation v) {
-        String purePath = v.getPurePath();
-        String targetPathFull = StrUtil.format(PREFIX_NEW115 + "{}", purePath);
-
-        String cloudPath = opConfig.getDHost() + targetPathFull;
-        String real302Url = cloudUtil.redirect302ByOpenlist(R_115, cloudPath, COMMON_UA);
-        if (StrUtil.isNotBlank(real302Url)) {
-            // 更新
-            videoPathRelationDao.updateByItemId(VideoPathRelation.x()
-                    .setItemId(v.getItemId()).setBakStatus(2)
-                    .setPath115(cloudPath));
-        }
+        handleUrlGeneration(v, PREFIX_NEW115, R_115, (relation, cloudPath) ->
+                videoPathRelationDao.updateByItemId(
+                        VideoPathRelation.x().setItemId(relation.getItemId()).setBakStatus(2)
+                                .setPath115(cloudPath)));
     }
 
     private void handleBak123Status0(VideoPathRelation v) {
-        String purePath = v.getPurePath();
-        String fileName = FileNameUtil.getName(purePath);
-        String purePathDir = StrUtil.removeSuffix(purePath, SLASH + fileName);
-        String sourcePathDir = StrUtil.format(PREFIX_NEW115 + "{}", purePathDir);
-
-        String targetPathDir = StrUtil.format(PREFIX_ZONG123 + "{}", purePathDir);
-        if (opProxy.mkdir(targetPathDir)) {
-            opProxy.copy(sourcePathDir, targetPathDir, Collections.singletonList(fileName));
-            videoPathRelationDao.updateByItemId(VideoPathRelation.x()
-                    .setItemId(v.getItemId()).setBakStatus123(1));
-        }
+        handleCopyOperation(v, PREFIX_NEW115, PREFIX_ZONG123, (relation, cloudPath) ->
+                videoPathRelationDao.updateByItemId(
+                        VideoPathRelation.x().setItemId(relation.getItemId()).setBakStatus123(1)));
     }
 
     private void handleBak123Status1(VideoPathRelation v) {
-        String purePath = v.getPurePath();
-        String targetPathFull = StrUtil.format(PREFIX_ZONG123 + "{}", purePath);
+        handleUrlGeneration(v, PREFIX_ZONG123, R_123, (relation, cloudPath) ->
+                videoPathRelationDao.updateByItemId(
+                        VideoPathRelation.x().setItemId(relation.getItemId()).setBakStatus123(2)
+                                .setPath123(cloudPath)));
+    }
 
-        String cloudPath = opConfig.getDHost() + targetPathFull;
-        String real302Url = cloudUtil.redirect302ByOpenlist(R_123, cloudPath, COMMON_UA);
-        if (StrUtil.isNotBlank(real302Url)) {
-            // 更新
-            videoPathRelationDao.updateByItemId(VideoPathRelation.x()
-                    .setItemId(v.getItemId()).setBakStatus123(2)
-                    .setPath115(cloudPath));
+    private void handleCopyOperation(VideoPathRelation v, String sourcePrefix,
+                                     String targetPrefix, StatusUpdater updater) {
+        String purePath = v.getPurePath();
+        String fileName = FileNameUtil.getName(purePath);
+        String purePathDir = StrUtil.removeSuffix(purePath, SLASH + fileName);
+        String sourcePathDir = StrUtil.format(sourcePrefix + "{}", purePathDir);
+        String targetPathDir = StrUtil.format(targetPrefix + "{}", purePathDir);
+
+        if (opProxy.mkdir(targetPathDir)) {
+            boolean copyResult = opProxy.copy(sourcePathDir, targetPathDir, Collections.singletonList(fileName));
+            if (copyResult) {
+                updater.update(v, null);
+            } else {
+                log.warn("文件复制失败: itemId={}, fileName={}", v.getItemId(), fileName);
+            }
+        } else {
+            log.warn("创建目标目录失败: itemId={}, targetDir={}", v.getItemId(), targetPathDir);
         }
+    }
+
+    private void handleUrlGeneration(VideoPathRelation v, String targetPrefix,
+                                     CloudStorageType storageType, StatusUpdater updater) {
+        String purePath = v.getPurePath();
+        String targetPathFull = StrUtil.format(targetPrefix + "{}", purePath);
+        String cloudPath = opConfig.getDHost() + targetPathFull;
+
+        String real302Url = cloudUtil.redirect302ByOpenlist(storageType, cloudPath, COMMON_UA);
+        if (StrUtil.isNotBlank(real302Url)) {
+            updater.update(v, cloudPath);
+        }
+    }
+
+    @FunctionalInterface
+    private interface StatusUpdater {
+        void update(VideoPathRelation relation, String cloudPath);
     }
 
 }
