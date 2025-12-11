@@ -53,7 +53,6 @@ import cn.hutool.v7.json.JSONUtil;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.Charset;
@@ -978,6 +977,7 @@ public class EmbyProxy {
                     }
                     videoPathRelation.setItemId(itemId).setBakStatus(0).setBakStatus123(0)
                             .setStrmTime(nowStrmTime).setEmbyTime(itemInfo.getDateModified())
+                            .setCheckTime(DateUtil.dateSecond())
                             .setStrmPath(itemPath).setRealPath(realPath).setStrmType(strmType)
                             .setPathPrefix(pathSplit.getMiddle().getValue()).setPurePath(pathSplit.getRight())
                             .setPath115(path115).setPath123(path123);

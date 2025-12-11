@@ -40,14 +40,30 @@ public class Webdav2CloudTask {
     /**
      * 115上传到123
      */
-    @Scheduled(
+    /*@Scheduled(
             initialDelay = 2,       // 启动后1分钟执行第一次
             fixedDelay = 5,         // 每次执行完后间隔5分钟再执行
             timeUnit = TimeUnit.MINUTES  // 时间单位为分钟
-    )
+    )*/
     public void r115to123() {
         try {
             webdav2CloudTaskService.r115to123();
+        } catch (Exception e) {
+            log.error("执行异常-115上传到123 ", e);
+        }
+    }
+
+    /**
+     * 清除无效关系
+     */
+    @Scheduled(
+            initialDelay = 5,       // 启动后1分钟执行第一次
+            fixedDelay = 60,         // 每次执行完后间隔5分钟再执行
+            timeUnit = TimeUnit.MINUTES  // 时间单位为分钟
+    )
+    public void clearInvalidRelation() {
+        try {
+            webdav2CloudTaskService.clearInvalidRelation();
         } catch (Exception e) {
             log.error("执行异常-115上传到123 ", e);
         }

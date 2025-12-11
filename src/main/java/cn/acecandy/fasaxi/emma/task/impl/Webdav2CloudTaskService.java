@@ -4,6 +4,7 @@ import cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix;
 import cn.acecandy.fasaxi.emma.config.OpConfig;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
 import cn.acecandy.fasaxi.emma.dao.embyboss.service.VideoPathRelationDao;
+import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.OpProxy;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
@@ -11,13 +12,12 @@ import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.io.file.FileNameUtil;
 import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.lang.mutable.MutableTriple;
-import cn.hutool.v7.core.net.url.UrlBuilder;
-import cn.hutool.v7.core.net.url.UrlDecoder;
-import cn.hutool.v7.core.net.url.UrlPath;
+import cn.hutool.v7.core.text.StrPool;
 import cn.hutool.v7.core.text.StrUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
@@ -70,6 +70,23 @@ public class Webdav2CloudTaskService {
     public void r115to123() {
         List<VideoPathRelation> relations = videoPathRelationDao.findNoBak123(null);
         processVideoRelations123(relations, PRE_ZONG123, this::handleBak123Status0, this::handleBak123Status1);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void clearInvalidRelation() {
+        List<VideoPathRelation> relations = videoPathRelationDao.findNeedCheck();
+        if (CollUtil.isEmpty(relations)) {
+            return;
+        }
+        // 获取distinct itemId
+        List<Integer> itemIds = relations.stream().map(VideoPathRelation::getItemId).distinct().toList();
+        String items = CollUtil.join(itemIds, StrPool.COMMA);
+        List<EmbyItem> itemsInfo = embyProxy.getItemInfoByCache(items);
+        List<Integer> validItemIds = itemsInfo.stream().map(s -> Integer.parseInt(s.getItemId())).toList();
+        videoPathRelationDao.updateCheckTimeByItemId(validItemIds);
+        // 差集 当前relation-emby数据
+        List<Integer> invalidItemIds = CollUtil.subtractToList(itemIds, validItemIds);
+        videoPathRelationDao.delByItemIds(invalidItemIds);
     }
 
     private void processVideoRelations(List<VideoPathRelation> relations,

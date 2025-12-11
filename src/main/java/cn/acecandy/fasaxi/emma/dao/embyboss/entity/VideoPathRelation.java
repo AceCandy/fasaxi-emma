@@ -83,6 +83,11 @@ public class VideoPathRelation extends Model<VideoPathRelation> {
     private Date strmTime;
 
     /**
+     * 最近一次检查时间
+     */
+    private Date checkTime;
+
+    /**
      * 对应115路径
      */
     @Column("115_path")
