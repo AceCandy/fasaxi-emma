@@ -67,11 +67,6 @@ public class CustomCollections extends Model<CustomCollections> {
     private Date createdAt;
 
     /**
-     * 健康状态 完整-ok/有缺失-has_missing
-     */
-    private String healthStatus;
-
-    /**
      * 包含的媒体类型 Movie-电影 Series-电视剧
      * <p>
      * 混合为两种都包含["Movie", "Series"]
@@ -82,11 +77,6 @@ public class CustomCollections extends Model<CustomCollections> {
      * 库中数量
      */
     private Integer inLibraryCount;
-
-    /**
-     * 缺失数量
-     */
-    private Integer missingCount;
 
     /**
      * 构建的媒体信息 list
