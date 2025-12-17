@@ -125,17 +125,15 @@ public class CollectionTaskService {
 
         // Integer limit = definition.containsKey("limit") ? definition.getInt("limit") : 50;
         List<String> newEmbyIds = ListUtil.of();
-        List<GeneratedMediaInfo> generatedMediaInfos = ListUtil.of();
+        // List<GeneratedMediaInfo> generatedMediaInfos = ListUtil.of();
+        List<String> generatedMediaInfos = ListUtil.of();
         if (StrUtil.equals(collectionType, "emby-list")) {
             newEmbyIds.addAll(handleEmbyCollectionList(definition));
             if (CollUtil.isEmpty(newEmbyIds)) {
                 return;
             }
 
-            generatedMediaInfos.addAll(newEmbyIds.stream()
-                    .map(m -> GeneratedMediaInfo.builder()
-                            .status("in_library").embyId(m).build()
-                    ).toList());
+            generatedMediaInfos.addAll(newEmbyIds);
         } else {
             Set<MatchedItem> matchedItems = SetUtil.ofLinked();
             if (StrUtil.equals(collectionType, "list")) {
@@ -161,14 +159,7 @@ public class CollectionTaskService {
                     .flatMap(List::stream).filter(StrUtil::isNotBlank)
                     .toList());
 
-            generatedMediaInfos.addAll(mediaMetadatas.stream()
-                    .flatMap(m -> m.getEmbyItemIdsJson().stream().filter(StrUtil::isNotBlank)
-                            .map(embyId -> GeneratedMediaInfo.builder()
-                                    .title(m.getTitle()).status(m.getInLibrary() ? "in_library" : "missing")
-                                    .embyId(embyId).tmdbId(m.getTmdbId())
-                                    .releaseDate(DateUtil.formatDate(m.getReleaseDate()))
-                                    .build())
-                    ).toList());
+            generatedMediaInfos.addAll(mediaMetadatas.stream().map(MediaMetadata::getTmdbId).collect(Collectors.toSet()));
         }
 
         String embyCollectionId = coll.getEmbyCollectionId();

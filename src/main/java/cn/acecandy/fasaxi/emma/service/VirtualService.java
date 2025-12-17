@@ -444,19 +444,20 @@ public class VirtualService {
         if (coll == null) {
             return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
         }
-        JSONArray generatedMediaInfoJson = JSONUtil.parseArray(coll.getGeneratedMediaInfoJson());
-        List<String> embyIds = generatedMediaInfoJson.stream().filter(g ->
-                        ObjUtil.isNotEmpty(g.getObjByPath("emby_id")))
-                .map(g -> g.getByPath("emby_id", String.class).toString()).toList();
+        // JSONArray generatedMediaInfoJson = JSONUtil.parseArray(coll.getGeneratedMediaInfoJson());
+        // List<String> generatedMediaInfoJson = coll.getGeneratedMediaInfoJson();
+        // List<String> embyIds = generatedMediaInfoJson.stream().filter(g ->
+        //                 ObjUtil.isNotEmpty(g.getObjByPath("emby_id")))
+        //         .map(g -> g.getByPath("emby_id", String.class).toString()).toList();
 
         String realEmbyCollectionId = coll.getEmbyCollectionId();
         cachedParam.put("ParentId", realEmbyCollectionId);
         EmbyItemsInfoOut out = embyProxy.getUserItems(userId, cachedParam);
         // out的items按照 List<String> embyIds 的顺序来排序
-        if (CollUtil.isNotEmpty(embyIds)) {
+        /*if (CollUtil.isNotEmpty(embyIds)) {
             // return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
             out.getItems().sort(Comparator.comparing(item -> embyIds.indexOf(item.getItemId())));
-        }
+        }*/
 
         return out;
     }

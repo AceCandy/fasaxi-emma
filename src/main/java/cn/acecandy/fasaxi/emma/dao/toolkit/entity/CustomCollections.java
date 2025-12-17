@@ -81,8 +81,8 @@ public class CustomCollections extends Model<CustomCollections> {
     /**
      * 构建的媒体信息 list
      */
-    @Column(typeHandler = JsonbTypeHandler.class)
-    private List<GeneratedMediaInfo> generatedMediaInfoJson;
+    // @Column(typeHandler = JsonbTypeHandler.class)
+    private List<String> generatedMediaInfoJson;
 
     /**
      * 封面图
