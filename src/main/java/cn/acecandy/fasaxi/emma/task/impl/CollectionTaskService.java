@@ -187,7 +187,7 @@ public class CollectionTaskService {
             embyProxy.delItemsByCollections(embyCollectionId, needDeleteEmbyIds);
             embyProxy.addItemsByCollections(embyCollectionId, needAddEmbyIds);
         }
-        CustomCollections.x().setId(id).setHealthStatus("ok").setMissingCount(0)
+        CustomCollections.x().setId(id)
                 .setGeneratedMediaInfoJson(generatedMediaInfos)
                 .setInLibraryCount(CollUtil.size(newEmbyIds))
                 .setEmbyCollectionId(embyCollectionId)
