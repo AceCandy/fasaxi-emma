@@ -3,6 +3,7 @@ package cn.acecandy.fasaxi.emma.task;
 import cn.acecandy.fasaxi.emma.task.impl.Webdav2CloudTaskService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +22,9 @@ public class Webdav2CloudTask {
     @Resource
     private Webdav2CloudTaskService webdav2CloudTaskService;
 
+    @Value("${task.all-enabled:true}")
+    private boolean allEnabled;
+
     /**
      * micu上传到115
      */
@@ -31,6 +35,9 @@ public class Webdav2CloudTask {
     )
     public void webdav2Cloud() {
         try {
+            if (!allEnabled) {
+                return;
+            }
             webdav2CloudTaskService.uploadTo115();
         } catch (Exception e) {
             log.error("执行异常-micu上传到115 ", e);

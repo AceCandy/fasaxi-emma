@@ -14,6 +14,7 @@ import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.task.impl.CollectionTaskService;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.date.DateTime;
 import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.math.NumberUtil;
@@ -28,6 +29,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
@@ -133,45 +136,95 @@ public class ApiController {
     }
 
     // 构建tmdb&豆瓣本地库
-    /*@GetMapping("/build/tmdb-douban")
+    @GetMapping("/build/tmdb-douban")
     public Rsres<Object> buildTmdbDouban(Integer min, Integer max) {
-        String uniqueKey = "unique:tmdb-douban";
+        String uniqueKey = "unique:tmdbId";
         // List<Integer> itemIds = embyItemPicDao.findAllItemId();
-        if (null == min) {
-            min = 100;
+        List<Integer> allItemIds = ListUtil.of();
+        if (null == min || null == max) {
+            allItemIds = collectionTaskService.getAllItemIdByCache(null)
+                    .stream().map(NumberUtil::parseInt).toList();
+        } else {
+            allItemIds = IntStream.rangeClosed(min, max).boxed().toList();
         }
-        if (null == max) {
-            max = 999;
-        }
-        Integer finalMin = min;
-        Integer finalMax = max;
-        ThreadUtil.execAsync(() -> {
-            AtomicInteger i = new AtomicInteger();
-            IntStream.rangeClosed(finalMin, finalMax).boxed().toList()
-                    .forEach(itemId -> {
-                        String value = redisClient.hgetStr(uniqueKey, itemId.toString());
-                        if (StrUtil.isNotBlank(value)) {
-                            return;
-                        }
-                        ThreadUtil.safeSleep(RandomUtil.randomInt(50, 500));
-                        ThreadUtil.execVirtual(() -> {
-                            try {
-                                ThreadUtil.safeSleep(RandomUtil.randomInt(50, 500));
-                                EmbyItem embyItem = embyProxy.getItemInfoByCache(itemId.toString());
-                                embyProxy.initTmdbProvider(embyItem);
-                                redisClient.hset(uniqueKey, itemId.toString(), "1");
-                                i.getAndIncrement();
-                            } catch (Exception e) {
-                                log.warn("Controller-[itemId:{}]构建tmdb-douban失败: ", itemId, e);
-                            } finally {
-                                ThreadUtil.safeSleep(RandomUtil.randomInt(400, 1400));
-                            }
-                        });
-                    });
-            log.warn("构建tmdb&豆瓣本地库==>执行完成, 共处理: {}条", i.get());
+        processItemsWith3Threads(allItemIds, uniqueKey);
+
+        /*AtomicInteger i = new AtomicInteger();
+        allItemIds.forEach(itemId -> {
+            String value = redisClient.hgetStr(uniqueKey, itemId.toString());
+            if (StrUtil.isNotBlank(value)) {
+                System.out.print(".");
+                return;
+            }
+            // ThreadUtil.safeSleep(RandomUtil.randomInt(50, 500));
+            // ThreadUtil.execVirtual(() -> {
+            try {
+                // ThreadUtil.safeSleep(RandomUtil.randomInt(50, 500));
+                List<EmbyItem> embyItems = embyProxy.getItemInfoByCache(itemId.toString());
+                if (CollUtil.isEmpty(embyItems)) {
+                    return;
+                }
+                EmbyItem embyItem = CollUtil.getFirst(embyItems);
+                embyProxy.initTmdbProvider(embyItem);
+                redisClient.hset(uniqueKey, itemId.toString(), "1");
+                i.getAndIncrement();
+            } catch (Exception e) {
+                log.warn("Controller-[itemId:{}]构建tmdb-douban失败: ", itemId, e);
+            } finally {
+                ThreadUtil.safeSleep(RandomUtil.randomInt(10, 50));
+            }
+            // });
         });
+        log.warn("构建tmdb&豆瓣本地库==>执行完成, 共处理: {}条", i.get());*/
         return Rsres.success("构建tmdb&豆瓣本地库==>执行中");
-    }*/
+    }
+
+    public void processItemsWith3Threads(List<Integer> allItemIds, String uniqueKey) {
+        // 1. 创建固定3个线程的线程池（Hutool/原生都可，这里用原生更简洁）
+        ExecutorService executor = Executors.newFixedThreadPool(5);
+
+        // 2. 遍历所有itemId，异步提交到线程池（无需等待返回）
+        for (Integer itemId : allItemIds) {
+            // 注意：捕获itemId的当前值（lambda闭包陷阱）
+            Integer finalItemId = itemId;
+            executor.submit(() -> {
+                String value = redisClient.hgetStr(uniqueKey, finalItemId.toString());
+                if (StrUtil.isNotBlank(value)) {
+                    System.out.print(".");
+                    return;
+                }
+                try {
+                    // 核心处理逻辑
+                    List<EmbyItem> embyItems = embyProxy.getItemInfoByCache(finalItemId.toString());
+                    if (CollUtil.isEmpty(embyItems)) {
+                        return;
+                    }
+
+                    EmbyItem embyItem = CollUtil.getFirst(embyItems);
+                    if (embyProxy.initTmdbProvider(embyItem)) {
+                        redisClient.hset(uniqueKey, finalItemId.toString(), "1");
+                    }
+                } catch (Exception e) {
+                    log.warn("Controller-[itemId:{}]构建tmdb-douban失败: ", finalItemId, e);
+                } finally {
+                    // 每个任务执行完休眠10-50ms（保留原有逻辑）
+                    ThreadUtil.safeSleep(RandomUtil.randomInt(20, 50));
+                }
+            });
+        }
+
+        // 3. 优雅关闭线程池（非必须，但建议加，避免线程泄漏）
+        ThreadUtil.execAsync(() -> {
+            executor.shutdown(); // 停止接收新任务
+            try {
+                // 等待所有任务执行完（可根据业务调整超时时间）
+                executor.awaitTermination(1, java.util.concurrent.TimeUnit.HOURS);
+            } catch (InterruptedException e) {
+                executor.shutdownNow();
+            }
+        });
+    }
+
 
     // 构建tmdb&豆瓣本地库-补全豆瓣id
     @GetMapping("/build/completion-doubanId")

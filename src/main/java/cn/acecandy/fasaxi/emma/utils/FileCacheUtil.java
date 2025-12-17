@@ -35,6 +35,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_206;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_500;
@@ -353,7 +354,7 @@ public class FileCacheUtil {
     }
 
     public void writeCacheAndMoov(EmbyItem embyItem) {
-        Lock lock = LockUtil.lockVideoCache(embyItem.getItemId());
+        ReentrantLock lock = LockUtil.lockVideoCache(embyItem.getItemId());
         if (LockUtil.isLock(lock)) {
             return;
         }

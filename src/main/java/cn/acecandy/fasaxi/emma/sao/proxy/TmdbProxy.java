@@ -11,6 +11,8 @@ import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.reflect.TypeReference;
 import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.text.split.SplitUtil;
+import cn.hutool.v7.core.util.RandomUtil;
 import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.client.engine.ClientEngine;
@@ -53,15 +55,15 @@ public class TmdbProxy {
         if (null == type || StrUtil.isBlank(tmdbId)) {
             return null;
         }
-        String url = tmdbConfig.getHost() + StrUtil.format(tmdbConfig.getDetailInfoUrl(),
-                type.getTmdbName(), tmdbId);
+        String url = RandomUtil.randomEle(SplitUtil.splitTrim(tmdbConfig.getHost(), ","))
+                + StrUtil.format(tmdbConfig.getDetailInfoUrl(), type.getTmdbName(), tmdbId);
         try (Response res = httpClient.send(Request.of(url).method(Method.GET)
                 .form(MapUtil.<String, Object>builder("api_key", tmdbConfig.getApiKey())
                         .put("append_to_response", "images,external_ids,credits,videos")
                         .put("language", "zh-CN").put("include_image_language", "zh-CN,zh,null")
                         .map()))) {
             if (!res.isOk()) {
-                throw new BaseException(StrUtil.format("返回码异常: {}", res.getStatus()));
+                throw new BaseException(StrUtil.format("返回码异常: {},url:{}", res.getStatus(), url));
             }
             String resBody = res.bodyStr();
             if (!JSONUtil.isTypeJSON(resBody)) {
@@ -122,8 +124,8 @@ public class TmdbProxy {
         if (StrUtil.isBlank(name)) {
             return null;
         }
-        String url = tmdbConfig.getHost() + StrUtil.format(tmdbConfig.getSearchDetailInfoUrl(),
-                type.getTmdbName());
+        String url = RandomUtil.randomEle(SplitUtil.splitTrim(tmdbConfig.getHost(), ","))
+                + StrUtil.format(tmdbConfig.getSearchDetailInfoUrl(), type.getTmdbName());
         Map<String, Object> params = MapUtil.newHashMap();
         params.put("api_key", tmdbConfig.getApiKey());
         params.put("language", "zh-CN");

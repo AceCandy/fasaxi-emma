@@ -275,7 +275,7 @@ public class CollectionTaskService {
         return allItems;
     }
 
-    private List<String> getAllItemIdByCache(List<String> libraryIds) {
+    public List<String> getAllItemIdByCache(List<String> libraryIds) {
         List<String> allItemsId = ListUtil.ofCopyOnWrite();
 
         List<String> allLibraryIds = embyConfig.getVirtualHide().keySet().stream().toList();

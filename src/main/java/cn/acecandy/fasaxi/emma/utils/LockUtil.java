@@ -20,7 +20,7 @@ public final class LockUtil extends cn.hutool.v7.core.thread.lock.LockUtil {
     private static final String LOCK_VIDEO_CACHE_KEY = "lock:video-cache:{}";
 
     // 视频重定向------------------------------------------------------------------------------------------
-    private static final Map<String, Lock> VIDEO_LOCK_CACHE_MAP =
+    private static final Map<String, ReentrantLock> VIDEO_LOCK_CACHE_MAP =
             new ConcurrentHashMap<>();
 
     private LockUtil() {
@@ -52,12 +52,12 @@ public final class LockUtil extends cn.hutool.v7.core.thread.lock.LockUtil {
         return StrUtil.format(LOCK_VIDEO_CACHE_KEY, itemId);
     }
 
-    public static Lock lockVideoCache(String itemId) {
+    public static ReentrantLock lockVideoCache(String itemId) {
         return VIDEO_LOCK_CACHE_MAP.computeIfAbsent(buildVideoCacheLock(itemId), k -> new ReentrantLock());
     }
 
-    public static void unlockVideoCache(Lock lock, String itemId) {
-        if (lock != null) {
+    public static void unlockVideoCache(ReentrantLock lock, String itemId) {
+        if (lock != null && lock.isHeldByCurrentThread()) {
             try {
                 lock.unlock(); // 现在这个unlock调用是在当前线程确实持有锁的情况下执行的
             } finally {

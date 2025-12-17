@@ -24,6 +24,7 @@ import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
+import cn.acecandy.fasaxi.emma.utils.LockUtil;
 import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.acecandy.fasaxi.emma.utils.SortUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
@@ -59,6 +60,8 @@ import java.nio.charset.Charset;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
@@ -614,41 +617,52 @@ public class EmbyProxy {
         return result;
     }
 
-    public void initTmdbProvider(EmbyItem embyItem) {
+    public boolean initTmdbProvider(EmbyItem embyItem) {
         try {
             if (null == embyItem) {
-                return;
+                return false;
             }
             Map<String, String> prividerMap = embyItem.getProviderIds();
             String embyType = embyItem.getType();
             if (MapUtil.isEmpty(prividerMap) ||
                     !StrUtil.equalsAnyIgnoreCase(embyType, 电影.getEmbyName(), 电视剧.getEmbyName())) {
-                return;
+                return false;
             }
 
             String tmdbId = MapUtil.getStr(prividerMap, "Tmdb");
             if (StrUtil.isBlank(tmdbId)) {
-                return;
+                return false;
             }
-            TmdbProvider tmdbProvider = tmdbProviderDao.findByTmdb(tmdbId, embyType);
-            if (null != tmdbProvider) {
-                return;
+            ReentrantLock lock = LockUtil.lockVideoCache(tmdbId);
+            if (LockUtil.isLock(lock)) {
+                return false;
             }
-            String doubanId = MapUtil.getStr(prividerMap, "Douban");
-            String imdbId = MapUtil.getStr(prividerMap, "Imdb");
-            String tvdbId = MapUtil.getStr(prividerMap, "Tvdb");
-            tmdbProvider = TmdbProvider.x().setTmdbId(tmdbId).setEmbyType(embyType)
-                    .setDoubanId(doubanId).setImdbId(imdbId).setTvdbId(tvdbId);
-            EmbyMediaType embyMediaType = EmbyMediaType.fromEmby(embyType);
+            try {
+                TmdbProvider tmdbProvider = tmdbProviderDao.findByTmdb(tmdbId, embyType);
+                if (null != tmdbProvider) {
+                    return true;
+                }
+                String doubanId = MapUtil.getStr(prividerMap, "Douban");
+                String imdbId = MapUtil.getStr(prividerMap, "Imdb");
+                String tvdbId = MapUtil.getStr(prividerMap, "Tvdb");
+                tmdbProvider = TmdbProvider.x().setTmdbId(tmdbId).setEmbyType(embyType)
+                        .setDoubanId(doubanId).setImdbId(imdbId).setTvdbId(tvdbId);
+                EmbyMediaType embyMediaType = EmbyMediaType.fromEmby(embyType);
 
-            // 获取tmdb信息
-            String tmdbInfo = tmdbProxy.getInfoById(embyMediaType, tmdbId);
-            if (StrUtil.isNotBlank(tmdbInfo)) {
-                tmdbProvider.setTmdbInfo(tmdbInfo);
+                // 获取tmdb信息
+                String tmdbInfo = tmdbProxy.getInfoById(embyMediaType, tmdbId);
+                if (StrUtil.isNotBlank(tmdbInfo)) {
+                    tmdbProvider.setTmdbInfo(tmdbInfo);
+                }
+                tmdbProviderDao.insertOrUpdate(tmdbProvider);
+                System.out.print("✅");
+                return true;
+            } finally {
+                LockUtil.unlockVideoCache(lock, tmdbId);
             }
-            tmdbProviderDao.insertOrUpdate(tmdbProvider);
         } catch (Exception e) {
             log.warn("[itemId:{}]初始化构建tmdb-douban失败: ", embyItem.getItemId(), e);
+            return false;
         }
     }
 

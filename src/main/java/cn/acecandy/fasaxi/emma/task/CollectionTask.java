@@ -3,6 +3,7 @@ package cn.acecandy.fasaxi.emma.task;
 import cn.acecandy.fasaxi.emma.task.impl.CollectionTaskService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -21,12 +22,18 @@ public class CollectionTask {
     @Resource
     private CollectionTaskService collectionTaskService;
 
+    @Value("${task.all-enabled:true}")
+    private boolean allEnabled;
+
     /**
      * 同步自定义合集
      */
     @Scheduled(fixedDelay = 14 * 60, timeUnit = TimeUnit.MINUTES, initialDelay = 30)
     public void syncQuickCollection() {
         try {
+            if (!allEnabled) {
+                return;
+            }
             collectionTaskService.syncQuickCollection();
         } catch (Exception e) {
             log.error("执行异常-同步自定义合集(快速) ", e);
