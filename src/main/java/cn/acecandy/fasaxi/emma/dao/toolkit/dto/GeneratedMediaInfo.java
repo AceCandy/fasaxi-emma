@@ -44,9 +44,9 @@ public class GeneratedMediaInfo {
     /**
      * 海报路径
      */
-    @Alias("poster_path")
+    /*@Alias("poster_path")
     @JsonProperty("poster_path")
-    private String posterPath;
+    private String posterPath;*/
     /**
      * 发布日期
      */
