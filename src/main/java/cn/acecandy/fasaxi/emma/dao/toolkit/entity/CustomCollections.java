@@ -1,8 +1,5 @@
 package cn.acecandy.fasaxi.emma.dao.toolkit.entity;
 
-import cn.acecandy.fasaxi.emma.dao.toolkit.dto.GeneratedMediaInfo;
-import cn.acecandy.fasaxi.emma.dao.toolkit.handler.JsonbTypeHandler;
-import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
@@ -89,7 +86,7 @@ public class CustomCollections extends Model<CustomCollections> {
      * <p>
      * 类似/Items/3027958/Images/Primary?tag=28a45bca3015a10d168b1409ac0be69b
      */
-    private String posterPath;
+    // private String posterPath;
 
     /**
      * 在合集列表中的排序
