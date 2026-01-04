@@ -100,12 +100,12 @@ public class MediaMetadata extends Model<MediaMetadata> {
     /**
      *
      */
-    private String officialRating;
+    // private String officialRating;
 
     /**
      *
      */
-    private String unifiedRating;
+    // private String unifiedRating;
 
     /**
      *
