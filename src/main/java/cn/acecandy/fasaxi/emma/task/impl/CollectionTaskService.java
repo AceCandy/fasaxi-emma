@@ -2,7 +2,8 @@ package cn.acecandy.fasaxi.emma.task.impl;
 
 import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
-import cn.acecandy.fasaxi.emma.dao.toolkit.dto.GeneratedMediaInfo;
+import cn.acecandy.fasaxi.emma.dao.ms.entity.MediaServerSyncItems;
+import cn.acecandy.fasaxi.emma.dao.ms.service.MediaServerSyncItemsDao;
 import cn.acecandy.fasaxi.emma.dao.toolkit.entity.CustomCollections;
 import cn.acecandy.fasaxi.emma.dao.toolkit.entity.MediaMetadata;
 import cn.acecandy.fasaxi.emma.dao.toolkit.service.CustomCollectionsDao;
@@ -33,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -54,6 +54,9 @@ public class CollectionTaskService {
 
     @Resource
     private MediaMetadataDao mediaMetadataDao;
+
+    @Resource
+    private MediaServerSyncItemsDao mediaServerSyncItemsDao;
 
     @Resource
     private EmbyProxy embyProxy;
@@ -145,21 +148,21 @@ public class CollectionTaskService {
             if (CollUtil.isEmpty(matchedItems)) {
                 return;
             }
-            List<String> tmdbIds = matchedItems.stream().map(s -> String.valueOf(s.id())).toList();
+            List<Integer> tmdbIds = matchedItems.stream().map(MatchedItem::id).toList();
             // 默认合集存在，如果不存在从页面进行创建
-            List<MediaMetadata> mediaMetadatas = mediaMetadataDao.findByTmdbId(tmdbIds, itemType.getEmbyName());
-            // 内存重排序为传入的顺序
-            Map<String, MediaMetadata> metadataMap = mediaMetadatas.stream().collect(Collectors.toMap(
-                    MediaMetadata::getTmdbId, Function.identity(), (_, v2) -> v2));
-            mediaMetadatas = tmdbIds.stream()
-                    .map(metadataMap::get).filter(Objects::nonNull).toList();
+            // List<MediaMetadata> mediaMetadatas = mediaMetadataDao.findByTmdbId(tmdbIds, itemType.getEmbyName());
+            List<MediaServerSyncItems> mediaMetadatas
+                    = mediaServerSyncItemsDao.findByTmdbId(tmdbIds, itemType.getTmdbName());
+            // 按照tmdbid合并成Map<TmdbId,List<itemId>>
+            Map<Integer, List<String>> tmdbIdToEmbyIdsMap = mediaMetadatas.stream()
+                    .collect(Collectors.groupingBy(MediaServerSyncItems::getTmdbId,
+                            Collectors.mapping(MediaServerSyncItems::getItemId, Collectors.toList())));
+            // TODO 内存重排序为传入的顺序
+            newEmbyIds.addAll(tmdbIds.stream().map(tmdbIdToEmbyIdsMap::get)
+                    .filter(Objects::nonNull).flatMap(List::stream).toList());
 
-            newEmbyIds.addAll(mediaMetadatas.stream()
-                    .map(MediaMetadata::getEmbyItemIdsJson).filter(CollUtil::isNotEmpty)
-                    .flatMap(List::stream).filter(StrUtil::isNotBlank)
-                    .toList());
-
-            generatedMediaInfos.addAll(mediaMetadatas.stream().map(MediaMetadata::getTmdbId).collect(Collectors.toSet()));
+            generatedMediaInfos.addAll(mediaMetadatas.stream()
+                    .map(c -> String.valueOf(c.getTmdbId())).collect(Collectors.toSet()));
         }
 
         String embyCollectionId = coll.getEmbyCollectionId();
