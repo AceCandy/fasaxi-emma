@@ -134,13 +134,15 @@ public class OriginReqService {
         }
         stopPlay(req);
 
-        if (StrUtil.containsIgnoreCase(req.getParamUri(), "Sessions/Playing")) {
+        if (StrUtil.containsIgnoreCase(req.getParamUri(), "Sessions/Playing/Progress")) {
             if (redisLockClient.lock(buildSessionsLock(req), 15)) {
                 String url = embyConfig.getHost() + req.getParamUri();
                 String apiKey = "api_key=" + req.getApiKey();
                 url = HttpUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
                 Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod())).body(req.getCachedBody());
-                ThreadUtil.execute(() -> httpClient.send(originalRequest));
+                ThreadUtil.execute(() -> {
+                    httpClient.send(originalRequest);
+                });
             }
             response.setStatus(CODE_204);
             return true;
