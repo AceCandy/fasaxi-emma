@@ -1,36 +1,20 @@
 package cn.acecandy.fasaxi.emma.service.rss;
 
-import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
-import cn.acecandy.fasaxi.emma.dao.embyboss.entity.TmdbProvider;
-import cn.acecandy.fasaxi.emma.dao.embyboss.service.TmdbProviderDao;
 import cn.acecandy.fasaxi.emma.sao.entity.MatchedItem;
-import cn.acecandy.fasaxi.emma.sao.out.DataEyeContent;
+import cn.acecandy.fasaxi.emma.sao.out.DataEyeRank;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
-import cn.acecandy.fasaxi.emma.sao.out.RTmdbMovie;
-import cn.acecandy.fasaxi.emma.sao.out.RTmdbTv;
 import cn.acecandy.fasaxi.emma.sao.proxy.DataEyeProxy;
-import cn.acecandy.fasaxi.emma.sao.proxy.DoubanProxy;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
-import cn.acecandy.fasaxi.emma.sao.proxy.TmdbProxy;
-import cn.acecandy.fasaxi.emma.utils.HtmlUtil;
-import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.hutool.v7.core.collection.CollUtil;
-import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.collection.set.SetUtil;
-import cn.hutool.v7.core.lang.mutable.MutablePair;
-import cn.hutool.v7.core.text.StrUtil;
+import cn.hutool.v7.core.date.DateFormatPool;
+import cn.hutool.v7.core.date.DateUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电影;
-import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧;
 
 /**
  * dataeye 短剧 rss处理器
@@ -61,7 +45,8 @@ public class DataEyeRssFetcher {
      * @return {@link List }<{@link MatchedItem }>
      */
     public Set<String> exec(String url) {
-        List<DataEyeContent> top30 = dataEyeProxy.getTop30();
+        String lastMonth = DateFormatPool.NORM_MONTH_FORMAT.format(DateUtil.lastMonth());
+        List<DataEyeRank> top30 = dataEyeProxy.getHotRankByMonth(lastMonth);
         if (CollUtil.isEmpty(top30)) {
             return SetUtil.ofLinked();
         }

@@ -5,7 +5,9 @@ import cn.acecandy.fasaxi.emma.sao.entity.Op;
 import cn.acecandy.fasaxi.emma.sao.out.R123;
 import cn.acecandy.fasaxi.emma.sao.out.R123TokenResp;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
@@ -82,4 +84,18 @@ public interface OpClient {
     @PostMapping(path = "/api/fs/remove")
     Op<Void> remove(@RequestHeader("Authorization") String auth,
                     @RequestBody Op.RemoveReq req);
+
+    /**
+     * 文件上传
+     *
+     * @param auth       认证
+     * @param asTask     作为异步任务
+     * @param overwrite  是否覆盖
+     * @param targetPath 目标文件路径
+     * @return {@link Op }<{@link Void }>
+     */
+    @PutMapping(path = "/api/fs/put", consumes = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+    Op<Void> put(@RequestHeader("Authorization") String auth, @RequestHeader("As-Task") Boolean asTask,
+                 @RequestHeader("Overwrite") Boolean overwrite, @RequestHeader("File-Path") String targetPath,
+                 @RequestBody byte[] file);
 }

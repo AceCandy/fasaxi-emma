@@ -8,6 +8,7 @@ import cn.acecandy.fasaxi.emma.sao.client.RedisLockClient;
 import cn.acecandy.fasaxi.emma.sao.entity.Op;
 import cn.acecandy.fasaxi.emma.sao.out.R123TokenResp;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
+import cn.hutool.v7.core.io.file.FileUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -242,6 +243,24 @@ public class OpProxy {
         Op.RemoveReq req = new Op.RemoveReq(dir, names);
         Op<Void> result = opClient.remove(getTokenByCache(), req);
         return handleVoidResponse(result, req, "remove");
+    }
+
+    /**
+     * 文件上传
+     *
+     * @param targetPath 目标文件路径
+     * @param overwrite  是否覆盖
+     * @param filePath   文件
+     * @return boolean
+     */
+    public boolean put(String targetPath, Boolean overwrite, String filePath) {
+        if (StrUtil.isBlank(targetPath) || StrUtil.isBlank(filePath)) {
+            log.warn("put failed: parameters invalid, targetPath: {}, filePath: {}", targetPath, filePath);
+            return false;
+        }
+        byte[] fileBytes = FileUtil.readBytes(filePath);
+        Op<Void> result = opClient.put(getTokenByCache(), true, overwrite, targetPath, fileBytes);
+        return handleVoidResponse(result, filePath, "put");
     }
 
     /**

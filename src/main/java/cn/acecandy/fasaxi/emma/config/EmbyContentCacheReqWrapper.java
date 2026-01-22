@@ -4,9 +4,9 @@ import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.map.MapUtil;
+import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
-import cn.hutool.v7.http.HttpUtil;
 import cn.hutool.v7.http.server.servlet.ServletUtil;
 import cn.hutool.v7.json.JSONObject;
 import cn.hutool.v7.json.JSONUtil;
@@ -215,7 +215,7 @@ public class EmbyContentCacheReqWrapper extends HttpServletRequestWrapper {
                 this.userId = userId;
             }
         }
-        paramUri = HttpUtil.urlWithFormUrlEncoded(request.getRequestURI(), cachedParam, Charset.defaultCharset());
+        paramUri = UrlUtil.urlWithFormUrlEncoded(request.getRequestURI(), cachedParam, Charset.defaultCharset());
     }
 
 }

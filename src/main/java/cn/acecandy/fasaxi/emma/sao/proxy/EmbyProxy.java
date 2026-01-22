@@ -42,6 +42,7 @@ import cn.hutool.v7.core.math.NumberUtil;
 import cn.hutool.v7.core.net.url.UrlBuilder;
 import cn.hutool.v7.core.net.url.UrlDecoder;
 import cn.hutool.v7.core.net.url.UrlPath;
+import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.http.HttpUtil;
 import cn.hutool.v7.http.client.Request;
@@ -786,7 +787,7 @@ public class EmbyProxy {
                 .put("imageRefreshMode", "FullRefresh").put("metadataRefreshMode", "FullRefresh")
                 .put("recursive", true).put("replaceAllImages", "true")
                 .put("replaceAllMetadata", true).map();
-        url = HttpUtil.urlWithFormUrlEncoded(url, paramMap, Charset.defaultCharset());
+        url = UrlUtil.urlWithFormUrlEncoded(url, paramMap, Charset.defaultCharset());
         try (Response res = httpClient.send(Request.of(url).method(Method.POST))) {
             if (!res.isOk()) {
                 throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res.getStatus(), url));

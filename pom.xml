@@ -25,7 +25,7 @@
         <disruptor.version>4.0.0</disruptor.version>
         <guava.version>33.5.0-jre</guava.version>
         <httpclient.version>5.5.1</httpclient.version>
-        <hutool.version>7.0.0-M2</hutool.version>
+        <hutool.version>7.0.0-M4</hutool.version>
         <jpinyin.version>1.1.8</jpinyin.version>
         <jsoup.version>1.21.2</jsoup.version>
         <lombok.version>1.18.42</lombok.version>

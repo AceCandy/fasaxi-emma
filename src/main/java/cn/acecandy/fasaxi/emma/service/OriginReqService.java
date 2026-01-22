@@ -1,39 +1,25 @@
 package cn.acecandy.fasaxi.emma.service;
 
-import cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType;
-import cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix;
 import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
-import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
 import cn.acecandy.fasaxi.emma.dao.embyboss.service.VideoPathRelationDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.client.RedisLockClient;
-import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
-import cn.acecandy.fasaxi.emma.sao.out.EmbyMediaSource;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
 import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
-import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.array.ArrayUtil;
-import cn.hutool.v7.core.collection.CollUtil;
-import cn.hutool.v7.core.collection.ListUtil;
-import cn.hutool.v7.core.date.DateTime;
-import cn.hutool.v7.core.date.DateUtil;
 import cn.hutool.v7.core.date.StopWatch;
 import cn.hutool.v7.core.exception.ExceptionUtil;
-import cn.hutool.v7.core.io.file.FileUtil;
-import cn.hutool.v7.core.lang.mutable.MutableTriple;
-import cn.hutool.v7.core.math.NumberUtil;
 import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.util.CharsetUtil;
-import cn.hutool.v7.http.HttpUtil;
 import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.client.engine.ClientEngine;
@@ -48,8 +34,6 @@ import org.brotli.dec.BrotliInputStream;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.stream.Collectors;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
@@ -57,7 +41,6 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_308;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_408;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_599;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.HTTP_DELETE;
-import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧_集;
 import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildOriginLock;
 import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildSessionsLock;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.isCacheLongTimeReq;
@@ -138,7 +121,7 @@ public class OriginReqService {
             if (redisLockClient.lock(buildSessionsLock(req), 15)) {
                 String url = embyConfig.getHost() + req.getParamUri();
                 String apiKey = "api_key=" + req.getApiKey();
-                url = HttpUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
+                url = UrlUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
                 Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod())).body(req.getCachedBody());
                 ThreadUtil.execute(() -> {
                     httpClient.send(originalRequest);
@@ -152,7 +135,7 @@ public class OriginReqService {
             String url = embyConfig.getHost() + req.getParamUri();
             if (StrUtil.isNotBlank(req.getApiKey())) {
                 String apiKey = "api_key=" + req.getApiKey();
-                url = HttpUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
+                url = UrlUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
             }
             Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod()))
                     .body(req.getCachedBody()).header(req.getCachedHeader());
