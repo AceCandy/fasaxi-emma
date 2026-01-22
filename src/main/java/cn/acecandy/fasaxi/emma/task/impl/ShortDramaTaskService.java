@@ -50,20 +50,25 @@ public class ShortDramaTaskService {
     @Value("${dataeye.file-save-path}")
     private String fileSavePath;
 
+    public static final String CACHE_ID_KEY = "SD_LAST_SYNC_ITEM_ID";
+
     /**
      * 同步项目信息（从当前的source_id的最大值+1开始）
      *
      */
     public void syncItemInfo() {
         Long maxSourceId = sdItemDao.getMaxSourceId(1);
+        if (redisClient.hasKey(CACHE_ID_KEY)) {
+            maxSourceId = (Long) redisClient.get(CACHE_ID_KEY);
+        }
 
-        Long nextSourceId = maxSourceId + 1;
+        long nextSourceId = maxSourceId + 1;
         int nullCount = 0;
         while (true) {
             DataEyeItem item = dataEyeProxy.getItemInfo(nextSourceId);
             if (item == null) {
                 nullCount++;
-                if (nullCount >= 10) {
+                if (nullCount >= 100) {
                     break;
                 }
                 nextSourceId++;
@@ -96,6 +101,7 @@ public class ShortDramaTaskService {
             sdItemDao.save(sdItem);
             nextSourceId = item.getPlayletId() + 1;
         }
+        redisClient.set(CACHE_ID_KEY, nextSourceId);
     }
 
 }
