@@ -1,6 +1,5 @@
 package cn.acecandy.fasaxi.emma.dao.embyboss.entity;
 
-import cn.hutool.v7.core.date.DateTime;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.Table;
@@ -10,6 +9,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -55,5 +55,5 @@ public class SdJccRank extends Model<SdJccRank> {
     /**
      * 更新时间
      */
-    private DateTime updatedTime;
+    private LocalDateTime updatedTime;
 }

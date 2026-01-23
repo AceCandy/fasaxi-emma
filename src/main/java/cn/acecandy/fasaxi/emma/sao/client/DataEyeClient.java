@@ -43,5 +43,85 @@ public interface DataEyeClient {
     DataEye<List<DataEyeRank>> getHotRankUrl(@RequestParam("day") String day,
                                              @RequestParam("month") String month);
 
+    /**
+     * 获取抖音热播
+     *
+     * @param day   日
+     * @param month 月
+     * @return {@link DataEye }<{@link DataEyeItem }>
+     */
+    @GetMapping(path = "${dataeye.dy-url}")
+    DataEye<List<DataEyeRank>> getDyUrl(@RequestParam("day") String day,
+                                        @RequestParam("month") String month);
+
+    /**
+     * 获取快手热播
+     *
+     * @param day   日
+     * @param month 月
+     * @return {@link DataEye }<{@link DataEyeItem }>
+     */
+    @GetMapping(path = "${dataeye.ks-url}")
+    DataEye<List<DataEyeRank>> getKsUrl(@RequestParam("day") String day,
+                                        @RequestParam("month") String month);
+
+    /**
+     * 获取红果热播
+     *
+     * @param day   日
+     * @param month 月
+     * @return {@link DataEye }<{@link DataEyeItem }>
+     */
+    @GetMapping(path = "${dataeye.hg-url}")
+    DataEye<List<DataEyeRank>> getHgUrl(@RequestParam("day") String day,
+                                        @RequestParam("month") String month);
+
+    /**
+     * 获取品牌热播
+     *
+     * @param day   日
+     * @param month 月
+     * @return {@link DataEye }<{@link DataEyeItem }>
+     */
+    @GetMapping(path = "${dataeye.brand-url}")
+    DataEye<List<DataEyeRank>> getBrandUrl(@RequestParam("day") String day,
+                                           @RequestParam("month") String month);
+
+    /**
+     * 获取爱奇艺热播
+     *
+     * @param day 日
+     * @return {@link DataEye }<{@link DataEyeItem }>
+     */
+    @GetMapping(path = "${dataeye.iqy-url}")
+    DataEye<List<DataEyeRank>> getIqyUrl(@RequestParam("rankingDate") String day);
+
+
+    /**
+     * 获取优酷热播
+     *
+     * @param day 日
+     * @return {@link DataEye }<{@link DataEyeItem }>
+     */
+    @GetMapping(path = "${dataeye.yk-url}")
+    DataEye<List<DataEyeRank>> getYkUrl(@RequestParam("rankingDate") String day);
+
+    /**
+     * 获取腾讯竖剧热播
+     *
+     * @param day 日
+     * @return {@link DataEye }<{@link DataEyeItem }>
+     */
+    @GetMapping(path = "${dataeye.txs-url}")
+    DataEye<List<DataEyeRank>> getTxsUrl(@RequestParam("rankingDate") String day);
+
+    /**
+     * 获取腾讯横剧热播
+     *
+     * @param day 日
+     * @return {@link DataEye }<{@link DataEyeItem }>
+     */
+    @GetMapping(path = "${dataeye.txh-url}")
+    DataEye<List<DataEyeRank>> getTxhUrl(@RequestParam("rankingDate") String day);
 
 }

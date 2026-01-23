@@ -46,7 +46,7 @@ public class DataEyeRssFetcher {
      */
     public Set<String> exec(String url) {
         String lastMonth = DateFormatPool.NORM_MONTH_FORMAT.format(DateUtil.lastMonth());
-        List<DataEyeRank> top30 = dataEyeProxy.getHotRankByMonth(lastMonth);
+        List<DataEyeRank> top30 = dataEyeProxy.getHotRank(lastMonth);
         if (CollUtil.isEmpty(top30)) {
             return SetUtil.ofLinked();
         }

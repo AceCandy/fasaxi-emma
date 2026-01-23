@@ -28,8 +28,8 @@ public class ShortDramaTask {
     /**
      * 同步短剧媒体项
      */
-    @Scheduled(fixedDelay = 45, timeUnit = TimeUnit.MINUTES, initialDelay = 5)
-    public void syncLibItems() {
+    @Scheduled(fixedDelay = 15, timeUnit = TimeUnit.MINUTES, initialDelay = 5)
+    public void syncItems() {
         try {
             if (!allEnabled) {
                 return;
@@ -37,6 +37,21 @@ public class ShortDramaTask {
             shortDramaTaskService.syncItemInfo();
         } catch (Exception e) {
             log.error("执行异常-同步短剧媒体项 ", e);
+        }
+    }
+
+    /**
+     * 同步jcc短剧榜单数据
+     */
+    @Scheduled(fixedDelay = 11 * 60, timeUnit = TimeUnit.MINUTES, initialDelay = 7)
+    public void syncJccRanks() {
+        try {
+            if (!allEnabled) {
+                return;
+            }
+            shortDramaTaskService.syncJccRanks();
+        } catch (Exception e) {
+            log.error("执行异常-同步jcc短剧榜单数据 ", e);
         }
     }
 

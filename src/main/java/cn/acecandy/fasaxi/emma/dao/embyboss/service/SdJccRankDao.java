@@ -7,6 +7,10 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
+import static cn.acecandy.fasaxi.emma.dao.embyboss.entity.table.SdJccRankTableDef.SD_JCC_RANK;
+
 /**
  * 剧查查-短剧榜单表 dao
  *
@@ -17,4 +21,29 @@ import org.springframework.stereotype.Component;
 @UseDataSource("embyboss")
 @Component
 public class SdJccRankDao extends ServiceImpl<SdJccRankMapper, SdJccRank> {
+
+    /**
+     * 按类型和时间段查找
+     *
+     * @param type      类型
+     * @param timeStage 时间阶段
+     * @return {@link List }<{@link SdJccRank }>
+     */
+    public List<SdJccRank> findByTypeAndTimeStage(Integer type, String timeStage) {
+        return mapper.selectListByQuery(query().where(SD_JCC_RANK.TYPE.eq(type)
+                .and(SD_JCC_RANK.TIME_STAGE.eq(timeStage))));
+    }
+
+    /**
+     * 按类型和时间段+值查找
+     *
+     * @param type      类型
+     * @param timeStage 时间阶段
+     * @return {@link List }<{@link SdJccRank }>
+     */
+    public SdJccRank findByTypeAndTimeStage(Integer type, String timeStage, String timeValue) {
+        return mapper.selectOneByQuery(query().where(SD_JCC_RANK.TYPE.eq(type)
+                .and(SD_JCC_RANK.TIME_STAGE.eq(timeStage))
+                .and(SD_JCC_RANK.TIME_VALUE.eq(timeValue))));
+    }
 }
