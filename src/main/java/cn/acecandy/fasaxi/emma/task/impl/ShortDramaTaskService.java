@@ -102,7 +102,8 @@ public class ShortDramaTaskService {
     public void syncItemInfo() {
         Long maxSourceId = sdItemDao.getMaxSourceId(SOURCE_剧查查);
         if (redisClient.hasKey(CACHE_ID_KEY)) {
-            maxSourceId = ((Number) redisClient.get(CACHE_ID_KEY)).longValue();
+            long maxSourceIdRedis = ((Number) redisClient.get(CACHE_ID_KEY)).longValue();
+            maxSourceId = Math.max(maxSourceId, maxSourceIdRedis);
         }
 
         long nextSourceId = maxSourceId + 1;
@@ -143,8 +144,8 @@ public class ShortDramaTaskService {
 
             sdItemDao.save(sdItem);
             nextSourceId = item.getPlayletId() + 1;
+            redisClient.set(CACHE_ID_KEY, nextSourceId);
         }
-        redisClient.set(CACHE_ID_KEY, nextSourceId);
         log.warn("同步{}个短剧项目信息", nextSourceId - maxSourceId);
     }
 
