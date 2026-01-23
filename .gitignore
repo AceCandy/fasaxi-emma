@@ -38,3 +38,4 @@ application-*.yml
 create.sql
 rebel.xml
 workspace/
+plans/
