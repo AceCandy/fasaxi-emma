@@ -59,7 +59,7 @@ public class ShortDramaTaskService {
     public void syncItemInfo() {
         Long maxSourceId = sdItemDao.getMaxSourceId(1);
         if (redisClient.hasKey(CACHE_ID_KEY)) {
-            maxSourceId = (Long) redisClient.get(CACHE_ID_KEY);
+            maxSourceId = ((Number) redisClient.get(CACHE_ID_KEY)).longValue();
         }
 
         long nextSourceId = maxSourceId + 1;

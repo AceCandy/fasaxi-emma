@@ -28,7 +28,7 @@ public class ShortDramaTask {
     /**
      * 同步短剧媒体项
      */
-    @Scheduled(fixedDelay = 65, timeUnit = TimeUnit.MINUTES, initialDelay = 5)
+    @Scheduled(fixedDelay = 45, timeUnit = TimeUnit.MINUTES, initialDelay = 5)
     public void syncLibItems() {
         try {
             if (!allEnabled) {
