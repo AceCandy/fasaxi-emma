@@ -111,6 +111,7 @@ public class ShortDramaTaskService {
         while (true) {
             DataEyeItem item = dataEyeProxy.getItemInfo(nextSourceId);
             if (item == null) {
+                redisClient.set(CACHE_ID_KEY, nextSourceId);
                 nullCount++;
                 if (nullCount >= 500) {
                     break;
@@ -125,26 +126,28 @@ public class ShortDramaTaskService {
             sdItem.setTitle(item.getPlayletName());
             sdItem.setTags(item.getPlayletTagNames());
 
-            String fileName = StrUtil.format("{}-{}.{}", SOURCE_剧查查, item.getPlayletId(),
-                    FileNameUtil.extName(UrlUtil.getPath(item.getCoverOss())));
-            if (FileUtil.exists(fileSavePath)) {
-                if (!FileUtil.exists(fileSavePath + fileName)) {
-                    HttpDownloader.of(item.getCoverOss()).downloadFile(
-                            FileUtil.file(fileSavePath + fileName));
+            if (StrUtil.isNotEmpty(item.getCoverOss())) {
+                String fileName = StrUtil.format("{}-{}.{}", SOURCE_剧查查, item.getPlayletId(),
+                        FileNameUtil.extName(UrlUtil.getPath(item.getCoverOss())));
+                if (FileUtil.exists(fileSavePath)) {
+                    if (!FileUtil.exists(fileSavePath + fileName)) {
+                        HttpDownloader.of(item.getCoverOss()).downloadFile(
+                                FileUtil.file(fileSavePath + fileName));
+                    }
+                } else {
+                    String tmpFilePath = StrUtil.format("/tmp/{}/{}", DateUtil.formatToday(), fileName);
+                    if (!FileUtil.exists(tmpFilePath)) {
+                        File ossFile = HttpDownloader.of(item.getCoverOss()).downloadFile(
+                                FileUtil.file(tmpFilePath));
+                        opProxy.put(fileSavePathRemote + fileName, false, ossFile.getPath());
+                    }
                 }
-            } else {
-                String tmpFilePath = StrUtil.format("/tmp/{}/{}", DateUtil.formatToday(), fileName);
-                if (!FileUtil.exists(tmpFilePath)) {
-                    File ossFile = HttpDownloader.of(item.getCoverOss()).downloadFile(
-                            FileUtil.file(tmpFilePath));
-                    opProxy.put(fileSavePathRemote + fileName, false, ossFile.getPath());
-                }
+                sdItem.setCoverUrl(fileName);
             }
-            sdItem.setCoverUrl(fileName);
 
             sdItemDao.save(sdItem);
-            nextSourceId = item.getPlayletId() + 1;
             redisClient.set(CACHE_ID_KEY, nextSourceId);
+            nextSourceId = item.getPlayletId() + 1;
         }
         log.warn("同步{}个短剧项目信息", nextSourceId - maxSourceId);
     }
