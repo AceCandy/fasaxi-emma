@@ -183,6 +183,7 @@ public class VideoRedirectService {
                     storageType = StrmPathPrefix.PRE_ZONG123.getType();
                 } else if (StrUtil.isNotBlank(vpr.getPath115())) {
                     url302 = vpr.getPath115();
+                    url302 = StrUtil.replace(url302, "/new115/", "/new115-ck/");
                     storageType = StrmPathPrefix.PRE_115.getType();
                 }
                 url302 = cloudUtil.reqAndCacheOpenList302Url(CloudStorageType.of(storageType), url302, request.getUa(),
