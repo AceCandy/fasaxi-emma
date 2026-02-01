@@ -7,6 +7,8 @@ import com.mybatisflex.spring.service.impl.ServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 import static cn.acecandy.fasaxi.emma.dao.embyboss.entity.table.SdItemTableDef.SD_ITEM;
 import static com.mybatisflex.core.query.QueryMethods.max;
 
@@ -29,5 +31,14 @@ public class SdItemDao extends ServiceImpl<SdItemMapper, SdItem> {
     public Long getMaxSourceId(Integer source) {
         return mapper.selectOneByQueryAs(query().select(max(SD_ITEM.SOURCE_ID)
                 .as("maxSourceId")).where(SD_ITEM.SOURCE.eq(source)), Long.class);
+    }
+
+    /**
+     * 根据源id查询短剧
+     *
+     * @return {@link Long }
+     */
+    public List<SdItem> findBySourceId(List<Long> sourceId) {
+        return mapper.selectListByQuery(query().where(SD_ITEM.SOURCE_ID.in(sourceId)));
     }
 }

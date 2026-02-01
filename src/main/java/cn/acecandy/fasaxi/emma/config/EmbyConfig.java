@@ -114,6 +114,11 @@ public class EmbyConfig {
     private Map<String, String> virtualNonVideo;
 
     /**
+     * 没有tmdb的媒体库
+     */
+    private Map<String, String> noTmdb;
+
+    /**
      * 公网emby地址
      */
     private String publicAddr;

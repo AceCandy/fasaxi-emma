@@ -141,7 +141,7 @@ public class TmdbProxy {
             }
             String resBody = res.bodyStr();
             if (!JSONUtil.isTypeJSON(resBody)) {
-                throw new BaseException(StrUtil.format("返回结果异常: {}", resBody));
+                throw new BaseException(StrUtil.format("返回结果异常:url:{} e:{}", url, resBody));
             }
             RTmdb<String> resp = JSONUtil.toBean(resBody, new TypeReference<RTmdb<String>>() {
             });

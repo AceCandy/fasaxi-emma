@@ -30,6 +30,10 @@ public class DoubanConfig {
      * 小程序相关
      */
     private HostInfo wxmini;
+    /**
+     * 小程序相关
+     */
+    private DouBanApi localApi;
 
     @Data
     public static class HostInfo {
@@ -47,4 +51,19 @@ public class DoubanConfig {
         private String detailInfoUrl;
     }
 
+    @Data
+    public static class DouBanApi {
+        /**
+         * 域名
+         */
+        private String host;
+        /**
+         * 搜索imdb url
+         */
+        private String searchImdbUrl;
+        /**
+         * 详情信息url
+         */
+        private String doubanItemUrl;
+    }
 }

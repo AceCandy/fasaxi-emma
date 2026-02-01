@@ -6,7 +6,6 @@ import cn.acecandy.fasaxi.emma.config.DoubanConfig;
 import cn.acecandy.fasaxi.emma.sao.entity.MatchedItem;
 import cn.acecandy.fasaxi.emma.sao.out.TmdbImageInfoOut;
 import cn.acecandy.fasaxi.emma.utils.HtmlUtil;
-import cn.acecandy.fasaxi.emma.utils.ReUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.map.MapUtil;
@@ -181,11 +180,11 @@ public class DoubanProxy {
             return null;
         }
         String doubanId = null;
-        if ((imdbId.hashCode() & Integer.MAX_VALUE) % 2 == 0) {
-            doubanId = ReUtil.findDouBanIdByJson(getInfoByImdbId(type, imdbId));
-        } else {
-            doubanId = ReUtil.findDouBanIdByHtml(getHtmlByImdbId(imdbId));
-        }
+        // if ((imdbId.hashCode() & Integer.MAX_VALUE) % 2 == 0) {
+        doubanId = getInfoByImdbIdOnApi(imdbId);
+        // } else {
+        //     doubanId = ReUtil.findDouBanIdByHtml(getHtmlByImdbId(imdbId));
+        // }
         return doubanId;
     }
 
@@ -207,7 +206,7 @@ public class DoubanProxy {
         try (Response res = httpClient.send(Request.of(url).form(MapUtil.<String, Object>builder(
                 "apikey", apiKey).map()).method(Method.POST))) {
             if (!res.isOk()) {
-                throw new BaseException(StrUtil.format("返回码异常: {}", res.getStatus()));
+                throw new BaseException(StrUtil.format("返回码异常: {}, url: {}", res.getStatus(), url));
             }
             String resBody = res.bodyStr();
             if (!JSONUtil.isTypeJSON(resBody)) {
@@ -239,6 +238,36 @@ public class DoubanProxy {
             return res.bodyStr();
         } catch (Exception e) {
             log.warn("getHtmlByImdbId 网络请求异常: ", e);
+        }
+        return null;
+    }
+
+    /**
+     * 通过imdbid获取豆瓣页面
+     *
+     * @param imdbId IMDb ID
+     * @return {@link TmdbImageInfoOut }
+     */
+    public String getInfoByImdbIdOnApi(String imdbId) {
+        if (StrUtil.isBlank(imdbId)) {
+            return null;
+        }
+        String url = doubanConfig.getLocalApi().getHost() + StrUtil.format(
+                doubanConfig.getLocalApi().getSearchImdbUrl(), imdbId);
+        try (Response res = httpClient.send(Request.of(url).method(Method.GET))) {
+            if (!res.isOk()) {
+                throw new BaseException(StrUtil.format("返回码异常: {}", res.getStatus()));
+            }
+            String resBody = res.bodyStr();
+            if (!JSONUtil.isTypeJSONArray(resBody)) {
+                throw new BaseException(StrUtil.format("返回结果异常: {}", resBody));
+            }
+            if (StrUtil.equals(resBody, "[]")) {
+                return null;
+            }
+            return JSONUtil.parseArray(resBody).getJSONObject(0).getStr("sid");
+        } catch (Exception e) {
+            log.warn("getInfoByImdbIdOnApi 网络请求异常: ", e);
         }
         return null;
     }

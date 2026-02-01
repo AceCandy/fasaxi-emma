@@ -12,8 +12,11 @@ import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.entity.MatchedItem;
 import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
+import cn.acecandy.fasaxi.emma.service.rss.DataEyeDbFetcher;
 import cn.acecandy.fasaxi.emma.service.rss.DataEyeRssFetcher;
 import cn.acecandy.fasaxi.emma.service.rss.DoulistRssFetcher;
+import cn.acecandy.fasaxi.emma.service.rss.JavJinjierFetcher;
+import cn.acecandy.fasaxi.emma.service.rss.JavRankFetcher;
 import cn.acecandy.fasaxi.emma.service.rss.MaoyanRssFetcher;
 import cn.acecandy.fasaxi.emma.service.rss.RuleFilterFetcher;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
@@ -75,6 +78,15 @@ public class CollectionTaskService {
 
     @Resource
     private DataEyeRssFetcher dataEyeRssFetcher;
+
+    @Resource
+    private DataEyeDbFetcher dataEyeDbFetcher;
+
+    @Resource
+    private JavJinjierFetcher javJinjierFetcher;
+
+    @Resource
+    private JavRankFetcher javRankFetcher;
 
     public void syncQuickCollection() {
         List<CustomCollections> collections = customCollectionsDao.findAllByStatus("active");
@@ -205,6 +217,12 @@ public class CollectionTaskService {
         EmbyMediaType itemType = EmbyMediaType.fromEmby(CollUtil.getFirst(itemTypeFromDb));
         if (StrUtil.contains(url, "playlet-applet.dataeye.com")) {
             return dataEyeRssFetcher.exec(url);
+        } else if (StrUtil.contains(url, "SdJccRank")) {
+            return dataEyeDbFetcher.exec(url);
+        } else if (StrUtil.contains(url, "JavJinjier")) {
+            return javJinjierFetcher.exec(url);
+        } else if (StrUtil.contains(url, "JavRank")) {
+            return javRankFetcher.exec(url);
         }
         return Set.of();
     }
@@ -220,10 +238,6 @@ public class CollectionTaskService {
         if (StrUtil.isBlank(url)) {
             return Set.of();
         }
-        /*if (StrUtil.startWith(url, "http://192.168.1.249:11200")) {
-            url = StrUtil.replace(url, "http://192.168.1.249:11200",
-                    "https://rss.acecandy.cn:880");
-        }*/
 
         List<String> itemTypeFromDb = JSONUtil.toList(definition.getStr("item_type"), String.class);
         EmbyMediaType itemType = EmbyMediaType.fromEmby(CollUtil.getFirst(itemTypeFromDb));
@@ -273,6 +287,20 @@ public class CollectionTaskService {
         List<String> allItemsId = ListUtil.ofCopyOnWrite();
 
         List<String> allLibraryIds = embyConfig.getVirtualHide().keySet().stream().toList();
+        List<String> realLibraryIds = CollUtil.isEmpty(libraryIds) ? allLibraryIds :
+                CollUtil.intersectionDistinct(libraryIds, allLibraryIds).stream().toList();
+        realLibraryIds.parallelStream().forEach(k -> {
+            String itemIds = redisClient.getStr(CacheUtil.buildItemsIdCacheKey(k));
+            allItemsId.addAll(SplitUtil.splitTrim(itemIds, ","));
+        });
+        return allItemsId;
+    }
+
+    public List<String> getAllItemIdByCacheNoShort(List<String> libraryIds) {
+        List<String> allItemsId = ListUtil.ofCopyOnWrite();
+
+        List<String> allLibraryIds = embyConfig.getVirtualHide().keySet().stream().toList();
+        allLibraryIds = CollUtil.subtractToList(allLibraryIds, embyConfig.getNoTmdb().keySet().stream().toList());
         List<String> realLibraryIds = CollUtil.isEmpty(libraryIds) ? allLibraryIds :
                 CollUtil.intersectionDistinct(libraryIds, allLibraryIds).stream().toList();
         realLibraryIds.parallelStream().forEach(k -> {

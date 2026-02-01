@@ -46,4 +46,19 @@ public class SdJccRankDao extends ServiceImpl<SdJccRankMapper, SdJccRank> {
                 .and(SD_JCC_RANK.TIME_STAGE.eq(timeStage))
                 .and(SD_JCC_RANK.TIME_VALUE.eq(timeValue))));
     }
+
+    /**
+     * 按类型和时间段+like值查找
+     *
+     * @param type      类型
+     * @param timeStage 时间阶段
+     * @return {@link List }<{@link SdJccRank }>
+     */
+    public List<SdJccRank> findByTypeAndTimeStageLike(Integer type, String timeStage, String timeValue) {
+        return mapper.selectListByQuery(query().where(SD_JCC_RANK.TYPE.eq(type)
+                .and(SD_JCC_RANK.TIME_STAGE.eq(timeStage))
+                .and(SD_JCC_RANK.TIME_VALUE.likeLeft(timeValue)))
+                .orderBy(SD_JCC_RANK.TIME_VALUE.asc())
+        );
+    }
 }

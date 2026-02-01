@@ -153,7 +153,6 @@ public class VideoPathRelationDao extends ServiceImpl<VideoPathRelationMapper, V
                 .and(VIDEO_PATH_RELATION.PATH123.isNull())
                 .or(VIDEO_PATH_RELATION.PATH123.eq(""))
                 .limit(20);
-        Console.log(mapper.selectListByQuery(wrapper));
         return mapper.selectListByQuery(wrapper);
     }
 
@@ -169,7 +168,6 @@ public class VideoPathRelationDao extends ServiceImpl<VideoPathRelationMapper, V
                 .or(VIDEO_PATH_RELATION.BAK_STATUS.eq(1))
                 .or(VIDEO_PATH_RELATION.BAK_STATUS123.eq(1))
                 .limit(100);
-        Console.log(mapper.selectListByQuery(wrapper));
         return mapper.selectListByQuery(wrapper);
     }
 }

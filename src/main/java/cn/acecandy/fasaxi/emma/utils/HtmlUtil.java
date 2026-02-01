@@ -4,6 +4,7 @@ package cn.acecandy.fasaxi.emma.utils;
 import cn.acecandy.fasaxi.emma.sao.entity.MatchedItem;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
+import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.math.NumberUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
@@ -52,6 +53,7 @@ public final class HtmlUtil extends cn.hutool.v7.http.html.HtmlUtil {
     public static String randomUserAgent() {
         return RandomUtil.randomEle(USER_AGENTS);
     }
+
 
     /**
      * 解析豆列
@@ -135,6 +137,37 @@ public final class HtmlUtil extends cn.hutool.v7.http.html.HtmlUtil {
     }
 
     /**
+     * 解析JavDb rss
+     *
+     * @param xml 可扩展标记语言
+     * @return {@link List }<{@link MatchedItem.Doulist }>
+     */
+    public static List<MatchedItem.JavDb> parseJavDbRss(String xml) {
+        if (StrUtil.isBlank(xml)) {
+            return null;
+        }
+        List<MatchedItem.JavDb> allItems = ListUtil.of();
+        org.w3c.dom.Document doc = XmlUtil.readXml(xml);
+        NodeList items = XPathUtil.getNodeListByXPath("//rss/channel/item", doc);
+        for (int i = 0; i < items.getLength(); i++) {
+            Node itemNode = items.item(i);
+            if (itemNode.getNodeType() != Node.ELEMENT_NODE) {
+                continue; // 过滤非元素节点（如文本、注释）
+            }
+            String title = XPathUtil.getByXPath("title", itemNode, XPathConstants.STRING).toString().trim();
+            // 会包含中文名和其他名字 所有按照空格分割之后取第一个 待观察 可能有bug
+
+            List<String> titleSplit = SplitUtil.split(title, " ");
+            title = CollUtil.getFirst(titleSplit);
+            String link = XPathUtil.getByXPath("link", itemNode, XPathConstants.STRING).toString().trim();
+            String pubDate = XPathUtil.getByXPath("pubDate", itemNode, XPathConstants.STRING).toString().trim();
+            pubDate = DateUtil.formatDate(DateUtil.parse(pubDate));
+            allItems.add(new MatchedItem.JavDb(title, link, pubDate));
+        }
+        return allItems;
+    }
+
+    /**
      * 标准化字符串（剔除无用字段）
      *
      * @param s s
@@ -147,4 +180,9 @@ public final class HtmlUtil extends cn.hutool.v7.http.html.HtmlUtil {
         return s.replaceAll("[\\s:：·\\-*'!,?.。]+", "").toLowerCase();
     }
 
+
+    static void main() {
+        String s = "Tue, 03 Feb 2026 16:00:00 GMT";
+        Console.log(DateUtil.formatDate(DateUtil.parse(s)));
+    }
 }

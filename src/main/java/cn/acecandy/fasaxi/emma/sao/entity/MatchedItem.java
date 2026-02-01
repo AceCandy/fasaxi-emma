@@ -13,6 +13,9 @@ public record MatchedItem(Integer id, String name, EmbyMediaType type, RTmdbMedi
     public record Doulist(String title, Integer year, String doubanLink, String doubanId, String imdbId) {
     }
 
+    public record JavDb(String title, String link, String pubDate) {
+    }
+
     public record FilterRule(String field, String value, String operator) {
     }
 

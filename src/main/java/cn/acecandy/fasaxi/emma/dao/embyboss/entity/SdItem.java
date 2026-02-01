@@ -1,6 +1,5 @@
 package cn.acecandy.fasaxi.emma.dao.embyboss.entity;
 
-import cn.hutool.v7.core.date.DateTime;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.Table;
@@ -11,6 +10,7 @@ import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -84,10 +84,10 @@ public class SdItem extends Model<SdItem> {
     /**
      * 入库时间
      */
-    private DateTime createdTime;
+    private LocalDateTime createdTime;
 
     /**
      * 更新时间
      */
-    private DateTime updatedTime;
+    private LocalDateTime updatedTime;
 }
