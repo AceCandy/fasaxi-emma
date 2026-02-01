@@ -4,7 +4,6 @@ import cn.acecandy.fasaxi.emma.common.constants.CacheConstant;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.dao.toolkit.entity.CustomCollections;
-import cn.acecandy.fasaxi.emma.dao.toolkit.entity.MediaMetadata;
 import cn.acecandy.fasaxi.emma.dao.toolkit.service.CustomCollectionsDao;
 import cn.acecandy.fasaxi.emma.dao.toolkit.service.MediaMetadataDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
@@ -24,14 +23,12 @@ import cn.hutool.v7.core.date.DateUtil;
 import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
-import cn.hutool.v7.core.util.ObjUtil;
 import cn.hutool.v7.crypto.SecureUtil;
 import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.client.engine.ClientEngine;
 import cn.hutool.v7.http.meta.Method;
 import cn.hutool.v7.http.server.servlet.ServletUtil;
-import cn.hutool.v7.json.JSONArray;
 import cn.hutool.v7.json.JSONObject;
 import cn.hutool.v7.json.JSONUtil;
 import com.mybatisflex.core.query.QueryColumn;
@@ -41,7 +38,6 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -67,7 +63,7 @@ public class VirtualService {
     /**
      * 虚拟id基准
      */
-    private static final int MIMICKED_ID_BASE = 900000;
+    public static final long MIMICKED_ID_BASE = 9000000000L;
 
     /**
      * 库详细信息请求标记
@@ -266,7 +262,7 @@ public class VirtualService {
             response.setStatus(CODE_401);
             return;
         }
-        if (StrUtil.startWith(request.getParentId(), "-")) {
+        if (!isMimickedId(request.getParentId())) {
             EmbyItemsInfoOut embyItems = EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
             response.setStatus(CODE_200);
             ServletUtil.write(response, JSONUtil.toJsonStr(embyItems),
@@ -295,27 +291,31 @@ public class VirtualService {
         }
         List<EmbyView> fakeViewsItems = ListUtil.of();
 
+        List<String> truthItemIds = originLibs.stream().map(EmbyView::getId).toList();
+        Map<String, String> virtualTruthRelation = embyConfig.getVirtualTruthRelation();
+        List<String> excludeLibs = ListUtil.of();
+        virtualTruthRelation.forEach((k, v) -> {
+            if (!truthItemIds.contains(k)) {
+                excludeLibs.addAll(SplitUtil.splitTrim(v, ","));
+            }
+        });
+
         for (CustomCollections coll : customCollections) {
             // 1. 物理检查：库在Emby里有实体吗？
             String realEmbyCollectionId = coll.getEmbyCollectionId();
+            // 如果没有权限就隐藏
+            if (excludeLibs.contains(coll.getEmbyCollectionId())) {
+                continue;
+            }
             if (StrUtil.isBlank(realEmbyCollectionId)) {
                 log.warn("[虚拟库<{}>] 被隐藏: 无对应Emby实体", coll.getName());
                 continue;
             }
-            // 2. 权限检查：用户在不在邀请函上？
-            /*List<String> allowedUsers = JSONUtil.toList(coll.getAllowedUserIds(), String.class);
-            if (CollUtil.isNotEmpty(allowedUsers) && !CollUtil.contains(allowedUsers, userId)) {
-                log.warn("[虚拟库<{}>] 被隐藏: 用户不在可见列表中", coll.getName());
-                continue;
-            }*/
-
             // 生成虚拟库信息id
-            String mimickedId = toMimickedId(coll.getId());
+            String mimickedId = toMimickedId(coll.getEmbyCollectionId());
+            // String mimickedId = coll.getEmbyCollectionId();
 
             JSONObject definition = JSONUtil.parseObj(coll.getDefinitionJson());
-            /*JSONArray mergedLibs = definition.getJSONArray("merged_libraries");
-            String nameSuffix = JSONUtil.isEmpty(mergedLibs) ? "" :
-                    StrUtil.format(" (合并库: {}个)", mergedLibs.size());*/
             String nameSuffix = "";
 
             List<String> itemTypeFromDb = JSONUtil.toList(definition.getStr("item_type"), String.class);
@@ -350,6 +350,21 @@ public class VirtualService {
         List<EmbyView> nativeRetainLibs = originLibs.stream().filter(v ->
                 embyConfig.getVirtual().containsKey(v.getId())).toList();
         fakeViewsItems.addAll(nativeRetainLibs);
+
+        // 按照order排序
+        List<String> embyOrder = SplitUtil.splitTrim(embyConfig.getOrder(), ",");
+        Map<String, Integer> orderMap = MapUtil.newHashMap();
+        for (int i = 0; i < embyOrder.size(); i++) {
+            orderMap.put(embyOrder.get(i), i);
+            orderMap.put(toMimickedId(embyOrder.get(i)), i);
+        }
+        fakeViewsItems.sort((o1, o2) -> {
+            // 获取 o1 和 o2 在 order 列表中的索引
+            // 如果 ID 不在 order 列表中，默认给一个最大值 (Integer.MAX_VALUE)，让它排在最后
+            int index1 = orderMap.getOrDefault(o1.getId(), Integer.MAX_VALUE);
+            int index2 = orderMap.getOrDefault(o2.getId(), Integer.MAX_VALUE);
+            return Integer.compare(index1, index2);
+        });
 
         return fakeViewsItems;
     }
@@ -435,99 +450,17 @@ public class VirtualService {
         String userId = request.getUserId();
         String parentId = request.getParentId();
 
-        if (!StrUtil.startWith(parentId, "-")) {
+        if (!isMimickedId(parentId)) {
             List<EmbyItem> items = JSONUtil.toList(buildShowNext(request), EmbyItem.class);
             return EmbyItemsInfoOut.builder().items(items).totalRecordCount(items.size()).build();
         }
-        Long realId = fromMimickedId(parentId);
-        CustomCollections coll = customCollectionsDao.getById(realId);
-        if (coll == null) {
+        Long realEmbyCollectionId = fromMimickedId(parentId);
+        if (realEmbyCollectionId == null) {
             return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
         }
-        // JSONArray generatedMediaInfoJson = JSONUtil.parseArray(coll.getGeneratedMediaInfoJson());
-        // List<String> generatedMediaInfoJson = coll.getGeneratedMediaInfoJson();
-        // List<String> embyIds = generatedMediaInfoJson.stream().filter(g ->
-        //                 ObjUtil.isNotEmpty(g.getObjByPath("emby_id")))
-        //         .map(g -> g.getByPath("emby_id", String.class).toString()).toList();
-
-        String realEmbyCollectionId = coll.getEmbyCollectionId();
         cachedParam.put("ParentId", realEmbyCollectionId);
         EmbyItemsInfoOut out = embyProxy.getUserItems(userId, cachedParam);
-        // out的items按照 List<String> embyIds 的顺序来排序
-        /*if (CollUtil.isNotEmpty(embyIds)) {
-            // return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
-            out.getItems().sort(Comparator.comparing(item -> embyIds.indexOf(item.getItemId())));
-        }*/
-
         return out;
-    }
-
-    private EmbyItemsInfoOut buildLibDetail(EmbyContentCacheReqWrapper request) {
-        Map<String, Object> cachedParam = request.getCachedParam();
-        String userId = request.getUserId();
-        String parentId = request.getParentId();
-
-        if (!StrUtil.startWith(parentId, "-")) {
-            List<EmbyItem> items = JSONUtil.toList(buildShowNext(request), EmbyItem.class);
-            return EmbyItemsInfoOut.builder().items(items).totalRecordCount(items.size()).build();
-        }
-        Long realId = fromMimickedId(parentId);
-        CustomCollections coll = customCollectionsDao.getById(realId);
-        if (coll == null) {
-            return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
-        }
-        JSONArray generatedMediaInfoJson = JSONUtil.parseArray(coll.getGeneratedMediaInfoJson());
-        List<String> embyIds = generatedMediaInfoJson.stream().filter(g ->
-                        ObjUtil.isNotEmpty(g.getObjByPath("emby_id")))
-                .map(g -> g.getByPath("emby_id", String.class).toString()).toList();
-        if (CollUtil.isEmpty(embyIds)) {
-            return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
-        }
-        JSONObject definition = JSONUtil.parseObj(coll.getDefinitionJson());
-        if (definition.getBool("enforce_emby_permissions", false)) {
-            // 强制emby原生权限验证(默认只展示未观看完的)
-            List<String> allItemIds = getAllItemsIdByCache();
-            embyIds = embyIds.stream().filter(allItemIds::contains).toList();
-            if (CollUtil.isEmpty(embyIds)) {
-                return EmbyItemsInfoOut.builder().items(ListUtil.of()).totalRecordCount(0).build();
-            }
-        }
-        // 判断库类型
-        List<String> itemTypeFromDb = JSONUtil.toList(definition.getStr("item_type"), String.class);
-        boolean isSeriesFocused = itemTypeFromDb.contains("Series");
-        // 对于任何包含剧集的库（纯剧集或混合库），使用“综合排名”；对于纯电影库，简单按入库时间即可
-        List<String> sortStr = isSeriesFocused ?
-                ListUtil.of("DateLastContentAdded", "SortName") : ListUtil.of("DateCreated", "SortName");
-        // 最新是降序
-        String sortOrder = "Descending";
-
-        // 2. 判断走本地排序还是Emby原生排序
-        boolean useNativeSort = false;
-        if (CollUtil.containsAll(NATIVE_SORT_FIELDS, sortStr) ||
-                StrUtil.equals(definition.getStr("default_sort_by"), "none")) {
-            useNativeSort = true;
-        }
-        int start = MapUtil.getInt(cachedParam, "StartIndex", 0);
-        int showLimit = MapUtil.getInt(cachedParam, "Limit", 24);
-        String fields = MapUtil.getStr(cachedParam, "Fields",
-                "PrimaryImageAspectRatio,BasicSyncInfo,UserData,ProductionYear");
-
-        if (useNativeSort) {
-            // Emby原生排序
-            return embyProxy.getUserItems(userId, embyIds, sortStr, sortOrder,
-                    start, showLimit, fields, MapUtil.getStr(cachedParam, "IncludeItemTypes"));
-        } else {
-            log.warn("非原生排序---->这里按理说不能进入");
-            List<QueryColumn> dbSortStr = sortStr.stream().map(SORT_ORDER_MAP::get).toList();
-            boolean dbSortOrder = !StrUtil.equals(sortOrder, "Descending");
-            List<MediaMetadata> metadataList = mediaMetadataDao.findByEmbyIdOrder(
-                    embyIds, dbSortStr, dbSortOrder, showLimit);
-            List<String> sortEmbyIds = metadataList.stream().map(MediaMetadata::getEmbyItemIdsJson)
-                    .filter(CollUtil::isNotEmpty).flatMap(List::stream).filter(StrUtil::isNotBlank)
-                    .toList();
-            return embyProxy.getUserItems(userId, sortEmbyIds, null, null,
-                    null, null, fields, null);
-        }
     }
 
     /**
@@ -577,14 +510,12 @@ public class VirtualService {
             return;
         }
         String parentId = request.getParentId();
-        Long realId = fromMimickedId(parentId);
-        CustomCollections customCollections = customCollectionsDao.getById(realId);
-        if (null == customCollections) {
+        Long realEmbyCollectionId = fromMimickedId(parentId);
+        if (null == realEmbyCollectionId) {
             response.setStatus(CODE_401);
             return;
         }
-        String realEmbyCollectionId = customCollections.getEmbyCollectionId();
-        String url = embyConfig.getHost() + StrUtil.replace(request.getParamUri(), parentId, realEmbyCollectionId);
+        String url = embyConfig.getHost() + StrUtil.replace(request.getParamUri(), parentId, realEmbyCollectionId + "");
         Request originalRequest = Request.of(url).method(Method.valueOf(request.getMethod()));
         try (Response res = httpClient.send(originalRequest)) {
             response.setStatus(res.getStatus());
@@ -600,7 +531,33 @@ public class VirtualService {
      * @return {@link String }
      */
     private String toMimickedId(Long dbId) {
-        return String.valueOf(-(MIMICKED_ID_BASE + dbId));
+        return String.valueOf((MIMICKED_ID_BASE + dbId));
+    }
+
+    /**
+     * 构建虚拟id
+     *
+     * @param dbId 数据库id
+     * @return {@link String }
+     */
+    private String toMimickedId(String dbIdStr) {
+        long dbId = Long.parseLong(dbIdStr);
+        return String.valueOf((MIMICKED_ID_BASE + dbId));
+    }
+
+    /**
+     * 构建虚拟id
+     *
+     * @param dbId 数据库id
+     * @return {@link String }
+     */
+    public static boolean isMimickedId(String itemId) {
+        if (StrUtil.isBlank(itemId)) {
+            return false;
+        }
+        long temp = Long.parseLong(itemId);
+
+        return temp < 0 || temp > MIMICKED_ID_BASE;
     }
 
     /**
@@ -610,6 +567,13 @@ public class VirtualService {
      * @return {@link Long }
      */
     private Long fromMimickedId(String mimickedId) {
-        return (long) (-(Integer.parseInt(mimickedId)) - MIMICKED_ID_BASE);
+        long temp = Long.parseLong(mimickedId);
+        if (temp < 0) {
+            return (long) (-temp - MIMICKED_ID_BASE);
+        } else if (temp > MIMICKED_ID_BASE) {
+            return temp - MIMICKED_ID_BASE;
+        } else {
+            return temp;
+        }
     }
 }

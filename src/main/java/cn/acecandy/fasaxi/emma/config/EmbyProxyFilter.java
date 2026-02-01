@@ -38,6 +38,7 @@ import java.util.concurrent.TimeoutException;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_416;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_504;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.非图片;
+import static cn.acecandy.fasaxi.emma.service.VirtualService.isMimickedId;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getPicType;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.needClose;
 
@@ -122,7 +123,7 @@ public class EmbyProxyFilter implements Filter {
                         virtualService.handleUserResume(reqWrapper, res);
                     } else if (StrUtil.endWithIgnoreCase(reqWrapper.getRequestURI(), "/Items/Latest")) {
                         virtualService.handleLatest(reqWrapper, res);
-                    } else if (StrUtil.startWith(reqWrapper.getParentId(), "-")) {
+                    } else if (isMimickedId(reqWrapper.getParentId())) {
                         virtualService.handle(reqWrapper, res);
                     } else {
                         originReqService.forwardOriReq(reqWrapper, res);

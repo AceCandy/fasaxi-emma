@@ -119,6 +119,16 @@ public class EmbyConfig {
     private Map<String, String> noTmdb;
 
     /**
+     * 真实库和虚拟库的关联关系(如果没有真实库权限 虚拟库也不展示)
+     */
+    private Map<String, String> virtualTruthRelation;
+
+    /**
+     * 排序
+     */
+    private String order;
+
+    /**
      * 公网emby地址
      */
     private String publicAddr;

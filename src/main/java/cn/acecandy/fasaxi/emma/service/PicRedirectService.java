@@ -28,6 +28,7 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_404;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyPicType.非图片;
 import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildPicLock;
+import static cn.acecandy.fasaxi.emma.service.VirtualService.isMimickedId;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getCdnPicUrl;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getPic302Uri;
 import static cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil.getPicUri;
@@ -88,7 +89,7 @@ public class PicRedirectService {
             response.setStatus(CODE_404);
             return;
         }
-        if (Integer.parseInt(itemId) < 0) {
+        if (isMimickedId(itemId)) {
             virtualService.handleImage(request, response);
             return;
         }

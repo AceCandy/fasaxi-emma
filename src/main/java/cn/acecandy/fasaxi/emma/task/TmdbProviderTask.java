@@ -28,7 +28,7 @@ public class TmdbProviderTask {
     /**
      * 同步TmdbProvider
      */
-    @Scheduled(fixedDelay = 20, timeUnit = TimeUnit.MINUTES, initialDelay = 125)
+    @Scheduled(fixedDelay = 125, timeUnit = TimeUnit.MINUTES, initialDelay = 25)
     public void syncTmdbProvider() {
         try {
             if (!allEnabled) {
@@ -43,7 +43,7 @@ public class TmdbProviderTask {
     /**
      * 补充缺失的豆瓣id
      */
-    @Scheduled(fixedDelay = 12, timeUnit = TimeUnit.MINUTES, initialDelay = 65)
+    @Scheduled(fixedDelay = 65, timeUnit = TimeUnit.MINUTES, initialDelay = 35)
     public void completionDoubanId() {
         try {
             if (!allEnabled) {
