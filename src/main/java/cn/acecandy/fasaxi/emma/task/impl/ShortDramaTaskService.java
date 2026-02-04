@@ -113,7 +113,7 @@ public class ShortDramaTaskService {
             if (item == null) {
                 redisClient.set(CACHE_ID_KEY, nextSourceId);
                 nullCount++;
-                if (nullCount >= 500) {
+                if (nullCount >= 200) {
                     break;
                 }
                 nextSourceId++;
