@@ -28,7 +28,7 @@ public class JavTask {
     /**
      * 同步javDB-有码-月榜
      */
-    @Scheduled(fixedDelay = 20, timeUnit = TimeUnit.MINUTES, initialDelay = 65)
+    @Scheduled(fixedDelay = 65, timeUnit = TimeUnit.MINUTES, initialDelay = 20)
     public void syncJavDbCensoredMonth() {
         try {
             if (!allEnabled) {

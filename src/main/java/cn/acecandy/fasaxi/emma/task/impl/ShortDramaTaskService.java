@@ -101,10 +101,10 @@ public class ShortDramaTaskService {
      */
     public void syncItemInfo() {
         Long maxSourceId = sdItemDao.getMaxSourceId(SOURCE_剧查查);
-        if (redisClient.hasKey(CACHE_ID_KEY)) {
+        /*if (redisClient.hasKey(CACHE_ID_KEY)) {
             long maxSourceIdRedis = ((Number) redisClient.get(CACHE_ID_KEY)).longValue();
             maxSourceId = Math.max(maxSourceId, maxSourceIdRedis);
-        }
+        }*/
 
         long nextSourceId = maxSourceId + 1;
         int nullCount = 0;
