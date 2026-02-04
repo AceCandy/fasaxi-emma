@@ -39,3 +39,4 @@ create.sql
 rebel.xml
 workspace/
 plans/
+.mvn/
