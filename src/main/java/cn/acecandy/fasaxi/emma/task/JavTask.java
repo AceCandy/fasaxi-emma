@@ -4,10 +4,7 @@ import cn.acecandy.fasaxi.emma.task.impl.JavTaskService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * jav相关 定时任务
@@ -28,7 +25,7 @@ public class JavTask {
     /**
      * 同步javDB-有码-月榜
      */
-    @Scheduled(fixedDelay = 65, timeUnit = TimeUnit.MINUTES, initialDelay = 20)
+    // @Scheduled(fixedDelay = 65, timeUnit = TimeUnit.MINUTES, initialDelay = 20)
     public void syncJavDbCensoredMonth() {
         try {
             if (!allEnabled) {
