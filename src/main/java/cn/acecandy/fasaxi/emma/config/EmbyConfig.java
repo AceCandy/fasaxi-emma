@@ -8,6 +8,8 @@ import cn.hutool.v7.core.text.StrUtil;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -199,9 +201,36 @@ public class EmbyConfig {
                 ));
     }
 
+    public Map<String, String> getStrmPathMap() {
+        if (strmPaths == null || strmPaths.length == 0) {
+            return MapUtil.newHashMap();
+        }
+
+        return Arrays.stream(strmPaths).map(entry -> entry.split("::", 2))
+                .filter(parts -> parts.length == 2)
+                .collect(Collectors.toMap(
+                        parts -> StrUtil.trim(parts[0]),
+                        parts -> StrUtil.trim(parts[1]),
+                        (k1, k2) -> k2
+                ));
+    }
+
     public boolean isLocalPath(String mediaPath) {
         Map<String, String> pathMap = getLocalPathMap();
         return pathMap.keySet().stream()
                 .anyMatch(prefix -> StrUtil.startWithIgnoreCase(mediaPath, prefix));
+    }
+
+    public String normalizeStrmPath(String mediaPath) {
+        Map<String, String> pathMap = getStrmPathMap();
+        String bestMatchKey = pathMap.keySet().stream()
+                .filter(prefix -> StrUtil.startWithIgnoreCase(mediaPath, prefix))
+                .max(Comparator.comparingInt(String::length))
+                .orElse(null);
+        // 新增本地镜像路径时，先规范成系统已识别的 canonical openlist 路径再走后续分流。
+        if (bestMatchKey != null) {
+            return StrUtil.replaceIgnoreCase(mediaPath, bestMatchKey, pathMap.get(bestMatchKey));
+        }
+        return mediaPath;
     }
 }

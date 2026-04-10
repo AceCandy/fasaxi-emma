@@ -981,8 +981,9 @@ public class EmbyProxy {
                     }
 
                     String realPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
-                    // 只处理网络路径开头的标准化 本地格式保留
-                    MutableTriple<String, StrmPathPrefix, String> pathSplit = StrmPathPrefix.split(realPath);
+                    // 先把本地镜像路径规范成 canonical strm 路径，再写入关系表，避免误判为 local。
+                    String normalizedRealPath = embyConfig.normalizeStrmPath(realPath);
+                    MutableTriple<String, StrmPathPrefix, String> pathSplit = StrmPathPrefix.split(normalizedRealPath);
                     String strmType = pathSplit.getMiddle().getType();
                     String path115 = "", path123 = "";
                     if (StrUtil.equalsIgnoreCase(strmType, "123")) {

@@ -169,9 +169,13 @@ public class VideoRedirectService {
             String url302 = "";
             if (StrUtil.equals(storageType, StrmPathPrefix.PRE_LOCAL.getType())) {
                 urlOrigin = vpr.getRealPath();
-                url302 = vpr.getRealPath();
-                if (embyConfig.isLocalPath(url302)) {
-                    result = processLocalPath(url302);
+                url302 = embyConfig.normalizeStrmPath(vpr.getRealPath());
+                // 兼容历史 relation 里已写成 local 的镜像路径，播放时按规范化后的路径重新分流。
+                if (StrUtil.startWithIgnoreCase(url302, "http")) {
+                    result = processHttpPath(urlOrigin, url302, request);
+                } else {
+                    // 本地关系表命中后，无论是否配置了路径映射，都要返回一个可用结果，避免空指针。
+                    result = processLocalPath(urlOrigin);
                 }
             } else {
                 urlOrigin = opConfig.getHost() + vpr.getPathPrefix() + vpr.getPurePath();
@@ -213,40 +217,42 @@ public class VideoRedirectService {
     }
 
     private RedirectResult processMediaPath(MediaInfo mediaInfo, EmbyContentCacheReqWrapper request) {
-        String mediaPath = mediaInfo.path;
+        return processMediaPath(mediaInfo.path, request);
+    }
+
+    private RedirectResult processMediaPath(String originalPath, EmbyContentCacheReqWrapper request) {
+        String mediaPath = embyConfig.normalizeStrmPath(originalPath);
 
         if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
-            return processHttpPath(mediaInfo, request);
+            return processHttpPath(originalPath, mediaPath, request);
         }
 
         // 本地视频转alist
-        if (embyConfig.isLocalPath(mediaPath)) {
-            return processLocalPath(mediaInfo);
+        if (embyConfig.isLocalPath(originalPath)) {
+            return processLocalPath(originalPath, 15 * 24 * 60 * 60,
+                    CacheUtil.getVideoDefaultExpireTime(), originalPath);
         }
 
         // 默认处理：本地路径直接返回
-        return new RedirectResult(mediaPath, "local", CacheUtil.getVideoDefaultExpireTime(), mediaInfo.path);
+        return new RedirectResult(originalPath, "local", CacheUtil.getVideoDefaultExpireTime(), originalPath);
     }
 
-    private RedirectResult processHttpPath(MediaInfo mediaInfo, EmbyContentCacheReqWrapper request) {
-        String mediaPath = mediaInfo.path;
-
+    private RedirectResult processHttpPath(String originalPath, String mediaPath,
+                                           EmbyContentCacheReqWrapper request) {
         // 处理pt/Emby特殊情况
         if (StrUtil.containsIgnoreCase(mediaPath, "pt/Emby")) {
             // 替换strm路径为originPt路径
             mediaPath = PathUtil.replaceAfterUrlPath(mediaPath, "/d/pt", embyConfig.getOriginPt());
             mediaPath = UrlEncoder.encodeQuery(mediaPath);
-            return new RedirectResult(mediaPath, "micu", 24 * 60 * 60, mediaInfo.path);
+            return new RedirectResult(mediaPath, "micu", 24 * 60 * 60, originalPath);
         }
 
         // 处理其他网盘路径
-        return processCloudStoragePath(mediaInfo, request);
+        return processCloudStoragePath(originalPath, mediaPath, request);
     }
 
-    private RedirectResult processCloudStoragePath(MediaInfo mediaInfo,
+    private RedirectResult processCloudStoragePath(String originalPath, String mediaPath,
                                                    EmbyContentCacheReqWrapper request) {
-        String mediaPath = mediaInfo.path;
-
         // 默认替换为nc2o路径
         String realUrl = UrlEncoder.encodeQuery(StrUtil.replace(mediaPath,
                 "http://192.168.1.249:5244/d", "http://195.128.102.208:5244/p"));
@@ -255,7 +261,7 @@ public class VideoRedirectService {
         CloudStorageType cloudType = cloudTypePair.getLeft();
 
         if (cloudType.equals(L_NC2O)) {
-            return new RedirectResult(realUrl, "nc2o", 24 * 60 * 60, mediaInfo.path);
+            return new RedirectResult(realUrl, "nc2o", 24 * 60 * 60, originalPath);
         }
 
         // 获取下载URL 如果是115先获取复制的 没有的话复制并查询获取；如果是123的直接获取
@@ -278,32 +284,23 @@ public class VideoRedirectService {
                 }
             });*/
             threadLimitUtil.setThreadCache(cloudType, request.getDeviceId());
-            return new RedirectResult(real302Url, cloudType.getValue(), exTime, mediaInfo.path);
+            return new RedirectResult(real302Url, cloudType.getValue(), exTime, originalPath);
         }
 
-        return new RedirectResult(realUrl, "nc2o", 2 * 60 * 60, mediaInfo.path);
+        return new RedirectResult(realUrl, "nc2o", 2 * 60 * 60, originalPath);
     }
 
     private RedirectResult processLocalPath(MediaInfo mediaInfo) {
-        String mediaPath = mediaInfo.path();
-        Map<String, String> pathMap = embyConfig.getLocalPathMap();
-
-        // 找到最长匹配前缀的路径映射
-        String bestMatchKey = pathMap.keySet().stream()
-                .filter(prefix -> StrUtil.startWithIgnoreCase(mediaPath, prefix))
-                .max(Comparator.comparingInt(String::length))
-                .orElse(null);
-
-        if (bestMatchKey != null) {
-            String realUrl = StrUtil.replaceIgnoreCase(mediaPath, bestMatchKey, pathMap.get(bestMatchKey));
-            realUrl = UrlEncoder.encodeQuery(realUrl);
-            return new RedirectResult(realUrl, "local", 15 * 24 * 60 * 60, mediaInfo.path);
-        }
-
-        return new RedirectResult(mediaPath, "local", CacheUtil.getVideoDefaultExpireTime(), mediaInfo.path);
+        return processLocalPath(mediaInfo.path(), 15 * 24 * 60 * 60,
+                CacheUtil.getVideoDefaultExpireTime(), mediaInfo.path);
     }
 
     private RedirectResult processLocalPath(String mediaPath) {
+        return processLocalPath(mediaPath, 30 * 60, 2 * 60, mediaPath);
+    }
+
+    private RedirectResult processLocalPath(String mediaPath, int matchedExpireTime,
+                                            int fallbackExpireTime, String originalPath) {
         Map<String, String> pathMap = embyConfig.getLocalPathMap();
 
         // 找到最长匹配前缀的路径映射
@@ -315,10 +312,10 @@ public class VideoRedirectService {
         if (bestMatchKey != null) {
             String realUrl = StrUtil.replaceIgnoreCase(mediaPath, bestMatchKey, pathMap.get(bestMatchKey));
             realUrl = UrlEncoder.encodeQuery(realUrl);
-            return new RedirectResult(realUrl, "local", 30 * 60, mediaPath);
+            return new RedirectResult(realUrl, "local", matchedExpireTime, originalPath);
         }
 
-        return new RedirectResult(mediaPath, "local", 2 * 60, mediaPath);
+        return new RedirectResult(mediaPath, "local", fallbackExpireTime, originalPath);
     }
 
     private int calculateExpireTime(String real302Url) {
