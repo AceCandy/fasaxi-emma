@@ -19,12 +19,10 @@ import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.date.DateUtil;
 import cn.hutool.v7.core.io.file.FileNameUtil;
 import cn.hutool.v7.core.io.file.FileUtil;
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.net.url.UrlDecoder;
 import cn.hutool.v7.core.net.url.UrlEncoder;
 import cn.hutool.v7.core.net.url.UrlPath;
 import cn.hutool.v7.core.text.StrUtil;
-import cn.hutool.v7.core.util.CharsetUtil;
 import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.meta.Method;
@@ -69,14 +67,6 @@ public final class CloudUtil {
     private OpConfig opConfig;
     @Resource
     private EmbyConfig embyConfig;
-
-    static void main(String[] args) {
-        String filePath = "//Users/mac/Library//CloudStorage\\OneDrive-%E4%B8%AA%E4%BA%BA%2Fworkspace%2Fgithub%2Fjava%2Ffasaxi-emma%2Fsrc%2Fmain%2Fjava%2Fcn%2Facecandy%2Ffasaxi%2Femma%2Futils%2FCloudUtil.java";
-        Console.log(filePath);
-        filePath = FileUtil.normalize(filePath);
-        Console.log(filePath);
-        Console.log(UrlPath.of(filePath, CharsetUtil.defaultCharset()).getSegments());
-    }
 
     /**
      * 获取文件

@@ -4,7 +4,6 @@ package cn.acecandy.fasaxi.emma.utils;
 import cn.acecandy.fasaxi.emma.sao.entity.MatchedItem;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.math.NumberUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
@@ -180,9 +179,4 @@ public final class HtmlUtil extends cn.hutool.v7.http.html.HtmlUtil {
         return s.replaceAll("[\\s:：·\\-*'!,?.。]+", "").toLowerCase();
     }
 
-
-    static void main() {
-        String s = "Tue, 03 Feb 2026 16:00:00 GMT";
-        Console.log(DateUtil.formatDate(DateUtil.parse(s)));
-    }
 }

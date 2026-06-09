@@ -1,10 +1,8 @@
 package cn.acecandy.fasaxi.emma.utils;
 
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.net.NetUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.extern.slf4j.Slf4j;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -16,7 +14,6 @@ import java.net.UnknownHostException;
  * @author tangningzhu
  * @since 2023/12/20
  */
-@Slf4j
 public final class IpUtil extends NetUtil {
 
     private IpUtil() {
@@ -61,7 +58,4 @@ public final class IpUtil extends NetUtil {
         return isInnerIp(clientIp);
     }
 
-    public static void main(String[] args) {
-        Console.log(isInnerIp("192.168.1.204"));
-    }
 }

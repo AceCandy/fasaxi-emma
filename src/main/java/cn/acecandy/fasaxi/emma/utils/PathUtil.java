@@ -1,8 +1,6 @@
 package cn.acecandy.fasaxi.emma.utils;
 
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.text.StrUtil;
-import lombok.extern.slf4j.Slf4j;
 
 
 /**
@@ -11,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
  * @author tangningzhu
  * @since 2023/12/20
  */
-@Slf4j
 public final class PathUtil extends cn.hutool.v7.core.io.file.PathUtil {
 
     private PathUtil() {
@@ -35,7 +32,4 @@ public final class PathUtil extends cn.hutool.v7.core.io.file.PathUtil {
         return url;
     }
 
-    public static void main(String[] args) {
-        Console.log(replaceAfterUrlPath("https://alist.acecandy.cn:880/d/pt/emby1/国产剧/大明王朝/S01/E03.mkv", "/d/pt", "https://168.1.1.1:990/pt"));
-    }
 }

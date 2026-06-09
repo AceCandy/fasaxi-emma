@@ -57,6 +57,19 @@
   - `EmbyProxy` 初始化 `tmdbProvider` 成功提示改为 `log.debug`。
 - 保留接口返回、任务分支和数据库写入逻辑不变，只调整输出通道。
 
+### 6. 小工具调试入口
+
+- 移除纯本地样例性质的 `main`：
+  - `PathUtil`
+  - `IpUtil`
+  - `HtmlUtil`
+  - `CloudUtil`
+- 删除随之无用的 `Console` / `CharsetUtil` / `Slf4j` import。
+- 用单元测试替代可验证样例：
+  - `PathUtilTest` 覆盖 URL path base 替换和未命中原样返回。
+  - `IpUtilTest` 覆盖空值、回环、内网、公网和非法 IP。
+  - `HtmlUtilTest` 覆盖字符串标准化。
+
 ## 后续建议
 
-- 仓库内多个 `main` 调试入口和 `Console.log/System.out` 适合后续统一迁移到测试或日志，避免生产类承担调试样例职责。
+- 继续按小批次迁移剩余调试入口，优先处理已有明确输入输出且不依赖外部服务的工具类。
