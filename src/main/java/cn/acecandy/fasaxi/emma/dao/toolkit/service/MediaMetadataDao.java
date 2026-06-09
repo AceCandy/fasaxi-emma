@@ -3,7 +3,6 @@ package cn.acecandy.fasaxi.emma.dao.toolkit.service;
 import cn.acecandy.fasaxi.emma.dao.toolkit.entity.CustomCollections;
 import cn.acecandy.fasaxi.emma.dao.toolkit.entity.MediaMetadata;
 import cn.acecandy.fasaxi.emma.dao.toolkit.mapper.MediaMetadataMapper;
-import cn.hutool.v7.core.lang.Console;
 import com.mybatisflex.annotation.UseDataSource;
 import com.mybatisflex.core.query.QueryColumn;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -61,7 +60,7 @@ public class MediaMetadataDao extends ServiceImpl<MediaMetadataMapper, MediaMeta
                     .and(MEDIA_METADATA.ITEM_TYPE.eq(itemType));
             return mapper.selectListByQuery(wrapper);
         } finally {
-            Console.log("findByEmbyId itemType: {}, cost: {}ms",
+            log.debug("findByEmbyId itemType: {}, cost: {}ms",
                     itemType, System.currentTimeMillis() - start);
         }
     }

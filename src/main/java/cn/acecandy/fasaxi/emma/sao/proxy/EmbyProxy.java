@@ -656,7 +656,7 @@ public class EmbyProxy {
                     tmdbProvider.setTmdbInfo(tmdbInfo);
                 }
                 tmdbProviderDao.insertOrUpdate(tmdbProvider);
-                System.out.print("✅");
+                log.debug("初始化 tmdbProvider 成功: itemId={}, tmdbId={}", embyItem.getItemId(), tmdbId);
                 return true;
             } finally {
                 LockUtil.unlockVideoCache(lock, tmdbId);

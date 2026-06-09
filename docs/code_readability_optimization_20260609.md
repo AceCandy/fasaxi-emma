@@ -48,6 +48,15 @@
   - 缓存命中 URL 时直接返回缓存重定向，不进入分布式锁。
   - 远程返回 `undefined` 时返回 `404`、写无效缓存并释放锁。
 
+### 5. 运行时控制台输出
+
+- 将运行时路径中的裸 `Console.log` / `System.out.print` 替换为 `Slf4j` 日志：
+  - `ApiController` 清理接口进度和无效 itemId 输出改为 `log.info`。
+  - `MediaMetadataDao` 查询耗时输出改为 `log.debug`。
+  - `TmdbProviderTaskService` 已同步 item 跳过提示改为 `log.debug`。
+  - `EmbyProxy` 初始化 `tmdbProvider` 成功提示改为 `log.debug`。
+- 保留接口返回、任务分支和数据库写入逻辑不变，只调整输出通道。
+
 ## 后续建议
 
 - 仓库内多个 `main` 调试入口和 `Console.log/System.out` 适合后续统一迁移到测试或日志，避免生产类承担调试样例职责。

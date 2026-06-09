@@ -16,7 +16,6 @@ import cn.acecandy.fasaxi.emma.task.impl.TmdbProviderTaskService;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.date.DateTime;
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.math.NumberUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.util.RandomUtil;
@@ -77,7 +76,7 @@ public class ApiController {
         int pageNum = 1;
         int pageSize = 200;
         while (true) {
-            Console.log("{}-------{}", pageNum, pageSize);
+            log.info("清理 DB 图片进度: pageNum={}, pageSize={}", pageNum, pageSize);
             Page<EmbyItemPic> picPage = embyItemPicDao.findAllByPage(pageNum, pageSize);
             List<EmbyItemPic> records = picPage.getRecords();
 
@@ -90,7 +89,7 @@ public class ApiController {
                 }
                 List<String> realItemIds = infoOut.getItems().stream().map(EmbyItem::getItemId).toList();
                 List<String> removeItemIds = CollUtil.subtractToList(itemIds, realItemIds);
-                Console.log(removeItemIds);
+                log.info("清理 DB 图片无效 itemIds: {}", removeItemIds);
                 removeCnt += embyItemPicDao.delById(removeItemIds.stream().map(NumberUtil::parseInt).toList());
             }
 
@@ -122,7 +121,7 @@ public class ApiController {
                 }
                 List<String> realItemIds = infoOut.getItems().stream().map(EmbyItem::getItemId).toList();
                 List<String> removeItemIds = CollUtil.subtractToList(itemIds, realItemIds);
-                Console.log(CollUtil.subtractToList(itemIds, realItemIds));
+                log.info("清理缓存文件无效 itemIds: {}", removeItemIds);
                 removeCnt += embyItemPicDao.delById(removeItemIds.stream().map(NumberUtil::parseInt).toList());
             }
 

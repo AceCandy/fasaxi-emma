@@ -92,7 +92,7 @@ public class TmdbProviderTaskService {
             executor.submit(() -> {
                 String value = redisClient.hgetStr(uniqueKey, finalItemId.toString());
                 if (StrUtil.isNotBlank(value)) {
-                    System.out.print(".");
+                    log.debug("跳过已同步 tmdbProvider itemId={}", finalItemId);
                     return;
                 }
                 try {
