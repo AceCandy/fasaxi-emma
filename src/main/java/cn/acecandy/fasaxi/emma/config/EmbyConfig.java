@@ -101,6 +101,16 @@ public class EmbyConfig {
     private String cachePath;
 
     /**
+     * 原始 Emby 响应允许写入 Redis 的最大 body 大小，避免大响应在堆和 Redis 中重复占用。
+     */
+    private int originCacheMaxBodyBytes = 2 * 1024 * 1024;
+
+    /**
+     * 非 JSON 原始响应是否直接流式转发；业务改写只发生在 JSON 响应上。
+     */
+    private boolean streamNonJsonOrigin = true;
+
+    /**
      * 虚拟视图 需要添加的原生库
      */
     private Map<String, String> virtual;

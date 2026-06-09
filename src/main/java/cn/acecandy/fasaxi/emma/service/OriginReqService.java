@@ -34,6 +34,7 @@ import org.brotli.dec.BrotliInputStream;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.io.InputStream;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
@@ -200,6 +201,10 @@ public class OriginReqService {
         stopWatch.start("转发");
         cached = new EmbyCachedResp();
         try (Response res = sendOriginReq(request)) {
+            if (writeStreamResponseIfNeeded(request, response, res)) {
+                cached.setStatusCode(res.getStatus());
+                return;
+            }
             cached = embyProxy.transferResp(res, request);
             writeCacheResponse(request, response, cached);
         } catch (Throwable e) {
@@ -263,6 +268,40 @@ public class OriginReqService {
         return httpClient.send(originalRequest);
     }
 
+    private boolean writeStreamResponseIfNeeded(EmbyContentCacheReqWrapper request,
+                                                HttpServletResponse response,
+                                                Response originResponse) throws IOException {
+        if (!embyConfig.isStreamNonJsonOrigin()) {
+            return false;
+        }
+        if (!ServletUtil.isGetMethod(request) || !originResponse.isOk()
+                || originResponse.getStatus() == CODE_204 || isJsonResponse(originResponse)) {
+            return false;
+        }
+
+        response.setStatus(originResponse.getStatus());
+        originResponse.headers().forEach((k, v) -> {
+            if (EmbyProxyUtil.isNotAllowedHeader(k)) return;
+            for (String value : v) response.addHeader(k, value);
+        });
+
+        try (InputStream inputStream = originResponse.bodyStream();
+             ServletOutputStream outputStream = response.getOutputStream()) {
+            if (inputStream != null) {
+                inputStream.transferTo(outputStream);
+            }
+        } catch (IOException e) {
+            if (!ExceptUtil.isConnectionTerminated(e)) {
+                throw e;
+            }
+        }
+        return true;
+    }
+
+    private boolean isJsonResponse(Response res) {
+        return StrUtil.containsIgnoreCase(res.header("Content-Type"), "application/json");
+    }
+
     /**
      * 返回响应(满足条件会缓存)
      *
@@ -322,13 +361,7 @@ public class OriginReqService {
      */
     private void asyncWriteOriginReq(EmbyContentCacheReqWrapper request,
                                      EmbyCachedResp cached) {
-        if (null == request) {
-            return;
-        }
-        if (!ServletUtil.isGetMethod(request)) {
-            return;
-        }
-        if (!cached.getStatusCode().equals(CODE_200)) {
+        if (!isOriginResponseCacheable(request, cached)) {
             return;
         }
         int exTime = 5;
@@ -339,6 +372,21 @@ public class OriginReqService {
             exTime = 3 * 60 * 60;
         }
         redisClient.setBean(CacheUtil.buildOriginCacheKey(request), cached, exTime);
+    }
+
+    boolean isOriginResponseCacheable(EmbyContentCacheReqWrapper request, EmbyCachedResp cached) {
+        if (null == request || null == cached) {
+            return false;
+        }
+        if (!ServletUtil.isGetMethod(request)) {
+            return false;
+        }
+        if (!Integer.valueOf(CODE_200).equals(cached.getStatusCode())) {
+            return false;
+        }
+        byte[] content = cached.getContent();
+        int maxBodyBytes = embyConfig.getOriginCacheMaxBodyBytes();
+        return maxBodyBytes <= 0 || content == null || content.length <= maxBodyBytes;
     }
 
 }

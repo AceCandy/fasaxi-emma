@@ -20,9 +20,11 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
@@ -36,6 +38,9 @@ import java.util.stream.IntStream;
 @Slf4j
 @Component
 public class TmdbProviderTaskService {
+
+    private static final int TMDB_SYNC_WORKERS = 5;
+    private static final int TMDB_SYNC_QUEUE_CAPACITY = 100;
 
     @Resource
     private JavRankDao javRankDao;
@@ -77,8 +82,8 @@ public class TmdbProviderTaskService {
     }
 
     public void processItemsWith3Threads(List<Integer> allItemIds, String uniqueKey) {
-        // 1. 创建固定3个线程的线程池（Hutool/原生都可，这里用原生更简洁）
-        ExecutorService executor = Executors.newFixedThreadPool(5);
+        // 使用有界队列对提交端反压，避免全量 itemId 都堆成 Runnable 占用内存。
+        ExecutorService executor = newTmdbSyncExecutor();
 
         // 2. 遍历所有itemId，异步提交到线程池（无需等待返回）
         for (Integer itemId : allItemIds) {
@@ -120,6 +125,16 @@ public class TmdbProviderTaskService {
                 executor.shutdownNow();
             }
         });
+    }
+
+    static ExecutorService newTmdbSyncExecutor() {
+        return new ThreadPoolExecutor(
+                TMDB_SYNC_WORKERS,
+                TMDB_SYNC_WORKERS,
+                0L,
+                TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(TMDB_SYNC_QUEUE_CAPACITY),
+                new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
     public void completionDoubanId() {
