@@ -118,56 +118,83 @@ public class OriginReqService {
         }
         stopPlay(req);
 
-        if (StrUtil.containsIgnoreCase(req.getParamUri(), "Sessions/Playing/Progress")) {
-            if (redisLockClient.lock(buildSessionsLock(req), 15)) {
-                String url = embyConfig.getHost() + req.getParamUri();
-                String apiKey = "api_key=" + req.getApiKey();
-                url = UrlUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
-                Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod())).body(req.getCachedBody());
-                ThreadUtil.execute(() -> {
-                    httpClient.send(originalRequest);
-                });
-            }
+        if (isPlayingProgressReq(req)) {
+            forwardPlayingProgressAsync(req);
             response.setStatus(CODE_204);
             return true;
         }
         try {
-            // === 提取公共的HTTP请求和响应转发逻辑 (开始) ===
-            String url = embyConfig.getHost() + req.getParamUri();
-            if (StrUtil.isNotBlank(req.getApiKey())) {
-                String apiKey = "api_key=" + req.getApiKey();
-                url = UrlUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
-            }
-            Request originalRequest = Request.of(url).method(Method.valueOf(req.getMethod()))
-                    .body(req.getCachedBody()).header(req.getCachedHeader());
-
-            try (Response res = httpClient.send(originalRequest)) {
-                response.setStatus(res.getStatus());
-                if (StrUtil.containsIgnoreCase(res.header("Content-Type"), "application/json")) {
-                    // 转发响应头
-                    res.headers().forEach((k, v) -> {
-                        if (EmbyProxyUtil.isNotAllowedHeader(k)) return;
-                        for (String value : v) response.addHeader(k, value);
-                    });
-                    // 处理响应体
-                    byte[] data;
-                    if (StrUtil.equalsIgnoreCase(res.header("Content-Encoding"), "br")) {
-                        data = (new BrotliInputStream(res.bodyStream())).readAllBytes();
-                    } else {
-                        data = res.bodyBytes();
-                    }
-                    // 写入响应
-                    try (ServletOutputStream outputStream = response.getOutputStream()) {
-                        outputStream.write(data);
-                    } catch (IOException e) {
-                        if (!ExceptUtil.isConnectionTerminated(e)) throw e;
-                    }
-                }
+            try (Response res = httpClient.send(buildNonGetOriginRequest(req))) {
+                writeJsonOriginResponse(response, res);
             }
         } finally {
             clearCache(req);
         }
         return true;
+    }
+
+    private boolean isPlayingProgressReq(EmbyContentCacheReqWrapper req) {
+        return StrUtil.containsIgnoreCase(req.getParamUri(), "Sessions/Playing/Progress");
+    }
+
+    private void forwardPlayingProgressAsync(EmbyContentCacheReqWrapper req) {
+        if (redisLockClient.lock(buildSessionsLock(req), 15)) {
+            ThreadUtil.execute(() -> httpClient.send(buildPlayingProgressRequest(req)));
+        }
+    }
+
+    private Request buildPlayingProgressRequest(EmbyContentCacheReqWrapper req) {
+        return Request.of(buildOriginUrl(req, true))
+                .method(Method.valueOf(req.getMethod()))
+                .body(req.getCachedBody());
+    }
+
+    private Request buildNonGetOriginRequest(EmbyContentCacheReqWrapper req) {
+        return Request.of(buildOriginUrl(req, false))
+                .method(Method.valueOf(req.getMethod()))
+                .body(req.getCachedBody())
+                .header(req.getCachedHeader());
+    }
+
+    private String buildOriginUrl(EmbyContentCacheReqWrapper req, boolean appendBlankApiKey) {
+        String url = embyConfig.getHost() + req.getParamUri();
+        if (appendBlankApiKey || StrUtil.isNotBlank(req.getApiKey())) {
+            String apiKey = "api_key=" + req.getApiKey();
+            url = UrlUtil.urlWithForm(url, apiKey, CharsetUtil.defaultCharset(), false);
+        }
+        return url;
+    }
+
+    private void writeJsonOriginResponse(HttpServletResponse response, Response res) throws IOException {
+        response.setStatus(res.getStatus());
+        if (!isJsonResponse(res)) {
+            return;
+        }
+
+        copyAllowedHeaders(response, res);
+        writeOriginBody(response, readOriginBody(res));
+    }
+
+    private void copyAllowedHeaders(HttpServletResponse response, Response res) {
+        res.headers().forEach((k, v) -> {
+            if (EmbyProxyUtil.isNotAllowedHeader(k)) return;
+            for (String value : v) response.addHeader(k, value);
+        });
+    }
+
+    private byte[] readOriginBody(Response res) throws IOException {
+        if (StrUtil.equalsIgnoreCase(res.header("Content-Encoding"), "br")) {
+            return (new BrotliInputStream(res.bodyStream())).readAllBytes();
+        }
+        return res.bodyBytes();
+    }
+
+    private void writeOriginBody(HttpServletResponse response, byte[] data) throws IOException {
+        try (ServletOutputStream outputStream = response.getOutputStream()) {
+            outputStream.write(data);
+        } catch (IOException e) {
+            if (!ExceptUtil.isConnectionTerminated(e)) throw e;
+        }
     }
 
     /**
@@ -280,10 +307,7 @@ public class OriginReqService {
         }
 
         response.setStatus(originResponse.getStatus());
-        originResponse.headers().forEach((k, v) -> {
-            if (EmbyProxyUtil.isNotAllowedHeader(k)) return;
-            for (String value : v) response.addHeader(k, value);
-        });
+        copyAllowedHeaders(response, originResponse);
 
         try (InputStream inputStream = originResponse.bodyStream();
              ServletOutputStream outputStream = response.getOutputStream()) {

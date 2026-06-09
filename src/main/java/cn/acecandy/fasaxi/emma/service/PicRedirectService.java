@@ -144,7 +144,7 @@ public class PicRedirectService {
             return false;
         }
         if (StrUtil.equals(uri, "undefined")) {
-            // 无效缓存直接返回200
+            // 无效缓存直接返回 404，避免重复请求远程图片接口。
             response.setStatus(CODE_404);
         } else {
             String url = getCdnPicUrl(uri, doubanConfig, tmdbConfig, maxWidth);
@@ -165,14 +165,33 @@ public class PicRedirectService {
                             String itemId, EmbyPicType picType, String maxWidth) {
         EmbyRemoteImageOut.Img imageInfo = embyProxy.getRemoteImage(itemId, picType);
         if (null == imageInfo) {
-            originReqService.return308to200(response, request.getParamUri());
-            // originReqService.forwardOriReq(request, response);
-            return;
-        } else if (StrUtil.equals(imageInfo.getUrl(), "undefined")) {
-            response.setStatus(CODE_404);
-            redisClient.set(CacheUtil.buildPicCacheKey(String.valueOf(itemId), picType), "undefined", 60 * 60);
+            fallbackToOriginalImage(request, response);
             return;
         }
+        if (isUndefinedImage(imageInfo)) {
+            cacheUndefinedImage(response, itemId, picType);
+            return;
+        }
+        redirectRemoteImage(request, response, itemId, picType, maxWidth, imageInfo);
+    }
+
+    private void fallbackToOriginalImage(EmbyContentCacheReqWrapper request, HttpServletResponse response) {
+        originReqService.return308to200(response, request.getParamUri());
+        // originReqService.forwardOriReq(request, response);
+    }
+
+    private boolean isUndefinedImage(EmbyRemoteImageOut.Img imageInfo) {
+        return StrUtil.equals(imageInfo.getUrl(), "undefined");
+    }
+
+    private void cacheUndefinedImage(HttpServletResponse response, String itemId, EmbyPicType picType) {
+        response.setStatus(CODE_404);
+        redisClient.set(CacheUtil.buildPicCacheKey(String.valueOf(itemId), picType), "undefined", 60 * 60);
+    }
+
+    private void redirectRemoteImage(EmbyContentCacheReqWrapper request, HttpServletResponse response,
+                                     String itemId, EmbyPicType picType, String maxWidth,
+                                     EmbyRemoteImageOut.Img imageInfo) {
         String uri = getPicUri(imageInfo.getUrl(), tmdbConfig);
         String url = getCdnPicUrl(uri, doubanConfig, tmdbConfig, maxWidth);
         if (StrUtil.isBlank(url)) {

@@ -13,6 +13,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * @author tangningzhu
@@ -202,13 +203,7 @@ public class EmbyConfig {
             return MapUtil.newHashMap();
         }
 
-        return localPaths.stream().map(entry -> entry.split("::", 2))
-                .filter(parts -> parts.length == 2)
-                .collect(Collectors.toMap(
-                        parts -> StrUtil.trim(parts[0]),
-                        parts -> StrUtil.trim(parts[1]),
-                        (k1, k2) -> k2
-                ));
+        return parsePathMap(localPaths.stream());
     }
 
     public Map<String, String> getStrmPathMap() {
@@ -216,7 +211,11 @@ public class EmbyConfig {
             return MapUtil.newHashMap();
         }
 
-        return Arrays.stream(strmPaths).map(entry -> entry.split("::", 2))
+        return parsePathMap(Arrays.stream(strmPaths));
+    }
+
+    private Map<String, String> parsePathMap(Stream<String> entries) {
+        return entries.map(entry -> entry.split("::", 2))
                 .filter(parts -> parts.length == 2)
                 .collect(Collectors.toMap(
                         parts -> StrUtil.trim(parts[0]),
@@ -226,21 +225,23 @@ public class EmbyConfig {
     }
 
     public boolean isLocalPath(String mediaPath) {
-        Map<String, String> pathMap = getLocalPathMap();
-        return pathMap.keySet().stream()
-                .anyMatch(prefix -> StrUtil.startWithIgnoreCase(mediaPath, prefix));
+        return findLongestPrefix(getLocalPathMap(), mediaPath) != null;
     }
 
     public String normalizeStrmPath(String mediaPath) {
         Map<String, String> pathMap = getStrmPathMap();
-        String bestMatchKey = pathMap.keySet().stream()
-                .filter(prefix -> StrUtil.startWithIgnoreCase(mediaPath, prefix))
-                .max(Comparator.comparingInt(String::length))
-                .orElse(null);
+        String bestMatchKey = findLongestPrefix(pathMap, mediaPath);
         // 新增本地镜像路径时，先规范成系统已识别的 canonical openlist 路径再走后续分流。
         if (bestMatchKey != null) {
             return StrUtil.replaceIgnoreCase(mediaPath, bestMatchKey, pathMap.get(bestMatchKey));
         }
         return mediaPath;
+    }
+
+    private String findLongestPrefix(Map<String, String> pathMap, String mediaPath) {
+        return pathMap.keySet().stream()
+                .filter(prefix -> StrUtil.startWithIgnoreCase(mediaPath, prefix))
+                .max(Comparator.comparingInt(String::length))
+                .orElse(null);
     }
 }

@@ -164,38 +164,7 @@ public class VideoRedirectService {
         RedirectResult result = null;
         VideoPathRelation vpr = videoPathRelationDao.findById(Integer.parseInt(mediaSourceId));
         if (vpr != null) {
-            String storageType = vpr.getStrmType();
-            String urlOrigin = "";
-            String url302 = "";
-            if (StrUtil.equals(storageType, StrmPathPrefix.PRE_LOCAL.getType())) {
-                urlOrigin = vpr.getRealPath();
-                url302 = embyConfig.normalizeStrmPath(vpr.getRealPath());
-                // 兼容历史 relation 里已写成 local 的镜像路径，播放时按规范化后的路径重新分流。
-                if (StrUtil.startWithIgnoreCase(url302, "http")) {
-                    result = processHttpPath(urlOrigin, url302, request);
-                } else {
-                    // 本地关系表命中后，无论是否配置了路径映射，都要返回一个可用结果，避免空指针。
-                    result = processLocalPath(urlOrigin);
-                }
-            } else {
-                urlOrigin = opConfig.getHost() + vpr.getPathPrefix() + vpr.getPurePath();
-                url302 = opConfig.getHost() + vpr.getPathPrefix() + vpr.getPurePath();
-
-                String url123 = vpr.getPath123();
-                if (StrUtil.isNotBlank(url123)) {
-                    url302 = url123;
-                    storageType = StrmPathPrefix.PRE_ZONG123.getType();
-                } else if (StrUtil.isNotBlank(vpr.getPath115())) {
-                    url302 = vpr.getPath115();
-                    url302 = StrUtil.replace(url302, "/new115/", "/new115-ck/");
-                    storageType = StrmPathPrefix.PRE_115.getType();
-                }
-                url302 = cloudUtil.reqAndCacheOpenList302Url(CloudStorageType.of(storageType), url302, request.getUa(),
-                        mediaSourceId, request.getDeviceId());
-
-                result = new RedirectResult(url302,
-                        storageType, CacheUtil.getVideoDefaultExpireTime(), urlOrigin);
-            }
+            result = processRelationPath(vpr, request, mediaSourceId);
         } else {
             // 3. 根据路径类型分发处理
             result = processMediaPath(mediaInfo, request);
@@ -214,6 +183,50 @@ public class VideoRedirectService {
         String redirectUrl = getPtUrl(result.url(), result.storageType());
         // 执行重定向
         doRedirect(response, redirectUrl, result.expireTime(), result.originalPath());
+    }
+
+    private RedirectResult processRelationPath(VideoPathRelation vpr,
+                                               EmbyContentCacheReqWrapper request,
+                                               String mediaSourceId) {
+        String storageType = vpr.getStrmType();
+        if (StrUtil.equals(storageType, StrmPathPrefix.PRE_LOCAL.getType())) {
+            return processLocalRelationPath(vpr, request);
+        }
+
+        RelationPath relationPath = resolveCloudRelationPath(vpr, storageType);
+        String url302 = cloudUtil.reqAndCacheOpenList302Url(CloudStorageType.of(relationPath.storageType()),
+                relationPath.redirectPath(), request.getUa(), mediaSourceId, request.getDeviceId());
+        return new RedirectResult(url302, relationPath.storageType(),
+                CacheUtil.getVideoDefaultExpireTime(), relationPath.originalPath());
+    }
+
+    private RedirectResult processLocalRelationPath(VideoPathRelation vpr,
+                                                    EmbyContentCacheReqWrapper request) {
+        String originalPath = vpr.getRealPath();
+        String normalizedPath = embyConfig.normalizeStrmPath(originalPath);
+
+        // 兼容历史 relation 里已写成 local 的镜像路径，播放时按规范化后的路径重新分流。
+        if (StrUtil.startWithIgnoreCase(normalizedPath, "http")) {
+            return processHttpPath(originalPath, normalizedPath, request);
+        }
+
+        // 本地关系表命中后，无论是否配置了路径映射，都要返回一个可用结果，避免空指针。
+        return processLocalPath(originalPath);
+    }
+
+    private RelationPath resolveCloudRelationPath(VideoPathRelation vpr, String storageType) {
+        String originalPath = opConfig.getHost() + vpr.getPathPrefix() + vpr.getPurePath();
+        String redirectPath = originalPath;
+
+        String url123 = vpr.getPath123();
+        if (StrUtil.isNotBlank(url123)) {
+            return new RelationPath(originalPath, url123, StrmPathPrefix.PRE_ZONG123.getType());
+        }
+        if (StrUtil.isNotBlank(vpr.getPath115())) {
+            redirectPath = StrUtil.replace(vpr.getPath115(), "/new115/", "/new115-ck/");
+            return new RelationPath(originalPath, redirectPath, StrmPathPrefix.PRE_115.getType());
+        }
+        return new RelationPath(originalPath, redirectPath, storageType);
     }
 
     private RedirectResult processMediaPath(MediaInfo mediaInfo, EmbyContentCacheReqWrapper request) {
@@ -489,6 +502,9 @@ public class VideoRedirectService {
     }
 
     public record RedirectResult(String url, String storageType, int expireTime, String originalPath) {
+    }
+
+    private record RelationPath(String originalPath, String redirectPath, String storageType) {
     }
 
     static void main() {
