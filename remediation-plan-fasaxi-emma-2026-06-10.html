@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fasaxi-emma 修复计划</title>
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --card: #ffffff;
+    --line: #e4e9f1;
+    --text: #1f2a37;
+    --muted: #5b6878;
+    --primary: #1768ff;
+    --primary-soft: #eaf1ff;
+    --danger: #d92d20;
+    --danger-soft: #feeceb;
+    --warn: #f79009;
+    --warn-soft: #fff4e5;
+    --ok: #039855;
+    --ok-soft: #e7f8ef;
+    --shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(180deg, #eef3fb 0%, #f8fafc 220px, var(--bg) 220px);
+    color: var(--text);
+    line-height: 1.75;
+  }
+  .wrap {
+    width: min(1180px, calc(100vw - 32px));
+    margin: 0 auto;
+    padding: 32px 0 56px;
+  }
+  .hero {
+    background: linear-gradient(135deg, #12213f 0%, #1c3b77 100%);
+    color: #fff;
+    border-radius: 18px;
+    padding: 28px 32px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+    line-height: 1.25;
+  }
+  .hero p {
+    margin: 0;
+    color: rgba(255,255,255,0.82);
+    font-size: 15px;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    font-size: 12px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 16px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .col-12 { grid-column: span 12; }
+  .col-8 { grid-column: span 8; }
+  .col-4 { grid-column: span 4; }
+  .card-head {
+    padding: 18px 22px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .card-head h2 {
+    margin: 0;
+    font-size: 18px;
+  }
+  .card-head p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .card-body {
+    padding: 18px 22px 22px;
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .stat {
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px solid var(--line);
+  }
+  .stat .num {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .stat .label {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  .stat.danger .num { color: var(--danger); }
+  .stat.warn .num { color: var(--warn); }
+  .stat.primary .num { color: var(--primary); }
+  .stat.ok .num { color: var(--ok); }
+  .list {
+    margin: 0;
+    padding-left: 18px;
+  }
+  .list li + li {
+    margin-top: 8px;
+  }
+  .phase {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    background: #fbfdff;
+  }
+  .phase + .phase {
+    margin-top: 12px;
+  }
+  .phase-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .phase-top h3 {
+    margin: 0;
+    font-size: 16px;
+  }
+  .phase-top .tag {
+    white-space: nowrap;
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+  }
+  .tag-danger { background: var(--danger-soft); color: var(--danger); border-color: #f6c7c3; }
+  .tag-warn { background: var(--warn-soft); color: #a15c00; border-color: #f4d7a4; }
+  .tag-ok { background: var(--ok-soft); color: var(--ok); border-color: #b8e7cc; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  th {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: #f8fafc;
+  }
+  tr:last-child td {
+    border-bottom: none;
+  }
+  .callout {
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: #f8fbff;
+  }
+  .callout.danger {
+    background: #fff8f7;
+    border-color: #f5d1cd;
+  }
+  .callout strong {
+    display: block;
+    margin-bottom: 6px;
+  }
+  .mono {
+    font-family: "SF Mono", "Fira Code", Consolas, monospace;
+    font-size: 13px;
+    background: #f3f6fb;
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+  .footer {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 16px;
+  }
+  @media (max-width: 960px) {
+    .col-8, .col-4, .col-12 { grid-column: span 12; }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    .wrap { width: min(100vw - 20px, 1180px); padding-top: 18px; }
+    .hero { padding: 22px 20px; border-radius: 14px; }
+    .stats { grid-template-columns: 1fr; }
+    th, td { padding-left: 8px; padding-right: 8px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>fasaxi-emma 修复计划</h1>
+      <p>基于 2026-06-10 全量审计结果拟定。目标不是一次性“清空所有问题”，而是在最短时间内恢复发布安全边界、建立测试护栏，并把后续技术债拆成可排期的工程任务。</p>
+      <div class="meta">
+        <span class="chip">项目：fasaxi-emma</span>
+        <span class="chip">依据：11 条 confirmed findings</span>
+        <span class="chip">总评：4.3 / C</span>
+        <span class="chip">日期：2026-06-10</span>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card col-8">
+        <div class="card-head">
+          <h2>修复原则</h2>
+          <p>排序按“先止血、再加护栏、最后收技术债”。</p>
+        </div>
+        <div class="card-body">
+          <ol class="list">
+            <li>先处理会导致凭据泄露、未授权操作、错误日志扩散的问题，再谈结构优化。</li>
+            <li>代码修复和外部处置分开推进：凭据轮换、历史 jar 下架、日志留存排查不应等待代码合并。</li>
+            <li>每一阶段都必须有可验证验收条件，避免“改了但无法确认风险是否真的消失”。</li>
+            <li>涉及入口治理的改动先补测试再发版，避免把新鉴权和新校验做成二次事故。</li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="card col-4">
+        <div class="card-head">
+          <h2>问题体量</h2>
+          <p>用于排期估算，不代表必须串行完成全部事项。</p>
+        </div>
+        <div class="card-body">
+          <div class="stats">
+            <div class="stat danger">
+              <div class="num">2</div>
+              <div class="label">Critical</div>
+            </div>
+            <div class="stat warn">
+              <div class="num">3</div>
+              <div class="label">High</div>
+            </div>
+            <div class="stat primary">
+              <div class="num">4</div>
+              <div class="label">Medium</div>
+            </div>
+            <div class="stat ok">
+              <div class="num">2</div>
+              <div class="label">Low</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card col-12">
+        <div class="card-head">
+          <h2>阶段 0：当天止血</h2>
+          <p>这些动作可以和代码修复并行，但必须先开始。</p>
+        </div>
+        <div class="card-body">
+          <div class="callout danger">
+            <strong>外部处置，不应等待代码提交</strong>
+            当前凭据既可能存在于本地配置，也可能已进入历史 jar 与日志。代码合并只能阻止继续扩散，不能收回已经暴露的 secret。
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>动作</th>
+                <th>负责人建议</th>
+                <th>完成标准</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>轮换数据库、云盘、Emby 等已暴露凭据</td>
+                <td>运维 / 系统负责人</td>
+                <td>旧凭据失效，新凭据仅通过环境变量或安全配置注入</td>
+              </tr>
+              <tr>
+                <td>下架或清理历史构建产物、共享目录、制品库中的敏感 jar</td>
+                <td>发布负责人</td>
+                <td>历史产物不可再下载，保留审计留痕</td>
+              </tr>
+              <tr>
+                <td>排查历史日志中的 <span class="mono">api_key</span>、Authorization、完整 header 泄露面</td>
+                <td>运维 / 安全</td>
+                <td>确认保留范围、访问控制和清理方案</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card col-12">
+        <div class="card-head">
+          <h2>阶段 1：48 小时内恢复发布安全边界</h2>
+          <p>先把最危险的入口和凭据链路关住。这一阶段完成前，不建议继续对外发布。</p>
+        </div>
+        <div class="card-body">
+          <div class="phase">
+            <div class="phase-top">
+              <h3>1. 移除打包路径中的 secret</h3>
+              <span class="tag tag-danger">Critical · 1-2 天</span>
+            </div>
+            <ul class="list">
+              <li>处理 <span class="mono">application-local.yml</span>、<span class="mono">application-prod.yml</span>、<span class="mono">application-homac.yml</span> 的打包路径，确保本地工作树配置不会进入 jar。</li>
+              <li>清理 <span class="mono">src/main/java/cn/acecandy/fasaxi/emma/utils/EmbyUtil.java</span> 等硬编码凭据/常量。</li>
+              <li>新增构建护栏：打包后自动检查 jar 内是否包含敏感配置或疑似密钥模式。</li>
+            </ul>
+            <div class="footer">验收：<span class="mono">jar tf target/fasaxi-emma.jar</span> 不再出现本地敏感配置；仓库中不存在硬编码真实凭据；CI 对敏感内容可自动 fail。</div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-top">
+              <h3>2. 收紧管理接口暴露面</h3>
+              <span class="tag tag-danger">Critical · 1-2 天</span>
+            </div>
+            <ul class="list">
+              <li>对 <span class="mono">DebugController</span>、<span class="mono">ApiController</span> 中的 <span class="mono">/api/debug/**</span>、<span class="mono">/api/build/**</span>、<span class="mono">/api/clear/**</span> 加管理员鉴权或仅限特定 profile。</li>
+              <li>把带副作用的 GET 改为 POST/DELETE，避免被缓存、预取或误触发。</li>
+              <li>同步复核 <span class="mono">CorsConfig.java</span>，避免跨域策略继续放大未授权调用面。</li>
+            </ul>
+            <div class="footer">验收：非授权请求统一返回 401/403；副作用接口不再使用 GET；本地调试和生产暴露面有明确区分。</div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-top">
+              <h3>3. 日志脱敏止血</h3>
+              <span class="tag tag-warn">High · 2-4 小时</span>
+            </div>
+            <ul class="list">
+              <li>修改 <span class="mono">AccessLog.java</span>、<span class="mono">OriginReqService.java</span>、<span class="mono">EmbyContentCacheReqWrapper.java</span>，统一掩码或白名单输出。</li>
+              <li>禁止写入 <span class="mono">api_key</span>、Authorization、Cookie、完整请求头、完整查询串。</li>
+              <li>为异常日志保留排障所需字段，但采用局部脱敏而不是整包落盘。</li>
+            </ul>
+            <div class="footer">验收：压测和错误回放日志中不再出现敏感 header / token 明文。</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card col-12">
+        <div class="card-head">
+          <h2>阶段 2：一周内补齐运行护栏</h2>
+          <p>目标是把“当前能跑”提升到“可以稳定发布”。</p>
+        </div>
+        <div class="card-body">
+          <div class="phase">
+            <div class="phase-top">
+              <h3>4. 修正 Redis 锁语义</h3>
+              <span class="tag tag-warn">High · 0.5-1 天</span>
+            </div>
+            <ul class="list">
+              <li>重写 <span class="mono">RedisLockClient.java</span>：加 owner token、续期策略和 compare-and-delete 释放。</li>
+              <li>Redis 异常时显式失败或降级为“拒绝执行”，不要 silent fail-open。</li>
+              <li>回归调用方：<span class="mono">OriginReqService.java</span>、<span class="mono">VideoRedirectService.java</span>。</li>
+            </ul>
+            <div class="footer">验收：并发测试下无双执行、无误删他人锁；Redis 故障时行为可预测且有明确日志。</div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-top">
+              <h3>5. 补输入校验和错误边界</h3>
+              <span class="tag tag-warn">Medium · 4-8 小时</span>
+            </div>
+            <ul class="list">
+              <li>对 debug/build 入口参数增加枚举或白名单校验，非法 <span class="mono">cloud</span> 参数直接返回 400。</li>
+              <li>不要让非法输入流入 <span class="mono">CloudUtil.java</span> 深层再以空指针爆炸。</li>
+              <li>顺手统一错误响应文案，便于调用方定位。</li>
+            </ul>
+            <div class="footer">验收：非法参数路径有稳定 4xx 响应，不再出现深层 NPE。</div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-top">
+              <h3>6. 统一定时任务门禁与注释</h3>
+              <span class="tag tag-warn">Medium · 2-4 小时</span>
+            </div>
+            <ul class="list">
+              <li>统一 <span class="mono">Webdav2CloudTask.java</span>、<span class="mono">ShortDramaTask.java</span>、<span class="mono">TmdbProviderTask.java</span> 的 enable gate。</li>
+              <li>修正 cron 注释与真实周期不一致的问题，消除误导性运行文案。</li>
+              <li>为禁用环境增加明确启动日志，避免“看起来没开，实际上在跑”。</li>
+            </ul>
+            <div class="footer">验收：关闭总开关后任务不执行；注释、日志、真实周期三者一致。</div>
+          </div>
+
+          <div class="phase">
+            <div class="phase-top">
+              <h3>7. 补关键入口测试并修正 Java 25 测试工具链</h3>
+              <span class="tag tag-warn">High · 1-2 天</span>
+            </div>
+            <ul class="list">
+              <li>新增控制器/过滤器/配置打包链路测试，重点覆盖鉴权、日志脱敏、任务门禁、jar 产物卫生。</li>
+              <li>保留现有 service 测试，同时补 <span class="mono">DebugController</span>、过滤器、打包断言的集成测试。</li>
+              <li>处理 Mockito 在 Java 25 下的 agent 告警，避免未来升级直接失效。</li>
+            </ul>
+            <div class="footer">验收：<span class="mono">mvn test</span> 覆盖关键安全入口；打包校验进入自动化；测试工具链告警有明确处置方案。</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card col-12">
+        <div class="card-head">
+          <h2>阶段 3：第二周开始收技术债</h2>
+          <p>这些问题不该插队到阶段 1 之前，但应尽快形成 backlog，避免再次拖成结构性负担。</p>
+        </div>
+        <div class="card-body">
+          <table>
+            <thead>
+              <tr>
+                <th>事项</th>
+                <th>范围</th>
+                <th>建议工期</th>
+                <th>说明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>拆分超大类与清理死代码</td>
+                <td><span class="mono">EmbyProxy.java</span>、<span class="mono">VirtualService.java</span>、<span class="mono">OldVideoRedirectService.java</span>、<span class="mono">ThreadUtil.java</span></td>
+                <td>2-4 天</td>
+                <td>按协作者拆分，不要在安全修复同一个 PR 里顺手重构过多逻辑。</td>
+              </tr>
+              <tr>
+                <td>优化线程限流算法</td>
+                <td><span class="mono">OriginReqService.java</span> 等播放热路径</td>
+                <td>0.5-1 天</td>
+                <td>从 Redis SCAN 改为显式计数、集合基数或更适合的限流模型。</td>
+              </tr>
+              <tr>
+                <td>裁剪依赖面</td>
+                <td><span class="mono">pom.xml</span></td>
+                <td>2-4 小时</td>
+                <td>评估移除 <span class="mono">hutool-all</span>、重复数据库驱动或替换成更小粒度依赖。</td>
+              </tr>
+              <tr>
+                <td>修正文档与启动文案</td>
+                <td>README、banner、运行手册</td>
+                <td>1-2 小时</td>
+                <td>这项可以穿插做，但以阶段 1/2 的真实行为为准，不要先写文档再改代码。</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card col-8">
+        <div class="card-head">
+          <h2>推荐并行方式</h2>
+          <p>避免多人同时修改同一条入口链路。</p>
+        </div>
+        <div class="card-body">
+          <ul class="list">
+            <li>A 线：凭据治理 + 打包护栏 + 历史产物排查。</li>
+            <li>B 线：Debug/Build/Clear 接口鉴权、HTTP 方法治理、参数校验。</li>
+            <li>C 线：日志脱敏 + Redis 锁修复 + 关键回归测试。</li>
+            <li>定时任务门禁和文档修正可在 B/C 线完成后合并，避免反复改验收基线。</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="card col-4">
+        <div class="card-head">
+          <h2>发布闸门</h2>
+          <p>满足以下条件后再考虑恢复稳定发布。</p>
+        </div>
+        <div class="card-body">
+          <ul class="list">
+            <li>新凭据已完成轮换。</li>
+            <li>jar 产物不再携带本地敏感配置。</li>
+            <li>管理接口具备鉴权或 profile 门禁。</li>
+            <li>日志已完成脱敏。</li>
+            <li>关键入口回归测试为绿。</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="card col-12">
+        <div class="card-head">
+          <h2>首批执行清单</h2>
+          <p>如果按最小 blast radius 开始做，建议按这个顺序落地。</p>
+        </div>
+        <div class="card-body">
+          <ol class="list">
+            <li>先轮换 secret，并冻结当前对外发版。</li>
+            <li>再修 jar 打包和硬编码凭据问题，防止新构建继续扩散。</li>
+            <li>随后收紧 debug/build/clear 接口，并补参数校验。</li>
+            <li>接着做日志脱敏与 Redis 锁修复，同时补对应回归测试。</li>
+            <li>最后统一任务门禁、修正 README/banner、安排结构和性能债拆分。</li>
+          </ol>
+        </div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

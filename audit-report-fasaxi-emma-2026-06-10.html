@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fasaxi-emma 审计报告</title>
+<style>
+  :root {
+    --sidebar-bg: #1a1f2e;
+    --sidebar-hover: #242a3d;
+    --sidebar-active: #2d3555;
+    --bg: #f0f3f7;
+    --card-bg: #ffffff;
+    --border: #e6eaef;
+    --text: #1e2233;
+    --text-secondary: #6b7394;
+    --accent: #3370ff;
+    --accent-light: #e8f0ff;
+    --success: #34c759;
+    --warning: #ff9500;
+    --danger: #ff3b30;
+    --info: #5ac8fa;
+    --badge-critical: #ff3b30;
+    --badge-high: #ff9500;
+    --badge-medium: #3370ff;
+    --badge-low: #8e8e93;
+    --badge-info: #5ac8fa;
+    --bar-bg: #e8eaed;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.8;
+    display: flex;
+    min-height: 100vh;
+    font-size: 15px;
+  }
+  .sidebar { width: 240px; background: var(--sidebar-bg); color: #fff; flex-shrink: 0; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  .sidebar-header { padding: 20px 20px 16px; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .sidebar-header h1 { font-size: 18px; font-weight: 700; letter-spacing: .5px; }
+  .sidebar-header .sub { font-size: 12px; color: rgba(255,255,255,.4); margin-top: 4px; }
+  .sidebar-nav { padding: 8px 0; flex: 1; }
+  .sidebar-nav a { display: flex; align-items: center; gap: 12px; padding: 14px 20px; color: rgba(255,255,255,.6); text-decoration: none; font-size: 14px; transition: all .15s; border-left: 3px solid transparent; }
+  .sidebar-nav a:hover { background: var(--sidebar-hover); color: #fff; }
+  .sidebar-nav a.active { background: var(--sidebar-active); color: #fff; border-left-color: var(--accent); }
+  .sidebar-nav a .icon { width: 18px; text-align: center; font-size: 14px; }
+  .sidebar-footer { padding: 12px 20px; border-top: 1px solid rgba(255,255,255,.06); font-size: 11px; color: rgba(255,255,255,.3); }
+  .main { flex: 1; min-width: 0; padding: 32px 40px 80px; }
+  .page-header { margin-bottom: 32px; }
+  .page-header h2 { font-size: 26px; font-weight: 700; }
+  .page-header .meta { font-size: 14px; color: var(--text-secondary); margin-top: 6px; display: flex; gap: 20px; flex-wrap: wrap; }
+  .page-header .meta span { display: flex; align-items: center; gap: 4px; }
+  .card { background: var(--card-bg); border-radius: 10px; border: 1px solid var(--border); margin-bottom: 20px; overflow: hidden; }
+  .card-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 15px; }
+  .card-body { padding: 24px; }
+  .score-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .score-item { display: flex; flex-direction: column; gap: 8px; padding: 18px 20px; background: #f8fafc; border-radius: 8px; border: 1px solid var(--border); }
+  .score-item .label { font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .4px; }
+  .score-item .bar-row { display: flex; align-items: center; gap: 12px; }
+  .score-item .bar-track { flex: 1; height: 10px; background: var(--bar-bg); border-radius: 5px; overflow: hidden; }
+  .score-item .bar-fill { height: 100%; border-radius: 5px; transition: width .6s ease; }
+  .score-item .value { font-size: 22px; font-weight: 700; min-width: 52px; text-align: right; }
+  .score-item .grade { font-size: 15px; font-weight: 700; min-width: 22px; text-align: center; }
+  .bar-fill.s { background: linear-gradient(90deg, #34c759, #30d158); }
+  .bar-fill.a { background: linear-gradient(90deg, #3370ff, #5e8cff); }
+  .bar-fill.b { background: linear-gradient(90deg, #ff9500, #ffb340); }
+  .bar-fill.c { background: linear-gradient(90deg, #ff3b30, #ff6b61); }
+  .bar-fill.d { background: linear-gradient(90deg, #ff6b61, #ff9f91); }
+  .bar-fill.f { background: linear-gradient(90deg, #9b1d1a, #d63031); }
+  .grade-s { color: #34c759; } .grade-a { color: #3370ff; }
+  .grade-b { color: #ff9500; } .grade-c { color: #ff3b30; }
+  .grade-d { color: #ff6b61; } .grade-f { color: #9b1d1a; }
+  .overall-row { grid-column: 1 / -1; background: linear-gradient(135deg, #1a1f2e, #2d3555); border-color: transparent; }
+  .overall-row .label { color: rgba(255,255,255,.6); }
+  .overall-row .value { color: #fff; }
+  .overall-row .grade { color: #34c759; }
+  .overall-row .bar-fill { background: linear-gradient(90deg, #34c759, #30d158); }
+  .stats-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat-card { flex: 1; min-width: 140px; padding: 20px 24px; background: var(--card-bg); border-radius: 10px; border: 1px solid var(--border); text-align: center; }
+  .stat-card .num { font-size: 32px; font-weight: 700; line-height: 1.3; }
+  .stat-card .desc { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+  .finding { border-left: 4px solid var(--border); margin-bottom: 20px; padding: 20px 24px; border-radius: 0 10px 10px 0; background: #fafbfc; border: 1px solid var(--border); border-left-width: 4px; }
+  .finding.severity-critical { border-left-color: var(--badge-critical); }
+  .finding.severity-high { border-left-color: var(--badge-high); }
+  .finding.severity-medium { border-left-color: var(--badge-medium); }
+  .finding.severity-low { border-left-color: var(--badge-low); }
+  .finding.severity-info { border-left-color: var(--badge-info); }
+  .finding-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .finding-header h4 { font-size: 16px; font-weight: 600; flex: 1; }
+  .badge { display: inline-block; padding: 3px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; line-height: 1.6; }
+  .badge-critical { background: #ffeae9; color: var(--badge-critical); }
+  .badge-high { background: #fff3e0; color: var(--badge-high); }
+  .badge-medium { background: var(--accent-light); color: var(--badge-medium); }
+  .badge-low { background: #f2f2f5; color: var(--badge-low); }
+  .badge-info { background: #e4f5ff; color: #007aff; }
+  .badge-confirmed { background: #e8ffe8; color: #248a3d; }
+  .badge-suspected { background: #fff8e1; color: #b8860b; }
+  .badge-s { background: #e8ffe8; color: #248a3d; }
+  .badge-a { background: var(--accent-light); color: var(--accent); }
+  .badge-b { background: #fff3e0; color: var(--warning); }
+  .badge-c { background: #ffeae9; color: var(--danger); }
+  .finding-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+  .finding-meta span { display: flex; align-items: center; gap: 4px; }
+  .finding .evidence { margin: 12px 0; padding: 14px 18px; background: #f0f2f5; border-radius: 8px; font-family: "SF Mono","Fira Code","Consolas",monospace; font-size: 13px; line-height: 1.8; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+  .finding .problem { font-size: 14px; margin: 12px 0; color: var(--text); line-height: 1.8; }
+  .finding .fix-box { margin-top: 12px; padding: 14px 18px; background: #f0f7ff; border-radius: 8px; border: 1px solid #d6e4ff; font-size: 13px; }
+  .finding .fix-box code { display: block; margin-top: 6px; padding: 12px 16px; background: #1e2233; color: #cdd6f4; border-radius: 6px; font-family: "SF Mono","Fira Code","Consolas",monospace; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-all; }
+  .fix-label { font-weight: 600; font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: .3px; }
+  .section-title { font-size: 20px; font-weight: 700; margin: 36px 0 20px; padding-bottom: 10px; border-bottom: 2px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; padding: 12px 16px; font-weight: 600; color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: .4px; border-bottom: 2px solid var(--border); background: #f8fafc; }
+  td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  .check-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 6px; }
+  .check-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-size: 14px; line-height: 1.6; }
+  .check-item .check { color: var(--success); font-weight: 700; }
+  .check-item .cross { color: var(--danger); font-weight: 700; }
+  .win-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .win-card { padding: 16px; background: linear-gradient(135deg, #f0f7ff, #e8f0ff); border-radius: 8px; border: 1px solid #d6e4ff; }
+  .win-card .win-title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  .win-card .win-meta { font-size: 11px; color: var(--text-secondary); }
+  .small { font-size: 13px; color: var(--text-secondary); }
+  @media (max-width: 768px) { .sidebar { display: none; } .main { padding: 16px; } .score-grid { grid-template-columns: 1fr; } .stats-row { flex-direction: column; } .check-list { grid-template-columns: 1fr; } .win-grid { grid-template-columns: 1fr; } }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #c1c7d0; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #a8adb8; }
+</style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-header">
+    <h1>fasaxi-emma</h1>
+    <div class="sub">Full Audit · 2026-06-10</div>
+  </div>
+  <div class="sidebar-nav">
+    <a href="#summary"><span class="icon">📊</span> 评分概览</a>
+    <a href="#executive-summary"><span class="icon">📝</span> 总体评估</a>
+    <a href="#top-risks"><span class="icon">⚠️</span> Top Risks</a>
+    <a href="#findings"><span class="icon">🔍</span> Detailed Findings</a>
+    <a href="#architecture"><span class="icon">🏗️</span> 架构</a>
+    <a href="#security"><span class="icon">🔒</span> 安全</a>
+    <a href="#stability"><span class="icon">⚡</span> 稳定性</a>
+    <a href="#performance"><span class="icon">🚀</span> 性能</a>
+    <a href="#testing"><span class="icon">🧪</span> 测试</a>
+    <a href="#maintainability"><span class="icon">📐</span> 可维护性</a>
+    <a href="#design"><span class="icon">🧭</span> 设计原则</a>
+    <a href="#release"><span class="icon">📦</span> 发布</a>
+    <a href="#documentation"><span class="icon">📚</span> 文档</a>
+    <a href="#configuration"><span class="icon">⚙️</span> 配置</a>
+    <a href="#observability"><span class="icon">📈</span> 可观测性</a>
+    <a href="#fallback"><span class="icon">🪂</span> Fallback</a>
+    <a href="#testing-authenticity"><span class="icon">🧬</span> 测试真实性</a>
+    <a href="#type-safety"><span class="icon">🔤</span> 类型安全</a>
+    <a href="#frontend-state"><span class="icon">🖥️</span> 前端状态</a>
+    <a href="#backend-api"><span class="icon">🛣️</span> 后端 API</a>
+    <a href="#dependency-weight"><span class="icon">🧱</span> 依赖重量</a>
+    <a href="#code-consistency"><span class="icon">📏</span> 一致性</a>
+    <a href="#comment-coverage"><span class="icon">💬</span> 注释覆盖</a>
+    <a href="#principles"><span class="icon">📋</span> Principles</a>
+    <a href="#fix-order"><span class="icon">🎯</span> Fix Order</a>
+  </div>
+  <div class="sidebar-footer">Fuck My Shit Mountain v1.0</div>
+</nav>
+
+<div class="main">
+
+  <div class="page-header" id="summary">
+    <h2>fasaxi-emma 全量审计报告</h2>
+    <div class="meta">
+      <span>📅 2026-06-10</span>
+      <span>🔍 full</span>
+      <span>🛠 Codex (GPT-5)</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">📊 评分面板</div>
+    <div class="card-body">
+      <div class="score-grid">
+        <div class="score-item">
+          <div class="label">Security</div>
+          <div class="bar-row">
+            <div class="bar-track"><div class="bar-fill d" style="width:24%"></div></div>
+            <span class="value grade-d">2.4</span>
+            <span class="grade grade-d">D</span>
+          </div>
+          <div class="small">高权限接口裸露，凭据卫生和日志脱敏同时失守</div>
+        </div>
+        <div class="score-item">
+          <div class="label">Stability</div>
+          <div class="bar-row">
+            <div class="bar-track"><div class="bar-fill c" style="width:47%"></div></div>
+            <span class="value grade-c">4.7</span>
+            <span class="grade grade-c">C</span>
+          </div>
+          <div class="small">Redis 锁 fail-open 且无 owner，调度门禁不一致</div>
+        </div>
+        <div class="score-item">
+          <div class="label">Performance</div>
+          <div class="bar-row">
+            <div class="bar-track"><div class="bar-fill b" style="width:61%"></div></div>
+            <span class="value grade-b">6.1</span>
+            <span class="grade grade-b">B</span>
+          </div>
+          <div class="small">主热点已有缓存，但播放热路径仍有全量 Redis SCAN</div>
+        </div>
+        <div class="score-item">
+          <div class="label">Testing</div>
+          <div class="bar-row">
+            <div class="bar-track"><div class="bar-fill c" style="width:42%"></div></div>
+            <span class="value grade-c">4.2</span>
+            <span class="grade grade-c">C</span>
+          </div>
+          <div class="small">控制器与过滤器几乎无测试，Java 25 工具链已出现警告</div>
+        </div>
+        <div class="score-item">
+          <div class="label">Maintainability</div>
+          <div class="bar-row">
+            <div class="bar-track"><div class="bar-fill b" style="width:52%"></div></div>
+            <span class="value grade-b">5.2</span>
+            <span class="grade grade-b">B</span>
+          </div>
+          <div class="small">God class、注释失真和整块死代码同时存在</div>
+        </div>
+        <div class="score-item">
+          <div class="label">Design</div>
+          <div class="bar-row">
+            <div class="bar-track"><div class="bar-fill c" style="width:38%"></div></div>
+            <span class="value grade-c">3.8</span>
+            <span class="grade grade-c">C</span>
+          </div>
+          <div class="small">SRP、Fail-Fast、KISS 在核心入口链路上多处失守</div>
+        </div>
+        <div class="score-item">
+          <div class="label">Release</div>
+          <div class="bar-row">
+            <div class="bar-track"><div class="bar-fill c" style="width:34%"></div></div>
+            <span class="value grade-c">3.4</span>
+            <span class="grade grade-c">C</span>
+          </div>
+          <div class="small">本地 secrets 可进打包产物，缺少 CI/运行手册/发布护栏</div>
+        </div>
+        <div class="score-item overall-row">
+          <div class="label">Overall</div>
+          <div class="bar-row">
+            <div class="bar-track" style="background:rgba(255,255,255,.12)"><div class="bar-fill" style="width:43%;background:linear-gradient(90deg,#ff3b30,#ff6b61)"></div></div>
+            <span class="value" style="color:#fff">4.3</span>
+            <span class="grade" style="color:#fff">C</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="executive-summary">📝 总体评估</h3>
+  <div class="card">
+    <div class="card-header">📋 总体评估</div>
+    <div class="card-body">
+      <p><strong>项目概况：</strong>这是一个基于 Spring Boot 3.5.8 / Java 25 的单体代理与任务调度服务，职责横跨 Emby 反向代理、图片/视频重定向、Redis 缓存与分布式锁、多库访问、云盘编排以及多条后台同步任务。请求入口主要分为两条：`/api/**` 直接进入控制器，其他流量统一由 `EmbyProxyFilter` 包装并分发到 `OriginReqService`、`PicRedirectService`、`VideoRedirectService` 和 `VirtualService`。</p>
+      <p style="margin-top:12px"><strong>主要风险：</strong>当前最严重的问题不是“代码不好看”，而是权限边界和密钥边界同时过宽。高权限调试/维护接口裸露在 HTTP 面上，本地凭据又能随工作树打进 `jar`，再叠加日志直接写出 `api_key` 与完整请求头，已经越过“发布前修一下”的范围，属于需要先收口暴露面再谈上线稳定性的状态。</p>
+      <p style="margin-top:12px"><strong>亮点：</strong>入口分流、外部客户端和持久层大体仍保持了 `control/config/service/task/sao/dao` 分层；Redis、Feign、Hikari、Jetty 都配置了显式超时或容量上限；最近对 `VideoRedirectService`、`OriginReqService`、`PicRedirectService` 和 `EmbyConfig` 补了一批回归测试，`mvn test` 与 `mvn -DskipTests package` 当前都可以通过。</p>
+      <p style="margin-top:12px"><strong>优先修复：</strong>第一优先级应是移除打包可见 secrets、给 `/api/debug/**` 和 `/api/build|clear/**` 加鉴权与 profile 门禁、统一改成非 GET 副作用接口、对日志做彻底脱敏；第二优先级是把 Redis 锁改成 owner-token + compare-and-delete，并补齐控制器/过滤器/配置层的集成测试。</p>
+      <p style="margin-top:12px"><strong>总评：</strong>C 总评。仓库已经具备“本地能编、部分关键链路有回归测试”的基础，但距离“稳定公开发布”还有明显差距，主要卡在安全面、入口治理和发布卫生，而不是单个业务函数的细枝末节。</p>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card"><div class="num">11</div><div class="desc">总发现</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--badge-critical)">2</div><div class="desc">Critical</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--badge-high)">3</div><div class="desc">High</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--badge-medium)">4</div><div class="desc">Medium</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--badge-low)">2</div><div class="desc">Low</div></div>
+    <div class="stat-card"><div class="num" style="color:var(--badge-info)">0</div><div class="desc">Info</div></div>
+  </div>
+
+  <h3 class="section-title" id="top-risks">⚠️ 最高风险</h3>
+  <div class="card">
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th style="width:60px">#</th><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">类别</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>本地资源与工具常量中包含真实凭据，打包产物会直接带出</td><td><span class="badge badge-critical">Critical</span></td><td>安全</td></tr>
+            <tr><td>2</td><td>`/api/debug/**` 与 `/api/build|clear/**` 无鉴权且用 GET 暴露管理能力</td><td><span class="badge badge-critical">Critical</span></td><td>后端 API</td></tr>
+            <tr><td>3</td><td>AccessLog / OriginReqService 会把 `api_key` 和完整请求头写入日志</td><td><span class="badge badge-high">High</span></td><td>可观测性</td></tr>
+            <tr><td>4</td><td>Redis 锁实现既 fail-open 又无 owner 校验，互斥语义不成立</td><td><span class="badge badge-high">High</span></td><td>稳定性</td></tr>
+            <tr><td>5</td><td>关键安全与入口链路没有测试，Java 25 下测试工具链已出现未来兼容告警</td><td><span class="badge badge-high">High</span></td><td>测试</td></tr>
+            <tr><td>6</td><td>线程限流决策在播放热路径上全量扫描 Redis key，并用 `synchronized` 串行化</td><td><span class="badge badge-medium">Medium</span></td><td>性能</td></tr>
+            <tr><td>7</td><td>定时任务开关不一致且注释与真实周期不符</td><td><span class="badge badge-medium">Medium</span></td><td>发布</td></tr>
+            <tr><td>8</td><td>`EmbyProxy` / `VirtualService` 等超大类叠加死代码，SRP 与 KISS 明显失守</td><td><span class="badge badge-medium">Medium</span></td><td>可维护性</td></tr>
+            <tr><td>9</td><td>API 输入边界缺少校验，非法 `cloud` 参数会在 CloudUtil 深处触发空指针</td><td><span class="badge badge-medium">Medium</span></td><td>类型安全</td></tr>
+            <tr><td>10</td><td>README 和启动横幅指向的运维入口与实际路由不一致</td><td><span class="badge badge-low">Low</span></td><td>文档</td></tr>
+            <tr><td>11</td><td>`hutool-all` 与双数据库驱动一起扩大了 classpath 和升级面</td><td><span class="badge badge-low">Low</span></td><td>依赖重量</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="findings">🔍 Detailed Findings</h3>
+
+  <div class="finding severity-critical">
+    <div class="finding-header">
+      <h4>1. 本地资源与工具常量中包含真实凭据，打包产物会直接带出</h4>
+      <span class="badge badge-critical">Critical</span>
+      <span class="badge badge-confirmed">已确认</span>
+    </div>
+    <div class="finding-meta">
+      <span>📁 安全 / 配置</span>
+      <span>📍 src/main/resources/application*.yml；src/main/java/cn/acecandy/fasaxi/emma/utils/EmbyUtil.java:40-46</span>
+      <span>🎯 资源打包 / EmbyUtil</span>
+    </div>
+    <div class="problem">
+      <strong>问题：</strong>工作树中的 `application.yml`、`application-local.yml`、`application-prod.yml`、`application-homac.yml` 含有 Redis、MySQL、PostgreSQL、123 云盘、115 refresh token、Emby API key 等真实值；`EmbyUtil` 还内置了 `EMBY_API_KEY` 与 `ALIST_TOKEN` 常量。虽然这些 yml 已被 `.gitignore` 忽略，但 `mvn package` 仍会把它们一起打进 `target/fasaxi-emma.jar`，导致“未进 Git”并不等于“不会泄露”。这违反了最基本的最小暴露面要求。
+    </div>
+    <div class="evidence">.gitignore:36-37 忽略 application.yml / application-*.yml
+src/main/resources/application.yml:28-33, 54-59, 95-97
+src/main/resources/application-local.yml:45-70
+src/main/java/cn/acecandy/fasaxi/emma/utils/EmbyUtil.java:40-46
+jar tf target/fasaxi-emma.jar:
+BOOT-INF/classes/application.yml
+BOOT-INF/classes/application-local.yml
+BOOT-INF/classes/application-prod.yml
+BOOT-INF/classes/application-homac.yml</div>
+    <div class="fix-box">
+      <div class="fix-label">最小修复</div>
+      <code>1. 删除 EmbyUtil 里的硬编码 token / 地址常量。
+2. 将所有 secrets 改为环境变量、外置挂载或密钥管理服务注入。
+3. 仓库只保留 application-example.yml，package 前增加 “产物中不得含 secrets” 扫描。</code>
+    </div>
+    <div class="fix-box" style="margin-top:6px;background:#fff8e1;border-color:#ffe082">
+      <strong>⏱ 预计工作量：</strong> 1-2 天 &nbsp;·&nbsp; <strong>回归建议：</strong> 在 CI 或本地构建脚本里解包 jar，断言不包含 `application*.yml` 实密钥，也不再匹配 `api-key` / `client-secret` / `refresh-token` 字样。
+    </div>
+  </div>
+
+  <div class="finding severity-critical">
+    <div class="finding-header">
+      <h4>2. `/api/debug/**` 与 `/api/build|clear/**` 无鉴权且用 GET 暴露管理能力</h4>
+      <span class="badge badge-critical">Critical</span>
+      <span class="badge badge-confirmed">已确认</span>
+    </div>
+    <div class="finding-meta">
+      <span>📁 安全 / 后端 API</span>
+      <span>📍 src/main/java/cn/acecandy/fasaxi/emma/control/DebugController.java:24-87；ApiController.java:66-190；CorsConfig.java:17-22</span>
+      <span>🎯 DebugController / ApiController / CorsConfig</span>
+    </div>
+    <div class="problem">
+      <strong>问题：</strong>`DebugController` 直接暴露了获取 123 access token、列目录、查文件、查下载地址、115 新建目录等能力；`ApiController` 还把清理缓存、清理 DB 图片、构建 TMDB/豆瓣数据等副作用操作挂在 GET 路由上。整个 API 层没有任何鉴权、签名、角色边界或 profile 限制，`CorsConfig` 还把跨域来源放成了 `*` 并允许携带凭证。只要服务地址可达，这些接口就不是“调试入口”，而是生产管理面。
+    </div>
+    <div class="evidence">DebugController.java:39-86 暴露 getAccessTokenByCache / getFileList / getDownloadUrl / addFolder
+ApiController.java:66-190 暴露 obtainCollection / clear/db-pic / clear/file-cache / build/*
+CorsConfig.java:17-22:
+allowedOriginPatterns("*")
+allowCredentials(true)</div>
+    <div class="fix-box">
+      <div class="fix-label">最小修复</div>
+      <code>1. 将 DebugController 默认仅在 dev/profile 下启用。
+2. 所有管理接口统一接入管理员鉴权或内网网关白名单。
+3. 将清理/构建类接口改成 POST 或 DELETE，并要求显式请求体或幂等键。</code>
+    </div>
+    <div class="fix-box" style="margin-top:6px;background:#fff8e1;border-color:#ffe082">
+      <strong>⏱ 预计工作量：</strong> 1-2 天 &nbsp;·&nbsp; <strong>回归建议：</strong> 增加 MockMvc/集成测试，验证未认证调用全部返回 401/403，且 GET 方式不能再触发任何副作用。
+    </div>
+  </div>
+
+  <div class="finding severity-high">
+    <div class="finding-header">
+      <h4>3. AccessLog / OriginReqService 会把 `api_key` 和完整请求头写入日志</h4>
+      <span class="badge badge-high">High</span>
+      <span class="badge badge-confirmed">已确认</span>
+    </div>
+    <div class="finding-meta">
+      <span>📁 安全 / 可观测性</span>
+      <span>📍 src/main/java/cn/acecandy/fasaxi/emma/config/AccessLog.java:31-38；EmbyContentCacheReqWrapper.java:108-155, 204-205；OriginReqService.java:241-248, 275-276</span>
+      <span>🎯 AccessLog / EmbyContentCacheReqWrapper / OriginReqService</span>
+    </div>
+    <div class="problem">
+      <strong>问题：</strong>请求包装器会主动提取 `X-Emby-Token`、`Authorization`、`X-Emby-Authorization` 中的 Token，并把所有头缓存下来；`AccessLog` 随后把 `api_key` 和完整 `cachedHeader` JSON 直接写入日志，`OriginReqService` 在 debug/error 日志里也会回写拼好的 `api_key`。这会把认证材料从“瞬时请求上下文”提升成“长期可复制日志”，一旦日志被收集、共享或排障导出，泄露面会显著扩大。
+    </div>
+    <div class="evidence">EmbyContentCacheReqWrapper.java:129-145 从头部提取 apiKey / Token
+EmbyContentCacheReqWrapper.java:147-155 缓存全部 header
+AccessLog.java:35-37 记录 {}?{}&amp;api_key={} [{}]
+OriginReqService.java:242-248, 275-276 记录 paramUri + api_key</div>
+    <div class="fix-box">
+      <div class="fix-label">最小修复</div>
+      <code>1. 对 `api_key`、Authorization、Token、Cookie 做统一脱敏。
+2. AccessLog 仅保留必要字段，不再序列化完整 header map。
+3. 错误日志改为 requestId + endpoint + status，不拼接敏感查询串。</code>
+    </div>
+    <div class="fix-box" style="margin-top:6px;background:#fff8e1;border-color:#ffe082">
+      <strong>⏱ 预计工作量：</strong> 2-4 小时 &nbsp;·&nbsp; <strong>回归建议：</strong> 增加日志单元测试或 appender 断言，校验任何日志行都不再包含 `api_key=`、`Authorization`、`X-Emby-Token` 的明文值。
+    </div>
+  </div>
+
+  <div class="finding severity-high">
+    <div class="finding-header">
+      <h4>4. Redis 锁实现既 fail-open 又无 owner 校验，互斥语义不成立</h4>
+      <span class="badge badge-high">High</span>
+      <span class="badge badge-confirmed">已确认</span>
+    </div>
+    <div class="finding-meta">
+      <span>📁 稳定性 / Fallback</span>
+      <span>📍 src/main/java/cn/acecandy/fasaxi/emma/sao/client/RedisLockClient.java:96-135；OriginReqService.java:101-111, 140-143；VideoRedirectService.java:101-114</span>
+      <span>🎯 RedisLockClient / OriginReqService / VideoRedirectService</span>
+    </div>
+    <div class="problem">
+      <strong>问题：</strong>`RedisLockClient.lock()` 在 Redis 不可用、`setIfAbsent` 返回 `null`、甚至 key 为空时都直接返回 `true` 放行；`unlock()` 则只是简单 `delete(key)`，没有 owner token，也没有 compare-and-delete。调用方 `OriginReqService` 与 `VideoRedirectService` 都把它当成真正的互斥锁使用。这意味着 Redis 故障时会完全失去并发收敛，锁过期后旧请求的 finally 还能删掉新请求刚拿到的锁。
+    </div>
+    <div class="evidence">RedisLockClient.java:96-106:
+success == null || success
+catch (Exception) { return true; }
+RedisLockClient.java:130-134:
+redisTemplate.delete(key)
+OriginReqService.java:101-111 / VideoRedirectService.java:101-114 都在 finally 中无条件 unlock</div>
+    <div class="fix-box">
+      <div class="fix-label">最小修复</div>
+      <code>1. `lock()` 返回 owner token，不允许 Redis 异常静默放行。
+2. `unlock()` 改成 Lua compare-and-delete。
+3. 调用方对拿锁失败返回显式 429/503 或可观察的降级状态，不要伪装成正常执行。</code>
+    </div>
+    <div class="fix-box" style="margin-top:6px;background:#fff8e1;border-color:#ffe082">
+      <strong>⏱ 预计工作量：</strong> 0.5-1 天 &nbsp;·&nbsp; <strong>回归建议：</strong> 增加并发测试，覆盖 Redis 异常、锁过期后旧请求解锁、新旧请求交错三种场景，断言不会出现双执行或误删锁。
+    </div>
+  </div>
+
+  <div class="finding severity-high">
+    <div class="finding-header">
+      <h4>5. 关键安全与入口链路没有测试，Java 25 下测试工具链已出现未来兼容告警</h4>
+      <span class="badge badge-high">High</span>
+      <span class="badge badge-confirmed">已确认</span>
+    </div>
+    <div class="finding-meta">
+      <span>📁 测试 / 发布</span>
+      <span>📍 src/test/java/**；pom.xml:206-255</span>
+      <span>🎯 Maven 测试基线 / 测试覆盖面</span>
+    </div>
+    <div class="problem">
+      <strong>问题：</strong>仓库共有 169 个主源码文件、8 个测试文件、约 18895 行主代码和 555 行测试代码；测试主要集中在 `VideoRedirectService`、`OriginReqService`、`PicRedirectService`、`EmbyConfig` 及少数工具类，没有控制器、过滤器、鉴权边界、调度门禁和配置打包的自动化验证。与此同时，`mvn test` 在 Java 25 下已经出现 Lombok `sun.misc.Unsafe` 与 Mockito 动态 agent 的未来兼容告警，说明测试链路本身也存在老化信号。
+    </div>
+    <div class="evidence">统计结果:
+main_files=169
+test_files=8
+main_loc=18895
+test_loc=555
+src/test/java 中未发现 controller / filter 测试包
+mvn -q test 输出:
+Mockito is currently self-attaching...
+Dynamic loading of agents will be disallowed by default in a future release</div>
+    <div class="fix-box">
+      <div class="fix-label">最小修复</div>
+      <code>1. 先补控制器与过滤器的 MockMvc / 集成测试。
+2. 增加“打包产物不含 secrets”“未认证访问被拒绝”“task.all-enabled 生效”的回归用例。
+3. 按 Mockito 官方方式配置 agent，避免继续依赖未来会失效的 self-attach。</code>
+    </div>
+    <div class="fix-box" style="margin-top:6px;background:#fff8e1;border-color:#ffe082">
+      <strong>⏱ 预计工作量：</strong> 1-2 天 &nbsp;·&nbsp; <strong>回归建议：</strong> 将 `mvn test` 与一个最小集成测试任务接入 CI，明确覆盖 `/api/**`、`EmbyProxyFilter` 和打包检查三类高风险路径。
+    </div>
+  </div>
+
+  <div class="finding severity-medium">
+    <div class="finding-header">
+      <h4>6. 线程限流决策在播放热路径上全量扫描 Redis key，并用 `synchronized` 串行化</h4>
+      <span class="badge badge-medium">Medium</span>
+      <span class="badge badge-confirmed">已确认</span>
+    </div>
+    <div class="finding-meta">
+      <span>📁 性能</span>
+      <span>📍 src/main/java/cn/acecandy/fasaxi/emma/utils/ThreadLimitUtil.java:45-120；RedisClient.java:329-338</span>
+      <span>🎯 ThreadLimitUtil.limitThreadCache / RedisClient.scanKeysByPrefix</span>
+    </div>
+    <div class="problem">
+      <strong>问题：</strong>每次视频重定向选路时，`ThreadLimitUtil.limitThreadCache()` 都会进入同步方法，再调用 `scanKeysByPrefix(THREAD_LIMIT_KEY)` 全量扫描 Redis 前缀并重新统计类型数量。随着在线设备数增长，这条逻辑会在播放热路径上变成 O(N keys) 的串行决策点，吞吐和尾延迟都会被拖慢。
+    </div>
+    <div class="evidence">ThreadLimitUtil.java:66-76 `limitThreadCache` 为 synchronized
+ThreadLimitUtil.java:80, 93, 102 都调用 getCloudStorageTypeCount()
+ThreadLimitUtil.java:111-120 每次都 scanKeysByPrefix(THREAD_LIMIT_KEY)
+RedisClient.java:329-338 通过 Redis SCAN 遍历整个前缀集合</div>
+    <div class="fix-box">
+      <div class="fix-label">最小修复</div>
+      <code>1. 改为维护按云盘类型聚合的计数键或 set/cardinality。
+2. 只在设备进入/退出时更新计数，不在每次播放时全量扫描。
+3. 去掉方法级 synchronized，改用 Redis 原子计数或更细粒度锁。</code>
+    </div>
+    <div class="fix-box" style="margin-top:6px;background:#fff8e1;border-color:#ffe082">
+      <strong>⏱ 预计工作量：</strong> 0.5-1 天 &nbsp;·&nbsp; <strong>回归建议：</strong> 增加基准测试或并发测试，比较 10/100/1000 设备 key 下的 `limitThreadCache()` 耗时，确保不再随 key 数线性上升。
+    </div>
+  </div>
+
+  <div class="finding severity-medium">
+    <div class="finding-header">
+      <h4>7. 定时任务开关不一致且注释与真实周期不符</h4>
+      <span class="badge badge-medium">Medium</span>
+      <span class="badge badge-confirmed">已确认</span>
+    </div>
+    <div class="finding-meta">
+      <span>📁 稳定性 / 发布</span>
+      <span>📍 src/main/java/cn/acecandy/fasaxi/emma/task/Webdav2CloudTask.java:31-74；ShortDramaTask.java:46-52；TmdbProviderTask.java:31-52</span>
+      <span>🎯 Webdav2CloudTask / ShortDramaTask / TmdbProviderTask</span>
+    </div>
+    <div class="problem">
+      <strong>问题：</strong>`task.all-enabled` 并没有被所有调度任务一致使用，`Webdav2CloudTask.clearInvalidRelation()` 在开关关闭时仍会执行；同文件注释又把 `fixedDelay = 2` 写成“间隔 5 分钟”，`fixedDelay = 60` 也写成“间隔 5 分钟”，`ShortDramaTask.syncJccRanks()` 的 `11 * 60 MINUTES` 实际是 11 小时而不是肉眼容易误读的 11 分钟。运行开关和运维认知都存在偏差。
+    </div>
+    <div class="evidence">Webdav2CloudTask.java:31-44 `webdav2Cloud()` 有 allEnabled 门禁
+Webdav2CloudTask.java:66-74 `clearInvalidRelation()` 没有 allEnabled 门禁
+Webdav2CloudTask.java:33, 68 注释都写“间隔5分钟”
+ShortDramaTask.java:46 `fixedDelay = 11 * 60, timeUnit = MINUTES`</div>
+    <div class="fix-box">
+      <div class="fix-label">最小修复</div>
+      <code>1. 将所有 @Scheduled 入口统一接入同一个 enable guard。
+2. 用常量或 Duration 表达式替代裸数字。
+3. 修正文档与注释，避免值和语义脱节。</code>
+    </div>
+    <div class="fix-box" style="margin-top:6px;background:#fff8e1;border-color:#ffe082">
+      <strong>⏱ 预计工作量：</strong> 2-4 小时 &nbsp;·&nbsp; <strong>回归建议：</strong> 增加任务门禁单元测试，验证 `task.all-enabled=false` 时不会执行任何业务任务；同时对周期值做常量断言。
+    </div>
+  </div>
+
+  <div class="finding severity-medium">
+    <div class="finding-header">
+      <h4>8. `EmbyProxy` / `VirtualService` 等超大类叠加死代码，SRP 与 KISS 明显失守</h4>
+      <span class="badge badge-medium">Medium</span>
+      <span class="badge badge-confirmed">已确认</span>
+    </div>
+    <div class="finding-meta">
+      <span>📁 可维护性 / 设计</span>
+      <span>📍 EmbyProxy.java(1130 LOC, 33 methods)；VirtualService.java(578 LOC)；OldVideoRedirectService.java(459 LOC)；ThreadUtil.java:26-31</span>
+      <span>🎯 EmbyProxy / VirtualService / OldVideoRedirectService / ThreadUtil</span>
+    </div>
+    <div class="problem">
+      <strong>问题：</strong>`EmbyProxy` 集中承担集合管理、条目查询、远端调用、缓存拼装、下一集预热、关系表更新等大量责任，`VirtualService` 也把视图构建、缓存、数据库映射和 HTTP 响应混在一起。更糟的是，仓库里还保留了整文件注释掉的 `OldVideoRedirectService`，以及带 RSA 调试 `main` 的 `ThreadUtil`。这不是单纯“代码长”，而是责任边界、历史包袱和运行工具混杂在一起，后续任何改动都更难定位 blast radius。
+    </div>
+    <div class="evidence">wc -l:
+EmbyProxy.java 1130
+VirtualService.java 578
+VideoRedirectService.java 517
+OriginReqService.java 416
+OldVideoRedirectService.java 459
+EmbyProxy methods=33
+VirtualService methods=23
+OldVideoRedirectService.java:1-80 整块注释文件
+ThreadUtil.java:26-31 保留 RSA 调试 main</div>
+    <div class="fix-box">
+      <div class="fix-label">最小修复</div>
+      <code>1. 先删除整块死代码与无关调试 main。
+2. 将 EmbyProxy 拆成“远端查询”“集合操作”“预热/关系维护”等协作者。
+3. 将 VirtualService 的视图拼装与 HTTP 输出分离。</code>
+    </div>
+    <div class="fix-box" style="margin-top:6px;background:#fff8e1;border-color:#ffe082">
+      <strong>⏱ 预计工作量：</strong> 2-4 天 &nbsp;·&nbsp; <strong>回归建议：</strong> 在拆分类前先锁定现有对外行为，给集合查询、NextUp、Latest、Items/Resume 等主路径补回归测试，再做分批重构。
+    </div>
+  </div>
+
+  <div class="finding severity-medium">
+    <div class="finding-header">
+      <h4>9. API 输入边界缺少校验，非法 `cloud` 参数会在 CloudUtil 深处触发空指针</h4>
+      <span class="badge badge-medium">Medium</span>
+      <span class="badge badge-confirmed">已确认</span>
+    </div>
+    <div class="finding-meta">
+      <span>📁 类型安全 / 后端 API</span>
+      <span>📍 pom.xml:84-87；DebugController.java:59-81；CloudStorageType.java:29-39；CloudUtil.java:128-146, 206-218, 230-255</span>
+      <span>🎯 DebugController / CloudStorageType / CloudUtil</span>
+    </div>
+    <div class="problem">
+      <strong>问题：</strong>项目把 `spring-boot-starter-validation` 注释掉了，控制器也没有 `@Validated` 或参数约束。`DebugController` 直接把字符串 `cloud` 映射为 `CloudStorageType.of(cloud)`，该方法找不到值时返回 `null`；而 `CloudUtil.getFileMatch()`、`getDownloadUrl()`、`getDownloadUrlOnCopy()` 随后会调用 `cloudStorage.equals(...)`，导致非法输入直接在服务深处变成 NPE。这种边界弱化既不 fail-fast，也让错误响应不可预测。
+    </div>
+    <div class="evidence">pom.xml:84-87 `spring-boot-starter-validation` 被注释
+CloudStorageType.java:29-39 非法值返回 null
+DebugController.java:59-81 直接传入 cloud / filePath / size
+CloudUtil.java:134-143, 213-218, 236-255 对 cloudStorage 直接 equals</div>
+    <div class="fix-box">
+      <div class="fix-label">最小修复</div>
+      <code>1. 启用 `spring-boot-starter-validation`。
+2. 将 `cloud` 改成枚举解析失败立即返回 400，而不是返回 null。
+3. 对 `filePath`、`size`、`deviceId` 加显式约束，并统一错误响应。</code>
+    </div>
+    <div class="fix-box" style="margin-top:6px;background:#fff8e1;border-color:#ffe082">
+      <strong>⏱ 预计工作量：</strong> 4-8 小时 &nbsp;·&nbsp; <strong>回归建议：</strong> 增加非法 `cloud`、空 `filePath`、负数 `size` 的接口测试，断言返回 400 且不会进入 CloudUtil 深层逻辑。
+    </div>
+  </div>
+
+  <div class="finding severity-low">
+    <div class="finding-header">
+      <h4>10. README 和启动横幅指向的运维入口与实际路由不一致</h4>
+      <span class="badge badge-low">Low</span>
+      <span class="badge badge-confirmed">已确认</span>
+    </div>
+    <div class="finding-meta">
+      <span>📁 文档 / 发布</span>
+      <span>📍 README.md:1-2；Application.java:47-56；ApiController.java:60-62；src/main/resources/ 下无 `web/index.html` / `doc.html`</span>
+      <span>🎯 README / Application 启动日志</span>
+    </div>
+    <div class="problem">
+      <strong>问题：</strong>README 只有两行，无法指导环境准备、运行方式、配置来源或回滚流程；启动日志又声称存在 `/web/index.html`、`/health/time`、`/doc.html`，但仓库资源目录里并无这些静态资源，真实时间接口是 `/api/time`。这会直接误导值班和新接手同学，增加排障时间。
+    </div>
+    <div class="evidence">README.md:1-2
+Application.java:50-52 输出 `/web/index.html` `/health/time` `/doc.html`
+ApiController.java:60-62 实际仅有 `/api/time`
+src/main/resources 仅存在 application*.yml / log4j2.xml / mybatis-flex.config</div>
+    <div class="fix-box">
+      <div class="fix-label">最小修复</div>
+      <code>1. 修正启动横幅中的 URL。
+2. README 至少补齐启动步骤、必需环境变量、profile 说明、常见运维入口与发布流程。
+3. 若没有 doc.html，就不要在日志中暗示它存在。</code>
+    </div>
+    <div class="fix-box" style="margin-top:6px;background:#fff8e1;border-color:#ffe082">
+      <strong>⏱ 预计工作量：</strong> 1-2 小时 &nbsp;·&nbsp; <strong>回归建议：</strong> 为 README 与启动 banner 建一个简单的人工 checklist，发布前核对路由和文档链接是否真实存在。
+    </div>
+  </div>
+
+  <div class="finding severity-low">
+    <div class="finding-header">
+      <h4>11. `hutool-all` 与双数据库驱动一起扩大了 classpath 和升级面</h4>
+      <span class="badge badge-low">Low</span>
+      <span class="badge badge-confirmed">已确认</span>
+    </div>
+    <div class="finding-meta">
+      <span>📁 依赖重量</span>
+      <span>📍 pom.xml:157-198</span>
+      <span>🎯 Maven 依赖面</span>
+    </div>
+    <div class="problem">
+      <strong>问题：</strong>`pom.xml` 引入了 `hutool-all`、MySQL 驱动、PostgreSQL 驱动和一整套 Spring Cloud/OpenFeign 依赖，但仓库中没有任何依赖裁剪、unused dependency 检查或 classpath 体积约束。`hutool-all` 会把很多未必使用到的模块带进来，双数据库驱动也增大了升级和 CVE 排查面。
+    </div>
+    <div class="evidence">pom.xml:157-166 `guava` + `hutool-all`
+pom.xml:180-198 `mysql-connector-j` + `postgresql`
+pom.xml 中未见 `maven-dependency-plugin`、`enforcer`、`jacoco` 或依赖裁剪规则</div>
+    <div class="fix-box">
+      <div class="fix-label">最小修复</div>
+      <code>1. 用具体 hutool 子模块替代 `hutool-all`。
+2. 明确数据库驱动 scope，并确认是否都必须跟随主应用发布。
+3. 加入依赖分析或 enforcer 规则，防止 classpath 继续膨胀。</code>
+    </div>
+    <div class="fix-box" style="margin-top:6px;background:#fff8e1;border-color:#ffe082">
+      <strong>⏱ 预计工作量：</strong> 2-4 小时 &nbsp;·&nbsp; <strong>回归建议：</strong> 增加一次依赖审计任务，比较替换前后的依赖树与打包体积，确保功能不回退。
+    </div>
+  </div>
+
+  <h3 class="section-title" id="architecture">🏗️ 架构与模块边界</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 1 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>`EmbyProxy` / `VirtualService` 等超大类叠加死代码，边界过宽</td><td><span class="badge badge-medium">Medium</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证结构优点</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 入口分层仍然清晰：`/api/**` 控制器与代理过滤链分离</div>
+        <div class="check-item"><span class="check">✓</span> 外部访问集中在 `sao.client` / `sao.proxy`，DAO 与任务类命名规则一致</div>
+        <div class="check-item"><span class="check">✓</span> 配置对象大多通过 `@ConfigurationProperties` 管理，而不是散落静态读取</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="security">🔒 安全</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 3 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>本地资源与工具常量中包含真实凭据，打包产物会直接带出</td><td><span class="badge badge-critical">Critical</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>`/api/debug/**` 与 `/api/build|clear/**` 无鉴权且用 GET 暴露管理能力</td><td><span class="badge badge-critical">Critical</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>AccessLog / OriginReqService 会把 `api_key` 和完整请求头写入日志</td><td><span class="badge badge-high">High</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证安全优点</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> `application*.yml` 已被 `.gitignore` 排除出版本控制，说明团队有本地 secrets 不入仓意识</div>
+        <div class="check-item"><span class="check">✓</span> 外部 HTTP/Feign 调用普遍设置了 5 秒级超时，避免安全故障无限挂起</div>
+        <div class="check-item"><span class="check">✓</span> 非 API 请求大多统一经 `EmbyProxyFilter` 进入，安全收口点并非完全分散</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="stability">⚡ 稳定性与错误处理</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 2 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>Redis 锁实现既 fail-open 又无 owner 校验，互斥语义不成立</td><td><span class="badge badge-high">High</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>定时任务开关不一致且注释与真实周期不符</td><td><span class="badge badge-medium">Medium</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证稳健点</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> Hikari、Redis、Feign、Jetty 都配置了显式超时或容量上限</div>
+        <div class="check-item"><span class="check">✓</span> `OriginReqService.notGetReq()` 在 finally 中清理刷新缓存，避免常见脏缓存遗留</div>
+        <div class="check-item"><span class="check">✓</span> 多数定时任务至少已有统一的 `task.all-enabled` 设计意图，可在现有基础上收敛</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="performance">🚀 性能与可扩展性</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 1 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>线程限流决策在播放热路径上全量扫描 Redis key，并用 `synchronized` 串行化</td><td><span class="badge badge-medium">Medium</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证性能护栏</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> Hikari 连接池和 Jetty 线程池都有上界，不是无界资源模型</div>
+        <div class="check-item"><span class="check">✓</span> `emby.origin-cache-max-body-bytes` 已限制原始响应缓存体积</div>
+        <div class="check-item"><span class="check">✓</span> Redis 前缀删除使用了 `unlink`，避免大 key 删除阻塞主线程</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="testing">🧪 测试质量</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 1 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>关键安全与入口链路没有测试，Java 25 下测试工具链已出现未来兼容告警</td><td><span class="badge badge-high">High</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证测试亮点</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 最近的 `VideoRedirectService`、`OriginReqService`、`PicRedirectService` 回归测试覆盖了复杂分支</div>
+        <div class="check-item"><span class="check">✓</span> `EmbyConfigTest`、`PathUtilTest`、`IpUtilTest` 说明已有小步补测的习惯</div>
+        <div class="check-item"><span class="check">✓</span> `mvn test` 当前可通过，说明仓库还没有到“测试基线已坏”的阶段</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="maintainability">📐 可维护性</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 2 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>`EmbyProxy` / `VirtualService` 等超大类叠加死代码，SRP 与 KISS 明显失守</td><td><span class="badge badge-medium">Medium</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>README 和启动横幅指向的运维入口与实际路由不一致</td><td><span class="badge badge-low">Low</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证维护基础</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 层级命名整体统一：`*Proxy`、`*Dao`、`*TaskService`、`*Config` 可快速定位职责</div>
+        <div class="check-item"><span class="check">✓</span> `docs/code_readability_optimization_20260609.md` 记录了近期小步重构与补测思路</div>
+        <div class="check-item"><span class="check">✓</span> 新增测试与逻辑整理倾向保持行为不变，这对渐进重构是加分项</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="design">🧭 设计原则符合度</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 3 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>Redis 锁实现既 fail-open 又无 owner 校验，Fail-Fast 与单一职责同时失守</td><td><span class="badge badge-high">High</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>`EmbyProxy` / `VirtualService` 等超大类叠加死代码，SRP 与 KISS 明显失守</td><td><span class="badge badge-medium">Medium</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>API 输入边界缺少校验，非法 `cloud` 参数会在深层触发空指针</td><td><span class="badge badge-medium">Medium</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证设计亮点</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> `@ConfigurationProperties` 的使用优于在业务代码中遍地读取环境变量</div>
+        <div class="check-item"><span class="check">✓</span> 图片、视频、原始请求分别已有独立 service，拆分方向是正确的</div>
+        <div class="check-item"><span class="check">✓</span> 最近对配置解析与重定向分支的收敛说明团队接受渐进式清理，而非一次性重写</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="release">📦 发布与部署过程</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 5 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>本地资源与工具常量中包含真实凭据，打包产物会直接带出</td><td><span class="badge badge-critical">Critical</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>关键安全与入口链路没有测试，Java 25 下测试工具链已出现未来兼容告警</td><td><span class="badge badge-high">High</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>定时任务开关不一致且注释与真实周期不符</td><td><span class="badge badge-medium">Medium</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>README 和启动横幅指向的运维入口与实际路由不一致</td><td><span class="badge badge-low">Low</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>`hutool-all` 与双数据库驱动一起扩大了 classpath 和升级面</td><td><span class="badge badge-low">Low</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证发布基线</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 2026-06-10 当天 `mvn test` 与 `mvn -DskipTests package` 都能通过</div>
+        <div class="check-item"><span class="check">✓</span> Spring Boot Maven 插件已配置可重打包主类</div>
+        <div class="check-item"><span class="check">✓</span> 配置文件已经按 local / prod / homac 分 profile 拆开，具备外置化改造基础</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="documentation">📚 文档准确性</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 1 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>README 和启动横幅指向的运维入口与实际路由不一致</td><td><span class="badge badge-low">Low</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证文档资产</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 仓库至少保留了一份可读性优化记录，说明不是完全无工程文档</div>
+        <div class="check-item"><span class="check">✓</span> 大部分类和方法有中文 JavaDoc，阅读门槛低于纯无注释代码</div>
+        <div class="check-item"><span class="check">✓</span> 近期文档对“保持行为不变”的边界描述较清楚，便于后续小步重构</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="configuration">⚙️ 配置安全</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 2 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>本地资源与工具常量中包含真实凭据，打包产物会直接带出</td><td><span class="badge badge-critical">Critical</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>定时任务开关不一致且注释与真实周期不符</td><td><span class="badge badge-medium">Medium</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证配置优点</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> Redis、Hikari、Feign、Jetty 都有显式超时与池配置，不是完全默认值驱动</div>
+        <div class="check-item"><span class="check">✓</span> 多环境 profile 已经拆开，后续迁移到外部配置不会从零开始</div>
+        <div class="check-item"><span class="check">✓</span> `ConfigurationPropertiesScan` 已启用，配置聚合方式基本一致</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="observability">📈 可观测性</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 1 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>AccessLog / OriginReqService 会把 `api_key` 和完整请求头写入日志</td><td><span class="badge badge-high">High</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证观测手段</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 已区分 `access.log` 与 `app.log`，且配置了 rolling policy</div>
+        <div class="check-item"><span class="check">✓</span> 多数关键链路会记录状态码和耗时，排查性能问题并非完全盲飞</div>
+        <div class="check-item"><span class="check">✓</span> 入口过滤器 finally 里统一打点，日志覆盖面较完整</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="fallback">🪂 Fallback / 防御式代码</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 1 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>Redis 锁实现既 fail-open 又无 owner 校验，属于隐藏真实故障的 defensive guess</td><td><span class="badge badge-high">High</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证 fallback 优点</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 图片不存在等已知分支通常会显式返回 404/204，而非完全吞错</div>
+        <div class="check-item"><span class="check">✓</span> 原始请求缓存体积和可缓存类型已有显式判断，不是无界缓存</div>
+        <div class="check-item"><span class="check">✓</span> 一部分 finally 清理逻辑做到了“失败也收尾”，具备可收敛基础</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="testing-authenticity">🧬 测试真实性</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 1 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>关键安全与入口链路没有测试，现有 Mockito 单元测试无法代表真实发布信心</td><td><span class="badge badge-high">High</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证真实回归价值</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 最近测试覆盖了重定向缓存、路径映射、非 GET 转发等真实 bug 高发点</div>
+        <div class="check-item"><span class="check">✓</span> 测试不是只有 getter/setter，而是对具体输入输出行为做断言</div>
+        <div class="check-item"><span class="check">✓</span> 可读性优化文档与新增测试配套，说明至少部分重构遵守“先锁行为”原则</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="type-safety">🔤 类型安全</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 1 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>API 输入边界缺少校验，非法 `cloud` 参数会在 CloudUtil 深处触发空指针</td><td><span class="badge badge-medium">Medium</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证类型基础</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 媒体类型、图片类型、云盘类型等核心概念已经枚举化，而不是全部裸字符串</div>
+        <div class="check-item"><span class="check">✓</span> 通用响应 `Rsres` 统一了 API 返回壳层</div>
+        <div class="check-item"><span class="check">✓</span> 多数配置对象通过强类型属性类承载，而不是到处 `Map` 取值</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="frontend-state">🖥️ 前端状态</h3>
+  <div class="card">
+    <div class="card-header">✅ 无发现</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> `src/main/resources` 未发现 React / Vue / TS / JS 前端源码</div>
+        <div class="check-item"><span class="check">✓</span> 仓库没有前端构建配置或浏览器端状态容器</div>
+        <div class="check-item"><span class="check">✓</span> 该维度对当前纯后端仓库按 N/A 处理</div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证适用性检查</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 主要 UI 痕迹仅是启动横幅和日志文本，不存在组件状态管理逻辑</div>
+        <div class="check-item"><span class="check">✓</span> 审计重点应留在代理链路、配置和后台任务，而不是前端渲染</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="backend-api">🛣️ 后端 API</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 2 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>`/api/debug/**` 与 `/api/build|clear/**` 无鉴权且用 GET 暴露管理能力</td><td><span class="badge badge-critical">Critical</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>API 输入边界缺少校验，非法 `cloud` 参数会在 CloudUtil 深处触发空指针</td><td><span class="badge badge-medium">Medium</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证 API 基础</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> `Rsres` 统一了 `/api/**` 的返回结构，调用方语义相对一致</div>
+        <div class="check-item"><span class="check">✓</span> `/api` 路由数量很少，治理成本低，适合尽快加鉴权和验证</div>
+        <div class="check-item"><span class="check">✓</span> `DebugController` 与业务控制器已物理分离，后续按 profile 收口较容易</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="dependency-weight">🧱 依赖重量</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 1 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>`hutool-all` 与双数据库驱动一起扩大了 classpath 和升级面</td><td><span class="badge badge-low">Low</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证依赖基础</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 版本号集中在 `pom.xml` properties 区，升级入口相对集中</div>
+        <div class="check-item"><span class="check">✓</span> 大多数依赖都能映射到明确能力：Web、Feign、Redis、MyBatis-Flex、Brotli、日志</div>
+        <div class="check-item"><span class="check">✓</span> Maven 构建当前未出现依赖冲突导致的直接失败</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="code-consistency">📏 代码一致性</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 2 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>定时任务开关不一致且注释与真实周期不符</td><td><span class="badge badge-medium">Medium</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>`EmbyProxy` / `VirtualService` 等超大类叠加死代码，历史风格没有清完</td><td><span class="badge badge-medium">Medium</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证一致性基础</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 包结构、类后缀和职责命名整体仍有稳定模式</div>
+        <div class="check-item"><span class="check">✓</span> 配置类、任务类、代理类各自有统一放置目录</div>
+        <div class="check-item"><span class="check">✓</span> 最近的整理已经在把裸 `Console` 输出迁回 Slf4j，这个方向是正确的</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="comment-coverage">💬 注释覆盖</h3>
+  <div class="card">
+    <div class="card-header">已确认 <span style="font-weight:400;font-size:13px;color:var(--text-secondary)">· 2 个发现</span></div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>发现</th><th style="width:100px">严重程度</th><th style="width:100px">状态</th></tr></thead>
+          <tbody>
+            <tr><td>定时任务注释和真实周期不一致，属于误导性注释</td><td><span class="badge badge-medium">Medium</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+            <tr><td>启动横幅宣称存在不存在的路由，属于误导性运行文案</td><td><span class="badge badge-low">Low</span></td><td><span class="badge badge-confirmed">Confirmed</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已验证注释基础</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 主要类和关键方法普遍带有中文 JavaDoc，阅读入口不差</div>
+        <div class="check-item"><span class="check">✓</span> 近期重构文档明确写了“保留原行为”的边界，说明注释能承载真实设计意图</div>
+        <div class="check-item"><span class="check">✓</span> 核心业务注释数量足够，但需要继续清理与代码脱节的老文案</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="principles">📋 Principles Compliance</h3>
+  <div class="card">
+    <div class="card-header">违反的原则</div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>原则</th><th>次数</th><th style="width:100px">严重程度</th><th>影响区域</th></tr></thead>
+          <tbody>
+            <tr><td>Single Responsibility (1.1)</td><td>3</td><td><span class="badge badge-medium">Medium</span></td><td>`EmbyProxy`、`VirtualService`、`ApiController`</td></tr>
+            <tr><td>File Size Limit (1.2)</td><td>4</td><td><span class="badge badge-medium">Medium</span></td><td>`EmbyProxy`、`VirtualService`、`VideoRedirectService`、`OriginReqService`</td></tr>
+            <tr><td>Fail-Fast (4.4)</td><td>3</td><td><span class="badge badge-high">High</span></td><td>`RedisLockClient`、`DebugController`、`CloudUtil`</td></tr>
+            <tr><td>KISS (4.3)</td><td>2</td><td><span class="badge badge-medium">Medium</span></td><td>超大代理类与历史注释文件并存</td></tr>
+            <tr><td>YAGNI (4.2)</td><td>2</td><td><span class="badge badge-low">Low</span></td><td>`OldVideoRedirectService`、`ThreadUtil.main`</td></tr>
+            <tr><td>Principle of Least Privilege (4.6)</td><td>2</td><td><span class="badge badge-critical">Critical</span></td><td>管理接口暴露面、凭据打包</td></tr>
+            <tr><td>Boolean / Stringly Typed Boundary (3.5 / type-safety)</td><td>1</td><td><span class="badge badge-medium">Medium</span></td><td>Debug API 的 `cloud` 字符串边界</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">✅ 已遵守的原则</div>
+    <div class="card-body">
+      <div class="check-list">
+        <div class="check-item"><span class="check">✓</span> 依赖与配置尽量集中在 Spring 组件和属性类中，没有到处散落系统属性读取</div>
+        <div class="check-item"><span class="check">✓</span> 多数外部调用存在显式超时，避免最基础的无限阻塞</div>
+        <div class="check-item"><span class="check">✓</span> 最近几处重构采用“先锁测试，再整理实现”的低风险推进方式</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title" id="fix-order">🎯 Recommended Fix Order</h3>
+
+  <div class="card">
+    <div class="card-header">
+      <span>⚡ 立即修复</span>
+      <span class="badge badge-critical">Blocker</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>修复项</th><th>工作量</th><th>主要风险</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>移除工作树 secrets 与 `EmbyUtil` 硬编码，并保证 jar 不再内置真实凭据</td><td>1-2 天</td><td>当前产物可直接泄露数据库、云盘和 Emby 凭据</td></tr>
+            <tr><td>2</td><td>给 `/api/debug/**`、`/api/build|clear/**` 加管理员鉴权 / profile 门禁，并将副作用 GET 改成 POST/DELETE</td><td>1-2 天</td><td>未授权用户可直接获取 token 或触发后台操作</td></tr>
+            <tr><td>3</td><td>对访问日志和错误日志做脱敏，禁止写入 `api_key`、Authorization、完整 header</td><td>2-4 小时</td><td>日志会放大凭据泄露面</td></tr>
+            <tr><td>4</td><td>把 Redis 锁改成 owner-token + compare-and-delete，Redis 故障时不要静默放行</td><td>0.5-1 天</td><td>高并发下会出现双执行、误删锁和难复现抖动</td></tr>
+            <tr><td>5</td><td>为 debug API 增加参数验证，非法输入统一返回 400</td><td>4-8 小时</td><td>当前非法参数会在服务深层以 NPE 方式爆炸</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span>🛡 稳定发布前</span>
+      <span class="badge badge-high">High</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>修复项</th><th>工作量</th><th>主要风险</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>补齐控制器、过滤器、配置打包和调度门禁的集成测试，并修复 Mockito Java 25 agent 配置</td><td>1-2 天</td><td>现在的绿测不能覆盖权限边界和发布链路</td></tr>
+            <tr><td>2</td><td>统一所有定时任务的 enable gate，修正注释与真实周期</td><td>2-4 小时</td><td>禁用环境仍可能跑任务，运维认知也会出错</td></tr>
+            <tr><td>3</td><td>修正 README 与启动 banner，补齐运行手册、环境说明和基本排障入口</td><td>1-2 小时</td><td>值班与交接时会直接踩文档坑</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span>📅 计划后排</span>
+      <span class="badge badge-medium">Medium</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>修复项</th><th>工作量</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>将 `EmbyProxy` / `VirtualService` 拆成更小的协作者，删除 `OldVideoRedirectService` 死文件</td><td>2-4 天</td></tr>
+            <tr><td>2</td><td>把线程限流从 Redis SCAN 模式改为显式计数或集合基数模型</td><td>0.5-1 天</td></tr>
+            <tr><td>3</td><td>裁剪 `hutool-all` 和不必要的数据库/工具依赖，缩小升级面</td><td>2-4 小时</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span>🧊 暂不处理</span>
+      <span class="badge badge-low">Low</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>修复项</th><th>工作量</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>无。当前低优先级问题都能和高优先级治理顺手一起收掉，不建议单独挂起</td><td>-</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="section-title">⚡ Quick Wins</h3>
+  <div class="win-grid">
+    <div class="win-card">
+      <div class="win-title">访问日志脱敏</div>
+      <div class="win-meta">2-4 小时；风险立减，几乎不动业务逻辑</div>
+    </div>
+    <div class="win-card">
+      <div class="win-title">DebugController 加 profile 门禁</div>
+      <div class="win-meta">1-2 小时；可以先止血，再逐步补鉴权</div>
+    </div>
+    <div class="win-card">
+      <div class="win-title">统一 task.all-enabled</div>
+      <div class="win-meta">1-2 小时；能立刻降低后台误执行风险</div>
+    </div>
+    <div class="win-card">
+      <div class="win-title">增加打包 secrets 扫描</div>
+      <div class="win-meta">2-4 小时；把“本地能包出敏感 jar”变成自动阻断</div>
+    </div>
+    <div class="win-card">
+      <div class="win-title">修正启动 banner 与 README</div>
+      <div class="win-meta">1 小时；减少值班和交接噪音</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:40px 0 20px;color:var(--text-secondary);font-size:12px">
+    报告基于 2026-06-10 对当前工作树、Maven 构建结果与 full 模式 rubric 的只读审计生成。
+  </div>
+
+</div>
+
+<script>
+  const sections = document.querySelectorAll('[id]');
+  const navLinks = document.querySelectorAll('.sidebar-nav a');
+
+  const observer = new IntersectionObserver((entries) => {
+    let activeId = null;
+    entries.forEach(entry => {
+      if (entry.isIntersecting) activeId = entry.target.id;
+    });
+    if (activeId) {
+      navLinks.forEach(a => {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + activeId);
+      });
+    }
+  }, { rootMargin: '-10% 0px -60% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+
+  navLinks.forEach(a => {
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      const target = document.querySelector(this.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+</script>
+
+</body>
+</html>
