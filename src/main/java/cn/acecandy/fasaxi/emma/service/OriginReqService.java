@@ -3,15 +3,13 @@ package cn.acecandy.fasaxi.emma.service;
 import cn.acecandy.fasaxi.emma.common.resp.EmbyCachedResp;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
-import cn.acecandy.fasaxi.emma.dao.embyboss.service.VideoPathRelationDao;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
 import cn.acecandy.fasaxi.emma.sao.client.RedisLockClient;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
-import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.acecandy.fasaxi.emma.utils.EmbyProxyUtil;
 import cn.acecandy.fasaxi.emma.utils.ExceptUtil;
-import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
+import cn.acecandy.fasaxi.emma.utils.LogSanitizer;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.array.ArrayUtil;
@@ -70,18 +68,9 @@ public class OriginReqService {
     private EmbyProxy embyProxy;
 
     @Resource
-    private CloudUtil cloudUtil;
-
-    @Resource
-    private FileCacheUtil fileCacheUtil;
-
-    @Resource
     private RedisLockClient redisLockClient;
     @Resource
     private ThreadLimitUtil threadLimitUtil;
-    @Resource
-    private VideoPathRelationDao videoPathRelationDao;
-
 
     /**
      * 转发原始请求
@@ -241,11 +230,11 @@ public class OriginReqService {
             if (EmbyProxyUtil.isHttpOk2(cached.getStatusCode())) {
                 log.debug("请求原始转发->[{}-{}:{}ms] {}", cached.getStatusCode(), request.getMethod(),
                         stopWatch.getLastTaskTimeMillis(),
-                        StrUtil.format("{}&api_key={}", request.getParamUri(), embyConfig.getApiKey()));
+                        LogSanitizer.sanitizeUri(request.getParamUri()));
             } else {
                 log.error("请求原始转发->[{}-{}:{}ms] {}", cached.getStatusCode(), request.getMethod(),
                         stopWatch.getLastTaskTimeMillis(),
-                        StrUtil.format("{}&api_key={}", request.getParamUri(), embyConfig.getApiKey()));
+                        LogSanitizer.sanitizeUri(request.getParamUri()));
             }
         }
     }
@@ -273,7 +262,8 @@ public class OriginReqService {
             throw e;
         } else {
             cached.setStatusCode(CODE_599);
-            log.error("请求599[{}]: {}&api_key={}, e:{}", request.getMethod(), request.getParamUri(), embyConfig.getApiKey(), ExceptionUtil.stacktraceToString(e));
+            log.error("请求599[{}]: {}, e:{}", request.getMethod(),
+                    LogSanitizer.sanitizeUri(request.getParamUri()), ExceptionUtil.stacktraceToString(e));
             throw e;
         }
     }

@@ -3,12 +3,13 @@ package cn.acecandy.fasaxi.emma.utils;
 import cn.acecandy.fasaxi.emma.common.vo.HeadVO;
 import cn.acecandy.fasaxi.emma.common.vo.HttpReqVO;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
+import cn.acecandy.fasaxi.emma.config.OpConfig;
 import cn.acecandy.fasaxi.emma.config.TmdbConfig;
 import cn.acecandy.fasaxi.emma.sao.proxy.TmdbProxy;
 import cn.hutool.v7.core.collection.CollUtil;
+import cn.hutool.v7.core.io.file.FileUtil;
 import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.net.url.UrlEncoder;
-import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
@@ -24,7 +25,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static cn.hutool.v7.http.meta.HttpStatus.HTTP_MOVED_TEMP;
 
@@ -37,23 +41,16 @@ import static cn.hutool.v7.http.meta.HttpStatus.HTTP_MOVED_TEMP;
 @Slf4j
 @Component
 public class EmbyUtil {
-    private static final String EMBY_INNER_URL = "http://192.168.1.205:8096";
-    private static final String EMBY_PUBLIC_URL = "http://emby-real.acecandy.cn:800";
-    private static final String EMBY_API_KEY = "b8647127d2fa4ae6b27b6918ed8a0593";
-    private static final String ALIST_ADDR = "http://192.168.1.205:5244";
-    private static final String ALIST_PUBLIC_ADDR = "https://alist.acecandy.cn:880";
-    private static final String ALIST_TOKEN =
-            "alist-1fbc1ca5-4506-49d8-9950-53d9ab7edefaNH7xJwk7OYxNvaEP2Vd5fd9lpIBLanXcfNFZHtMvMQ73YfL4Z0ojIFwAjbFGsccd";
-    private static final Map<String, String> PATH_ALIST_CONFIG = MapUtil.<String, String>builder()
+    private static final Map<String, String> PATH_ALIST_BASE_CONFIG = MapUtil.<String, String>builder()
             .put("Z:\\", "/")
             .put("100PB:", "/115")
-            .put("https://alist.acecandy.cn:880/d/", "/")
-            .put("http://192.168.1.205:5244/d", "/")
             .build();
     @Resource
     private ClientEngine httpClient;
     @Resource
     private EmbyConfig embyConfig;
+    @Resource
+    private OpConfig opConfig;
     @Resource
     private TmdbConfig tmdbConfig;
     @Resource
@@ -103,24 +100,67 @@ public class EmbyUtil {
                 .build();
     }
 
-    public static String replacePath2Alist(String inputPath) {
-        for (Map.Entry<String, String> entry : PATH_ALIST_CONFIG.entrySet()) {
-            String k = entry.getKey();
-            String v = entry.getValue();
-            if (!inputPath.startsWith(k)) {
-                continue;
-            }
-            String changePath = StrUtil.replace(inputPath, k, v);
-            return UrlUtil.normalize(changePath, true, true);
-        }
-        return "";
-    }
-
-    public static String buildAlistPath(String embyUri) {
-        if (StrUtil.isBlank(embyUri)) {
+    public String replacePath2Alist(String inputPath) {
+        if (StrUtil.isBlank(inputPath)) {
             return "";
         }
-        return ALIST_PUBLIC_ADDR + "/d" + UrlEncoder.encodeQuery(embyUri);
+        Map<String, String> aliasConfig = buildPathAliasConfig();
+        String bestMatchKey = aliasConfig.keySet().stream()
+                .filter(prefix -> StrUtil.startWithIgnoreCase(inputPath, prefix))
+                .max(Comparator.comparingInt(String::length))
+                .orElse(null);
+        if (bestMatchKey == null) {
+            return "";
+        }
+        String changePath = StrUtil.replaceIgnoreCase(inputPath, bestMatchKey, aliasConfig.get(bestMatchKey));
+        return normalizeAlistRelativePath(changePath);
+    }
+
+    private Map<String, String> buildPathAliasConfig() {
+        Map<String, String> aliasConfig = new LinkedHashMap<>(PATH_ALIST_BASE_CONFIG.size() + 4);
+        aliasConfig.putAll(PATH_ALIST_BASE_CONFIG);
+        Stream.of(
+                        appendDownloadPathPrefix(embyConfig.getAlistPublic()),
+                        appendDownloadPathPrefix(embyConfig.getAlistInner()),
+                        normalizeDownloadHost(opConfig.getDHost())
+                )
+                .filter(StrUtil::isNotBlank)
+                .forEach(prefix -> aliasConfig.put(prefix, "/"));
+        return aliasConfig;
+    }
+
+    private String appendDownloadPathPrefix(String host) {
+        if (StrUtil.isBlank(host)) {
+            return "";
+        }
+        String normalizedHost = StrUtil.removeSuffix(host, "/");
+        if (StrUtil.endWithIgnoreCase(normalizedHost, "/d")) {
+            return normalizedHost;
+        }
+        return normalizedHost + "/d";
+    }
+
+    private String normalizeDownloadHost(String host) {
+        if (StrUtil.isBlank(host)) {
+            return "";
+        }
+        return StrUtil.removeSuffix(host, "/");
+    }
+
+    private String normalizeAlistRelativePath(String path) {
+        if (StrUtil.isBlank(path)) {
+            return "";
+        }
+        String normalizedPath = FileUtil.normalize(path).replace('\\', '/');
+        normalizedPath = StrUtil.replace(normalizedPath, "//", "/");
+        return StrUtil.startWith(normalizedPath, "/") ? normalizedPath : "/" + normalizedPath;
+    }
+
+    public String buildAlistPath(String embyUri) {
+        if (StrUtil.hasBlank(embyUri, embyConfig.getAlistPublic())) {
+            return "";
+        }
+        return embyConfig.getAlistPublic() + "/d" + UrlEncoder.encodeQuery(embyUri);
     }
 
     /**
@@ -178,12 +218,12 @@ public class EmbyUtil {
      */
     @SneakyThrows
     public String fetchEmbyFilePath(String mediaSourceId) {
-        if (StrUtil.isBlank(mediaSourceId)) {
+        if (StrUtil.hasBlank(mediaSourceId, embyConfig.getHost(), embyConfig.getApiKey())) {
             return "";
         }
         try (Response res = httpClient.send(Request.of(embyConfig.getHost() + "/Items").method(Method.GET)
                 .form(MapUtil.<String, Object>builder("Fields", "Path,MediaSources").put("Ids", mediaSourceId)
-                        .put("Limit", 1).put("api_key", EMBY_API_KEY).map())).sync()) {
+                        .put("Limit", 1).put("api_key", embyConfig.getApiKey()).map())).sync()) {
             if (res.isOk() && JSONUtil.isTypeJSON(res.bodyStr())) {
                 JSONObject resJn = JSONUtil.parseObj(res.bodyStr());
                 String mediaPath = resJn.getJSONArray("Items").getJSONObject(0)

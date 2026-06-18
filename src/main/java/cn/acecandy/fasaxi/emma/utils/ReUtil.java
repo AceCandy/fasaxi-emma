@@ -4,7 +4,6 @@ package cn.acecandy.fasaxi.emma.utils;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.convert.ConvertUtil;
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.lang.mutable.MutablePair;
 import cn.hutool.v7.core.math.NumberUtil;
 import cn.hutool.v7.core.regex.PatternPool;
@@ -249,15 +248,5 @@ public final class ReUtil extends cn.hutool.v7.core.regex.ReUtil {
 
         // 首字母大写后重新拼接
         return StrUtil.join("-", parts.stream().map(StrUtil::upperFirst).toList());
-    }
-
-    public static void main(String[] args) {
-        Console.log(parseTvNameSeason("我不是药神2023"));
-        Console.log(parseTvNameSeason("我不是药神第六季"));
-        Console.log(parseTvNameSeason("我不是药神3"));
-        Console.log(parseTvNameSeason("我不是药神"));
-        Console.log(parseTvNameSeason("我不是药神第2季"));
-        Console.log(parseTvNameSeason("我不是药神 第一季"));
-        Console.log(parseTvNameSeason("我不是药神 第4季"));
     }
 }

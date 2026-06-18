@@ -47,13 +47,12 @@ public class Application {
         log.info("""
                  \r----------------------------------------------------------
                  {}[{}] 已启动!
-                 请求路径: {}/web/index.html
-                 健康检查: {}/health/time
-                 接口文档: {}/doc.html
+                 健康检查: {}/api/time
+                 管理接口: 默认关闭，需显式配置 admin-api
                  ----------------------------------------------------------
                  """,
                 env.getProperty("spring.application.name"), env.getProperty("spring.profiles.active"),
-                uri, uri, uri);
+                uri);
     }
 
     /**

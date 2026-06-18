@@ -14,7 +14,6 @@ import cn.hutool.v7.core.bean.BeanUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.io.file.FileNameUtil;
 import cn.hutool.v7.core.io.file.FileUtil;
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.http.client.HttpDownloader;
@@ -207,13 +206,5 @@ public class ShortDramaTaskService {
         SdJccRank.x().setType(b).setTimeStage(t).setTimeValue(lastTimeStage)
                 .setRankList(rankList).save();
         log.warn("补充榜单[{}]-[{}]的数据", b, lastTimeStage);
-    }
-
-
-    static void main() {
-        Console.log(DateUtil.getLastTimeStage(时间阶段_月, null));
-        Console.log(DateUtil.getLastTimeStage(时间阶段_日, null));
-        Console.log(DateUtil.getLastTimeStage(时间阶段_月, "2024-10-01"));
-        Console.log(DateUtil.getLastTimeStage(时间阶段_日, "2024-10"));
     }
 }

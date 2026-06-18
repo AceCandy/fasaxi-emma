@@ -2,6 +2,7 @@ package cn.acecandy.fasaxi.emma.service;
 
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
+import cn.acecandy.fasaxi.emma.config.OpConfig;
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
 import cn.acecandy.fasaxi.emma.dao.embyboss.service.VideoPathRelationDao;
@@ -147,6 +148,36 @@ class VideoRedirectServiceTest {
         verify(redisLockClient).unlock("lock:video:" + mediaSourceId);
     }
 
+    @Test
+    void processVideo_whenThreadLimitFallsBackToNc2o_shouldUseConfiguredTransferBase() throws Exception {
+        EmbyConfig embyConfig = emptyConfig();
+        embyConfig.setStrmPaths(new String[]{
+                "/mnt/all/cd2/new115/::http://192.168.1.249:5244/d/new115/"
+        });
+        embyConfig.setTransPt3("http://fallback.example.com/p/pt");
+        VideoRedirectService service = buildService(embyConfig);
+
+        String mediaSourceId = "5553064";
+        String realPath = "/mnt/all/cd2/new115/movie/test.mkv";
+        String normalizedPath = "http://192.168.1.249:5244/d/new115/movie/test.mkv";
+
+        EmbyContentCacheReqWrapper request = buildRequest(mediaSourceId);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(redisClient.getStrFindOne(anyList())).thenReturn(null);
+        when(redisLockClient.lock(eq("lock:video:" + mediaSourceId))).thenReturn(true);
+        when(videoPathRelationDao.findById(5553064)).thenReturn(null);
+        when(embyProxy.getItemInfoByCache(mediaSourceId)).thenReturn(ListUtil.of(buildMovieItem(realPath)));
+        when(threadLimitUtil.limitThreadCache(eq(normalizedPath)))
+                .thenReturn(MutablePair.of(CloudStorageType.L_NC2O, ""));
+
+        service.processVideo(request, response);
+
+        assertEquals(SC_FOUND, response.getStatus());
+        assertEquals("http://fallback.example.com/p/new115/movie/test.mkv", response.getHeader("Location"));
+        verify(redisLockClient).unlock("lock:video:" + mediaSourceId);
+    }
+
     private VideoRedirectService buildService(EmbyConfig embyConfig) {
         VideoRedirectService service = new VideoRedirectService();
         ReflectionTestUtils.setField(service, "redisClient", redisClient);
@@ -156,6 +187,9 @@ class VideoRedirectServiceTest {
         ReflectionTestUtils.setField(service, "embyConfig", embyConfig);
         ReflectionTestUtils.setField(service, "threadLimitUtil", threadLimitUtil);
         ReflectionTestUtils.setField(service, "cloudUtil", cloudUtil);
+        OpConfig opConfig = new OpConfig();
+        opConfig.setHost("http://openlist.example.com");
+        ReflectionTestUtils.setField(service, "opConfig", opConfig);
         return service;
     }
 

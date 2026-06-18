@@ -7,7 +7,6 @@ import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.io.file.FileNameUtil;
 import cn.hutool.v7.core.io.file.FileUtil;
 import cn.hutool.v7.core.io.file.PathUtil;
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.lang.tuple.Pair;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.crypto.SecureUtil;
@@ -39,7 +38,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_206;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_500;
-import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电影;
 import static cn.acecandy.fasaxi.emma.common.enums.EmbyMediaType.电视剧_集;
 import static java.nio.file.StandardOpenOption.CREATE;
 import static java.nio.file.StandardOpenOption.WRITE;
@@ -67,10 +65,6 @@ public class FileCacheUtil {
     public static Path getCachePath(String itemId, String mediaType, String filePath) {
         return PathUtil.of(mediaType, itemId,
                 SecureUtil.md5(PathUtil.getLastPathEle(Paths.get(filePath)).toString()));
-    }
-
-    public static void main(String[] args) {
-        Console.log(getCachePath("12345", 电影.getEmbyName(), "/vol2/1000/dockerThirdConf/bili-sync-rs/docker-compose.yml"));
     }
 
     /**
@@ -147,7 +141,7 @@ public class FileCacheUtil {
         log.info("准备写入本地缓存文件->{}", cacheFilePath);
         File tmpTag = FileUtil.touch(cacheFilePair.getRight().toString() + ".tag");
         String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();
-        mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
+        mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath, embyConfig);
         Request originalRequest = Request.of(mediaPath).method(Method.GET)
                 .header("Range", range.toHeader()).setMaxRedirects(1);
         try (Response res = httpClient.send(originalRequest);
@@ -156,7 +150,7 @@ public class FileCacheUtil {
                 throw new RuntimeException(StrUtil.format("下载视频失败: [{}]{}",
                         range.toHeader(), mediaPath));
             }
-            Console.log(res.getStatus());
+            log.debug("缓存文件下载响应状态: {}", res.getStatus());
             fileChannel.position(range.start());
             ReadableByteChannel remoteChannel = Channels.newChannel(res.body().getStream());
             fileChannel.transferFrom(remoteChannel, 0, range.len());
@@ -179,7 +173,7 @@ public class FileCacheUtil {
             return false;
         }
         String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();
-        mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
+        mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath, embyConfig);
         VideoUtil.MoovPos moovPos = switch (embyItem.getContainer()) {
             case "mp4", "mov", "3gp" -> videoUtil.analyzeMp4(mediaPath, embyItem.getSize());
             default -> VideoUtil.MoovPos.builder().start(embyItem.getSize() - 512 * 1024)
@@ -282,11 +276,6 @@ public class FileCacheUtil {
         long actualStart = start;
         long actualEnd = cacheFile.end();
         long actualLen = actualEnd - actualStart + 1;
-
-        /*response.setStatus(HttpServletResponse.SC_FOUND);
-        response.setHeader("Location", "https://alist.acecandy.cn:880/d/local-vol2" +
-                StrUtil.removePrefix(cacheFilePair.getRight().toString(),"/vol2/1000"));
-        return true;*/
 
         try (FileChannel inChannel = FileChannel.open(cacheFile.file().toPath(), StandardOpenOption.READ);
              ServletOutputStream out = response.getOutputStream()) {

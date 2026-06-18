@@ -1,7 +1,9 @@
 package cn.acecandy.fasaxi.emma.sao.config;
 
+import cn.acecandy.fasaxi.emma.utils.LogSanitizer;
 import feign.Logger;
 import feign.Response;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 
 import java.io.IOException;
@@ -24,11 +26,13 @@ public class LogFeignConfig {
         return new TimedFeignLogger();
     }
 
-    public class TimedFeignLogger extends Logger {
+    public static class TimedFeignLogger extends Logger {
+        private static final org.slf4j.Logger log = LoggerFactory.getLogger(TimedFeignLogger.class);
+
         @Override
         protected void log(String configKey, String format, Object... args) {
-            // 默认日志打印（可自定义格式）
-            System.out.printf("[%s] %s%n", configKey, String.format(format, args));
+            String message = (args == null || args.length == 0) ? format : String.format(format, args);
+            log.debug("[{}] {}", configKey, LogSanitizer.sanitizeTextForLog(message));
         }
 
         @Override

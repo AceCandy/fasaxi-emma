@@ -1,9 +1,7 @@
 package cn.acecandy.fasaxi.emma.config;
 
 import cn.hutool.v7.core.collection.CollUtil;
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.map.MapUtil;
-import cn.hutool.v7.core.regex.ReUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -185,18 +183,6 @@ public class EmbyConfig {
      * 本地相关路径
      */
     private List<String> localPaths;
-
-    public static void main(String[] args) {
-        String s = "^/emby/Users/[a-zA-Z0-9]+/Items/[0-9]+$";
-        String s1 = "/Items/([0-9]+)$";
-        String url = "/emby/Users/656fcefa283149708880b416786e5fde/Items/1417552";
-        String url1 = "/emby/Users1/656fcefa283149708880b416786e5fde/Items/1417552";
-        String url2 = "/emby/Users1/656fcefa283149708880b416786e5fde/Items/1417552/123";
-        Console.log(ReUtil.isMatch(s, url));
-        Console.log(ReUtil.getGroup1(s1, url));
-        Console.log(ReUtil.isMatch(s, url1));
-        Console.log(ReUtil.isMatch(s, url2));
-    }
 
     public Map<String, String> getLocalPathMap() {
         if (CollUtil.isEmpty(localPaths)) {

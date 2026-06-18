@@ -39,27 +39,6 @@ public class VideoUtil {
     @Resource
     private ClientEngine httpClient;
 
-    public static void main(String[] args) {
-        /*try {
-            // 示例：分析指定URL的MP4视频
-            String videoUrl = "http://alist.netcup-1o2.worldline.space/p/pt/Emby1/%E5%9B%BD%E4%BA%A7%E5%89%A7/%E5%AD%A4%E5%B2%9B%E9%A3%9E%E9%B9%B0%20%282012%29/Season%201/%E5%AD%A4%E5%B2%9B%E9%A3%9E%E9%B9%B0%20-%20S01E21%20-%20%E7%AC%AC21%E9%9B%86%20-%20QHStudIo.mp4";
-            VideoUtil analyzer = new VideoUtil();
-
-            // 方法1：直接从HTTP请求分析（推荐）
-            MoovPos position = analyzer.analyzeMp4(videoUrl, 0L);
-            if (position != null) {
-                System.out.println("找到moov BOX:");
-                System.out.println("  起始位置: " + position.getStart() + " 字节");
-                System.out.println("  大小: " + position.getSize() + " 字节");
-                System.out.println("  相对位置: " + position.getPosDesc());
-            } else {
-                System.out.println("未找到moov BOX，可能需要扩展搜索范围或使用其他方法。");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }*/
-    }
-
     /**
      * 核心Box查找逻辑（支持偏移校正）
      *

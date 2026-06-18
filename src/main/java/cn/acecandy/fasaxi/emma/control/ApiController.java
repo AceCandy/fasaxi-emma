@@ -23,7 +23,10 @@ import cn.hutool.v7.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -63,14 +66,14 @@ public class ApiController {
     }
 
     // 更新对应合集
-    @GetMapping("/obtainCollection")
-    public Rsres<Void> obtainCollection(Long collectionId) {
+    @PostMapping("/obtainCollection")
+    public Rsres<Void> obtainCollection(@RequestParam Long collectionId) {
         collectionTaskService.obtainCollection(collectionId);
         return Rsres.success();
     }
 
     // 清除db无用图片
-    @GetMapping("/clear/db-pic")
+    @DeleteMapping("/clear/db-pic")
     public Rsres<Object> clearDbPic() {
         int removeCnt = 0;
         int pageNum = 1;
@@ -103,7 +106,7 @@ public class ApiController {
     }
 
     // 清除缓存文件
-    @GetMapping("/clear/file-cache")
+    @DeleteMapping("/clear/file-cache")
     public Rsres<Object> clearFileCache() {
         int removeCnt = 0;
         int pageNum = 1;
@@ -135,16 +138,16 @@ public class ApiController {
     }
 
     // 构建tmdb&豆瓣本地库
-    @GetMapping("/build/tmdb-douban")
-    public Rsres<Object> buildTmdbDouban(Integer min, Integer max) {
-        String uniqueKey = "unique:tmdbId";
+    @PostMapping("/build/tmdb-douban")
+    public Rsres<Object> buildTmdbDouban(@RequestParam(required = false) Integer min,
+                                         @RequestParam(required = false) Integer max) {
         tmdbProviderTaskService.syncTmdbProvider(min, max);
         return Rsres.success("构建tmdb&豆瓣本地库==>执行中");
     }
 
 
     // 构建tmdb&豆瓣本地库-补全豆瓣id
-    @GetMapping("/build/completion-doubanId")
+    @PostMapping("/build/completion-doubanId")
     public Rsres<Object> buildCompletionDoubanId() {
         ThreadUtil.execAsync(() -> {
             tmdbProviderTaskService.completionDoubanId();
@@ -153,7 +156,7 @@ public class ApiController {
     }
 
     // 构建tmdb&豆瓣本地库-补全豆瓣json
-    @GetMapping("/build/completion-doubanInfo")
+    @PostMapping("/build/completion-doubanInfo")
     public Rsres<Object> buildCompletionDoubanInfo() {
         String uniqueKey = "unique:doubanInfo";
         List<TmdbProvider> tmdbProviders = tmdbProviderDao.findAllNoDouBanInfo();

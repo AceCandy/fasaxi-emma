@@ -13,21 +13,17 @@ import cn.acecandy.fasaxi.emma.sao.out.EmbyItem;
 import cn.acecandy.fasaxi.emma.sao.proxy.EmbyProxy;
 import cn.acecandy.fasaxi.emma.utils.CacheUtil;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
-import cn.acecandy.fasaxi.emma.utils.FileCacheUtil;
 import cn.acecandy.fasaxi.emma.utils.PathUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadLimitUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.date.DateUtil;
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.lang.mutable.MutablePair;
 import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.net.url.UrlDecoder;
 import cn.hutool.v7.core.net.url.UrlEncoder;
 import cn.hutool.v7.core.net.url.UrlQueryUtil;
-import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.core.text.split.SplitUtil;
-import cn.hutool.v7.http.client.engine.ClientEngine;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.SneakyThrows;
@@ -43,7 +39,6 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_204;
 import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_404;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_MICU;
 import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.L_NC2O;
-import static cn.acecandy.fasaxi.emma.common.enums.CloudStorageType.R_123;
 import static cn.acecandy.fasaxi.emma.sao.client.RedisLockClient.buildVideoLock;
 
 /**
@@ -60,9 +55,6 @@ public class VideoRedirectService {
     private ThreadLimitUtil threadLimitUtil;
 
     @Resource
-    private ClientEngine httpClient;
-
-    @Resource
     private RedisClient redisClient;
 
     @Resource
@@ -70,9 +62,6 @@ public class VideoRedirectService {
 
     @Resource
     private EmbyProxy embyProxy;
-
-    @Resource
-    private FileCacheUtil fileCacheUtil;
 
     @Resource
     private CloudUtil cloudUtil;
@@ -267,8 +256,7 @@ public class VideoRedirectService {
     private RedirectResult processCloudStoragePath(String originalPath, String mediaPath,
                                                    EmbyContentCacheReqWrapper request) {
         // 默认替换为nc2o路径
-        String realUrl = UrlEncoder.encodeQuery(StrUtil.replace(mediaPath,
-                "http://192.168.1.249:5244/d", "http://195.128.102.208:5244/p"));
+        String realUrl = buildNc2oFallbackUrl(mediaPath);
 
         MutablePair<CloudStorageType, String> cloudTypePair = threadLimitUtil.limitThreadCache(mediaPath);
         CloudStorageType cloudType = cloudTypePair.getLeft();
@@ -281,26 +269,40 @@ public class VideoRedirectService {
         String real302Url = cloudUtil.getDownloadUrlOnCopyByOpenlist(cloudType, request.getUa(),
                 request.getDeviceId(), cloudTypePair.getRight());
 
-        // 如果获取失败且不是115网盘，尝试使用115网盘
-        /*if (StrUtil.isBlank(real302Url) && cloudType.equals(R_123_ZONG)) {
-            real302Url = cloudUtil.getDownloadUrlOnCopyByOpenlist(R_115, request.getUa(),
-                    request.getDeviceId(), cloudTypePair.getRight());
-        }*/
-
         if (StrUtil.isNotBlank(real302Url)) {
             int exTime = calculateExpireTime(real302Url);
-
-            // 特殊路径处理：115转123
-            /*ThreadUtil.execute(() -> {
-                if (StrUtil.contains(mediaPath, "/d/new115/")) {
-                    embyProxy.trans115To123(mediaPath);
-                }
-            });*/
             threadLimitUtil.setThreadCache(cloudType, request.getDeviceId());
             return new RedirectResult(real302Url, cloudType.getValue(), exTime, originalPath);
         }
 
         return new RedirectResult(realUrl, "nc2o", 2 * 60 * 60, originalPath);
+    }
+
+    private String buildNc2oFallbackUrl(String mediaPath) {
+        if (StrUtil.isBlank(mediaPath)) {
+            return mediaPath;
+        }
+        String fallbackBase = resolveNc2oFallbackBase();
+        if (StrUtil.isBlank(fallbackBase)) {
+            return UrlEncoder.encodeQuery(mediaPath);
+        }
+        return UrlEncoder.encodeQuery(PathUtil.replaceAfterUrlPath(mediaPath, "/d", fallbackBase));
+    }
+
+    private String resolveNc2oFallbackBase() {
+        String[] candidates = {embyConfig.getTransPt3(), embyConfig.getTransPt4(),
+                embyConfig.getTransPt1(), embyConfig.getTransPt2(), embyConfig.getOriginPt()};
+        for (String candidate : candidates) {
+            if (StrUtil.isBlank(candidate)) {
+                continue;
+            }
+            String normalized = StrUtil.removeSuffix(candidate, "/");
+            if (StrUtil.endWithIgnoreCase(normalized, "/pt")) {
+                return StrUtil.removeSuffix(normalized, "/pt");
+            }
+            return normalized;
+        }
+        return "";
     }
 
     private RedirectResult processLocalPath(MediaInfo mediaInfo) {
@@ -343,30 +345,12 @@ public class VideoRedirectService {
         }
     }
 
-    /**
-     * 通过id获取媒体路径和大小
-     *
-     * @param mediaSourceId 媒体源id
-     * @return {@link MediaInfo }
-     */
-    /*private MediaInfo getMediaInfo(String mediaSourceId) {
-        EmbyItem itemInfo = embyProxy.getItemInfoByCache(mediaSourceId);
-        if (itemInfo == null || CollUtil.isEmpty(itemInfo.getMediaSources())) {
-            return null;
-        }
-
-        String mediaPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
-        mediaPath = StrUtil.replace(UrlDecoder.decode(mediaPath), "(?<!http:|https:)/+", s -> "/");
-
-        return new MediaInfo(mediaPath, itemInfo.getSize());
-    }*/
     private MediaInfo getMediaInfo(String mediaSourceId) {
         List<EmbyItem> itemInfos = embyProxy.getItemInfoByCache(mediaSourceId);
         if (CollUtil.isEmpty(itemInfos)) {
             return null;
         }
         EmbyItem itemInfo = CollUtil.getFirst(itemInfos);
-        // ThreadUtil.execute(() -> originReqService.asyncUpdateVideoPathRelation(itemInfo));
 
         String mediaPath = CollUtil.getFirst(itemInfo.getMediaSources()).getPath();
         mediaPath = StrUtil.replace(UrlDecoder.decode(mediaPath), "(?<!http:|https:)/+", s -> "/");
@@ -391,106 +375,6 @@ public class VideoRedirectService {
                 DateUtil.date((DateUtil.currentSeconds() + exTime) * 1000), mediaPath, UrlDecoder.decode(realUrl));
     }
 
-    // private void originalVideoStream(EmbyContentCacheReqWrapper request,
-    //                                  HttpServletResponse response) {
-    //     String mediaSourceId = request.getMediaSourceId();
-    //     EmbyItem embyItem = embyProxy.getItemInfoByCache(mediaSourceId);
-    //     if (null == embyItem) {
-    //         response.setStatus(CODE_404);
-    //         return;
-    //     }
-    //     EmbyProxyUtil.Range range = EmbyProxyUtil.parseRangeHeader(request.getRange(), embyItem.getSize());
-    //     if (null == range) {
-    //         response.setHeader("Content-Range", "bytes */" + embyItem.getSize());
-    //         response.setStatus(CODE_416);
-    //         return;
-    //     }
-    //     if (fileCacheUtil.readFile(response, embyItem, range)) {
-    //         return;
-    //     }
-    //     // range = new EmbyProxyUtil.Range(range.start(), embyItem.getSize() - 1, embyItem.getSize());
-    //     String rangeHeader = range.toHeader();
-    //     String ua = embyConfig.getCommonUa();
-    //     Map<String, String> headerMap = MapUtil.<String, String>builder()
-    //             .put("User-Agent", ua).put("range", rangeHeader).build();
-    //
-    //     // ThreadUtil.execVirtual(() -> fileCacheUtil.writeFile(request, embyItem, headerMap));
-    //     String mediaPath = CollUtil.getFirst(embyItem.getMediaSources()).getPath();
-    //     Request originalRequest = null;
-    //     if (StrUtil.startWithIgnoreCase(mediaPath, "http")) {
-    //         mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath));
-    //         if (StrUtil.containsAny(mediaPath, "pt/Emby", "bt/Emby")) {
-    //             // mediaPath = EmbyProxyUtil.getPtUrlOnHk(mediaPath);
-    //         } else {
-    //             mediaPath = get302RealUrl(mediaSourceId, request.getDeviceId(), mediaPath, headerMap);
-    //         }
-    //         log.warn("原始range:{} total:{}", request.getRange(), embyItem.getSize());
-    //         log.warn("视频拉取(远程):[{}-({})] => {}", mediaSourceId, rangeHeader, mediaPath);
-    //         originalRequest = Request.of(mediaPath).method(Method.GET).header(headerMap).setMaxRedirects(1);
-    //     } else {
-    //         originalRequest = Request.of(embyConfig.getHost() + request.getParamUri())
-    //                 .method(Method.valueOf(request.getMethod()))
-    //                 .body(request.getCachedBody()).header(request.getCachedHeader()).header(headerMap);
-    //         log.warn("视频拉取(本地):[{}-({})] => {}", mediaSourceId, rangeHeader, mediaPath);
-    //     }
-    //     try (Response res = httpClient.send(originalRequest)) {
-    //         response.setStatus(res.getStatus());
-    //         res.headers().forEach((name, values) ->
-    //                 response.setHeader(name, String.join(StrPool.COMMA, values)));
-    //         log.info("返回请求头:{}", res.headers());
-    //         // 使用虚拟线程池（非阻塞模式）
-    //         try (ServletOutputStream out = response.getOutputStream(); InputStream bodyStream = res.bodyStream();
-    //              ReadableByteChannel inChannel = Channels.newChannel(bodyStream);
-    //              WritableByteChannel outChannel = Channels.newChannel(out)) {
-    //             // 使用直接缓冲区提升性能（适用于大文件）
-    //             ByteBuffer buffer = ByteBuffer.allocateDirect(1024 * 128);
-    //             while (inChannel.read(buffer) != -1) {
-    //                 buffer.flip();
-    //                 while (buffer.hasRemaining()) {
-    //                     outChannel.write(buffer);
-    //                 }
-    //                 buffer.clear();
-    //
-    //                 // 响应客户端中断（关键！）
-    //                 if (Thread.currentThread().isInterrupted()) {
-    //                     throw new InterruptedException("Streaming interrupted");
-    //                 }
-    //             }
-    //         } catch (InterruptedException e) {
-    //             Thread.currentThread().interrupt(); // 恢复中断状态
-    //             throw new RuntimeException("Video streaming interrupted", e);
-    //         }
-    //     } catch (IOException e) {
-    //         if (!response.isCommitted()) {
-    //             try {
-    //                 response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-    //             } catch (IOException ex) {
-    //                 throw new RuntimeException(ex);
-    //             }
-    //         }
-    //     } catch (Exception e) {
-    //         Thread.currentThread().interrupt(); // 恢复中断状态
-    //         // throw new RuntimeException("Thread interrupted", e);
-    //     }
-    // }
-
-    private String get302RealUrl(String mediaSourceId, String deviceId,
-                                 String mediaPath, Map<String, String> headerMap) {
-        String cacheUrl = redisClient.getStr(CacheUtil.buildVideoCacheKey(mediaSourceId, deviceId));
-        if (StrUtil.isBlank(cacheUrl)) {
-            // mediaPath = StrUtil.replace(mediaPath, embyConfig.getAlistPublic(), embyConfig.getAlistInner());
-            mediaPath = embyProxy.fetch302Path(mediaPath, headerMap);
-            if (StrUtil.isNotBlank(mediaPath)) {
-                int exTime = (int) (MapUtil.getLong(UrlQueryUtil.decodeQuery(
-                        mediaPath, Charset.defaultCharset()), "t") - DateUtil.currentSeconds() - 5 * 60);
-                redisClient.set(CacheUtil.buildVideoCacheKey(mediaSourceId, deviceId), mediaPath, exTime);
-            }
-        } else {
-            mediaPath = cacheUrl;
-        }
-        return mediaPath;
-    }
-
     /**
      * 临时存放mediaPath和size的实体
      *
@@ -505,13 +389,5 @@ public class VideoRedirectService {
     }
 
     private record RelationPath(String originalPath, String redirectPath, String storageType) {
-    }
-
-    static void main() {
-        Console.log(UrlDecoder.decode("/1000/download-rss/9kg-硬链/9kg-已刮削/里番/Hentai/2024/[とるだ屋] ゴムをつけてといいましたよね...＃1 [DMM-467012].mkv"));
-        Console.log(UrlUtil.normalize("/1000/download-rss/9kg-硬链/9kg-已刮削/里番/Hentai/2024/[とるだ屋] ゴムをつけてといいましたよね...＃1 [DMM-467012].mkv", true, true));
-        Console.log(UrlUtil.normalize(UrlDecoder.decode("/1000/download-rss/9kg-硬链/9kg-已刮削/里番/Hentai/2024/[とるだ屋] ゴムをつけてといいましたよね...＃1 [DMM-467012].mkv")));
-        Console.log(UrlUtil.normalize(UrlDecoder.decode("/1000/download-rss/9kg-硬链/9kg-已刮削/里番/Hentai/2024/[とるだ屋] ゴムをつけてといいましたよね...＃1 [DMM-467012].mkv"), true, true));
-        Console.log(UrlUtil.normalize(UrlDecoder.decode("/1000/download-rss/9kg-硬链/9kg-已刮削/里番/Hentai/2024/[とるだ屋] ゴムをつけてといいましたよね...＃1 [DMM-467012].mkv"), true, true));
     }
 }

@@ -1,6 +1,7 @@
 package cn.acecandy.fasaxi.emma.utils;
 
 import cn.acecandy.fasaxi.emma.common.enums.CloudStorageType;
+import cn.acecandy.fasaxi.emma.common.enums.StrmPathPrefix;
 import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.OpConfig;
 import cn.acecandy.fasaxi.emma.sao.client.RedisClient;
@@ -19,6 +20,7 @@ import cn.hutool.v7.core.collection.ListUtil;
 import cn.hutool.v7.core.date.DateUtil;
 import cn.hutool.v7.core.io.file.FileNameUtil;
 import cn.hutool.v7.core.io.file.FileUtil;
+import cn.hutool.v7.core.lang.mutable.MutableTriple;
 import cn.hutool.v7.core.net.url.UrlDecoder;
 import cn.hutool.v7.core.net.url.UrlEncoder;
 import cn.hutool.v7.core.net.url.UrlPath;
@@ -291,7 +293,7 @@ public final class CloudUtil {
         }*/
 
         // 构建默认的媒体路径（适用于所有类型，R_115已通过processedFilePath处理）
-        String defaultMediaPath = cloudStorage.getPrefix() + decodedNormalizedPath;
+        String defaultMediaPath = buildOpenlistMediaPath(cloudStorage, decodedNormalizedPath);
         return redirect302ByOpenlist(cloudStorage, defaultMediaPath, ua);
     }
 
@@ -339,7 +341,7 @@ public final class CloudUtil {
      */
     public String redirect302ByOpenlist(CloudStorageType cloudStorage,
                                         String newMediaPath, String ua) {
-        newMediaPath = StrUtil.replace(newMediaPath, "http://192.168.1.249:5244", opConfig.getHost());
+        newMediaPath = normalizeOpenlistMediaPath(cloudStorage, newMediaPath);
         String real302Url = "";
         try (Response resp = Request.of(newMediaPath).method(Method.HEAD)
                 .header("User-Agent", ua).send()) {
@@ -348,6 +350,57 @@ public final class CloudUtil {
             log.warn("获取<{}>重定向URL失败: {}", cloudStorage.getValue(), newMediaPath, e);
         }
         return real302Url;
+    }
+
+    String buildOpenlistMediaPath(CloudStorageType cloudStorage, String normalizedPath) {
+        if (cloudStorage == null || StrUtil.isBlank(normalizedPath)) {
+            return normalizedPath;
+        }
+        String baseHost = resolveOpenlistDownloadBase(cloudStorage);
+        if (StrUtil.isBlank(baseHost)) {
+            return normalizedPath;
+        }
+        return StrUtil.removeSuffix(baseHost, "/") + ensureLeadingSlash(normalizedPath);
+    }
+
+    String normalizeOpenlistMediaPath(CloudStorageType cloudStorage, String mediaPath) {
+        if (cloudStorage == null || StrUtil.isBlank(mediaPath)) {
+            return mediaPath;
+        }
+        if (!StrUtil.startWithIgnoreCase(mediaPath, "http")) {
+            return buildOpenlistMediaPath(cloudStorage, mediaPath);
+        }
+        MutableTriple<String, StrmPathPrefix, String> pathSplit = StrmPathPrefix.split(mediaPath);
+        if (pathSplit == null || pathSplit.getMiddle() == null) {
+            return mediaPath;
+        }
+        if (!StrUtil.equals(pathSplit.getMiddle().getValue(), resolveOpenlistPathPrefix(cloudStorage))) {
+            return mediaPath;
+        }
+        return buildOpenlistMediaPath(cloudStorage, pathSplit.getRight());
+    }
+
+    private String resolveOpenlistDownloadBase(CloudStorageType cloudStorage) {
+        if (StrUtil.isNotBlank(opConfig.getDHost())) {
+            return StrUtil.removeSuffix(opConfig.getDHost(), "/") + cloudStorage.getMain();
+        }
+        if (StrUtil.isBlank(opConfig.getHost())) {
+            return "";
+        }
+        return StrUtil.removeSuffix(opConfig.getHost(), "/") + resolveOpenlistPathPrefix(cloudStorage);
+    }
+
+    private String resolveOpenlistPathPrefix(CloudStorageType cloudStorage) {
+        return switch (cloudStorage) {
+            case R_115 -> StrmPathPrefix.PRE_NEW115.getValue();
+            case R_123 -> StrmPathPrefix.PRE_123.getValue();
+            case R_123_ZONG -> StrmPathPrefix.PRE_ZONG123.getValue();
+            default -> "";
+        };
+    }
+
+    private String ensureLeadingSlash(String path) {
+        return StrUtil.startWith(path, "/") ? path : "/" + path;
     }
 
     /**

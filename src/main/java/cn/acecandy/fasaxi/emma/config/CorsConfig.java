@@ -1,5 +1,7 @@
 package cn.acecandy.fasaxi.emma.config;
 
+import cn.hutool.v7.core.collection.CollUtil;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -11,14 +13,21 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * @since 2025/4/16
  */
 @Configuration
+@RequiredArgsConstructor
 public class CorsConfig implements WebMvcConfigurer {
+
+    private final CorsProperties corsProperties;
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
+        if (CollUtil.isEmpty(corsProperties.getAllowedOriginPatterns())) {
+            return;
+        }
         registry.addMapping("/**")
-                .allowedOriginPatterns("*")  // 允许所有来源
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")  // 包含OPTIONS方法
-                .allowedHeaders("*")
-                .allowCredentials(true)       // 允许携带凭证（如Cookie）
-                .maxAge(3600);                // 预检请求缓存时间
+                .allowedOriginPatterns(corsProperties.getAllowedOriginPatterns().toArray(String[]::new))
+                .allowedMethods(corsProperties.getAllowedMethods().toArray(String[]::new))
+                .allowedHeaders(corsProperties.getAllowedHeaders().toArray(String[]::new))
+                .allowCredentials(corsProperties.isAllowCredentials())
+                .maxAge(corsProperties.getMaxAge());
     }
 }

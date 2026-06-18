@@ -34,28 +34,6 @@ public class VideoStaticUtil {
     private static final String 尾部 = "尾部";
     private static final String mdat之后 = "mdat之后";
 
-    @SneakyThrows
-    public static void main(String[] args) {
-        try {
-            // 示例：分析指定URL的MP4视频
-            String videoUrl = "http://alist.netcup-1o.worldline.fun/p/pt/Emby1/综艺/我是歌手 (2013)/Season 10/我是歌手 - S10E02 - 第2集 - ADWeb.mp4";
-            VideoStaticUtil analyzer = new VideoStaticUtil();
-
-            // 方法1：直接从HTTP请求分析（推荐）
-            MoovPos position = analyzer.analyzeMp4(videoUrl, 6876864595L);
-            if (position != null) {
-                System.out.println("找到moov BOX:");
-                System.out.println("  起始位置: " + position.getStart() + " 字节");
-                System.out.println("  大小: " + position.getSize() + " 字节");
-                System.out.println("  相对位置: " + position.getPosDesc());
-            } else {
-                System.out.println("未找到moov BOX，可能需要扩展搜索范围或使用其他方法。");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
     /**
      * 核心Box查找逻辑（支持偏移校正）
      *

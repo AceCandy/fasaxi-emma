@@ -1,14 +1,15 @@
 package cn.acecandy.fasaxi.emma.dao.embyboss.service;
 
+import cn.acecandy.fasaxi.emma.config.OpConfig;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.VideoPathRelation;
 import cn.acecandy.fasaxi.emma.dao.embyboss.mapper.VideoPathRelationMapper;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.date.DateUtil;
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.text.StrUtil;
 import com.mybatisflex.annotation.UseDataSource;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +29,8 @@ import static cn.acecandy.fasaxi.emma.dao.embyboss.entity.table.VideoPathRelatio
 @UseDataSource("embyboss")
 @Component
 public class VideoPathRelationDao extends ServiceImpl<VideoPathRelationMapper, VideoPathRelation> {
+    @Resource
+    private OpConfig opConfig;
 
     /**
      * 插入或更新
@@ -93,14 +96,24 @@ public class VideoPathRelationDao extends ServiceImpl<VideoPathRelationMapper, V
         QueryWrapper wrapper = QueryWrapper.create()
                 .where(VIDEO_PATH_RELATION.PATH123.like("\\%2F"));
         List<VideoPathRelation> relations = mapper.selectListByQuery(wrapper);
-        if (CollUtil.isEmpty(relations) || CollUtil.size(relations) != 12) {
+        if (CollUtil.isEmpty(relations) || CollUtil.size(relations) != 12 || StrUtil.isBlank(opConfig.getHost())) {
             return;
         }
         relations.forEach(v -> {
+            String path123 = buildOpenlistPath(v.getPathPrefix(), v.getPurePath());
             VideoPathRelation vv = VideoPathRelation.x().setItemId(v.getItemId())
-                    .setPath123("http://192.168.1.249:5244" + v.getPathPrefix() + v.getPurePath());
+                    .setPath123(path123);
             updateByItemId(vv);
         });
+    }
+
+    String buildOpenlistPath(String pathPrefix, String purePath) {
+        if (StrUtil.isBlank(opConfig.getHost())) {
+            return "";
+        }
+        return StrUtil.removeSuffix(opConfig.getHost(), "/")
+                + (StrUtil.isBlank(pathPrefix) ? "" : pathPrefix)
+                + (StrUtil.isBlank(purePath) ? "" : purePath);
     }
 
     /**

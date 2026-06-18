@@ -10,7 +10,6 @@ import cn.acecandy.fasaxi.emma.sao.proxy.OpProxy;
 import cn.acecandy.fasaxi.emma.utils.CloudUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.io.file.FileNameUtil;
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.lang.mutable.MutableTriple;
 import cn.hutool.v7.core.text.StrPool;
 import cn.hutool.v7.core.text.StrUtil;
@@ -200,19 +199,5 @@ public class Webdav2CloudTaskService {
                     VideoPathRelation.x().setItemId(v.getItemId()).setBakStatus123(2)
                             .setPath123(cloudPath));
         }
-    }
-
-    static void main() {
-        String path115 = "http://192.168.1.249:5244/d/new115/worldline/Emby/华语电影/绣春刀 (2014)/绣春刀 (2014) - 2160p.mkv";
-        MutableTriple<String, StrmPathPrefix, String> splitResult = StrmPathPrefix.split(path115);
-        String purePath = splitResult.getRight();
-
-        String fileName = FileNameUtil.getName(purePath);
-        String purePathDir = StrUtil.removeSuffix(purePath, SLASH + fileName);
-        String sourcePathDir = StrUtil.format(PREFIX_NEW115 + "{}", purePathDir);
-        String targetPathDir = StrUtil.format(PREFIX_ZONG123 + "{}", purePathDir);
-
-        Console.log("sourcePathDir={}", sourcePathDir);
-        Console.log("targetPathDir={}", targetPathDir);
     }
 }

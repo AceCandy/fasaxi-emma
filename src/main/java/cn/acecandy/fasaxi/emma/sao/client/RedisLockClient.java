@@ -7,9 +7,14 @@ import cn.hutool.v7.json.JSONUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.UUID;
 
 /**
  * redis客户端
@@ -21,8 +26,15 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class RedisLockClient {
 
+    private static final DefaultRedisScript<Long> COMPARE_AND_DELETE_SCRIPT =
+            new DefaultRedisScript<>(
+                    "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+                    Long.class);
+
     @Resource
     private RedisTemplate<String, Object> redisTemplate;
+
+    private final ThreadLocal<Map<String, String>> ownedLocks = ThreadLocal.withInitial(HashMap::new);
 
     /**
      * 播放session锁
@@ -97,13 +109,16 @@ public class RedisLockClient {
         if (StrUtil.isBlank(key)) {
             return true;
         }
+        String token = UUID.randomUUID().toString();
         try {
-            Boolean success = redisTemplate.opsForValue().setIfAbsent(key, "1", expire, TimeUnit.SECONDS);
-            // 处理Redis不可用的情况（返回true，允许请求执行，避免业务阻断）
-            return success == null || success;
+            Boolean success = redisTemplate.opsForValue().setIfAbsent(key, token, expire, TimeUnit.SECONDS);
+            if (Boolean.TRUE.equals(success)) {
+                ownedLocks.get().put(key, token);
+                return true;
+            }
+            return false;
         } catch (Exception e) {
-            // Redis异常时，默认放行请求（可根据需求改为抛出异常或返回false）
-            return true;
+            throw new IllegalStateException(StrUtil.format("获取Redis锁失败: {}", key), e);
         }
     }
 
@@ -131,7 +146,23 @@ public class RedisLockClient {
         if (StrUtil.isBlank(key)) {
             return;
         }
-        redisTemplate.delete(key);
+        Map<String, String> currentLocks = ownedLocks.get();
+        String token = currentLocks.remove(key);
+        if (StrUtil.isBlank(token)) {
+            if (currentLocks.isEmpty()) {
+                ownedLocks.remove();
+            }
+            return;
+        }
+        try {
+            redisTemplate.execute(COMPARE_AND_DELETE_SCRIPT, Collections.singletonList(key), token);
+        } catch (Exception e) {
+            log.error("释放Redis锁失败: {}", key, e);
+        } finally {
+            if (currentLocks.isEmpty()) {
+                ownedLocks.remove();
+            }
+        }
     }
 
 }

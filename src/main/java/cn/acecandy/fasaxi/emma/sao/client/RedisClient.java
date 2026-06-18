@@ -108,6 +108,19 @@ public class RedisClient {
         }
     }
 
+    public boolean expire(String key, Integer time) {
+        if (StrUtil.isBlank(key) || time == null || time <= 0) {
+            return false;
+        }
+        try {
+            Boolean expired = redisTemplate.expire(key, time, TimeUnit.SECONDS);
+            return Boolean.TRUE.equals(expired);
+        } catch (Exception e) {
+            log.warn("redis expire方法异常:", e);
+            return false;
+        }
+    }
+
     public Object get(String key) {
         return StrUtil.isBlank(key) ? null : redisTemplate.opsForValue().get(key);
     }
@@ -402,6 +415,46 @@ public class RedisClient {
             return size.intValue();
         } catch (Exception e) {
             log.warn("redis scard方法异常", e);
+            return 0;
+        }
+    }
+
+    public boolean zadd(String key, Object value, double score) {
+        try {
+            Boolean added = redisTemplate.opsForZSet().add(key, value, score);
+            return Boolean.TRUE.equals(added);
+        } catch (Exception e) {
+            log.warn("redis zadd方法异常", e);
+            return false;
+        }
+    }
+
+    public boolean zrem(String key, Object value) {
+        try {
+            Long removed = redisTemplate.opsForZSet().remove(key, value);
+            return removed != null && removed > 0;
+        } catch (Exception e) {
+            log.warn("redis zrem方法异常", e);
+            return false;
+        }
+    }
+
+    public long zremrangeByScore(String key, double min, double max) {
+        try {
+            Long removed = redisTemplate.opsForZSet().removeRangeByScore(key, min, max);
+            return removed == null ? 0L : removed;
+        } catch (Exception e) {
+            log.warn("redis zremrangeByScore方法异常", e);
+            return 0L;
+        }
+    }
+
+    public int zcard(String key) {
+        try {
+            Long size = redisTemplate.opsForZSet().zCard(key);
+            return size == null ? 0 : size.intValue();
+        } catch (Exception e) {
+            log.warn("redis zcard方法异常", e);
             return 0;
         }
     }

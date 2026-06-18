@@ -1,19 +1,14 @@
 package cn.acecandy.fasaxi.emma.config;
 
+import cn.acecandy.fasaxi.emma.utils.LogSanitizer;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.date.DateUtil;
 import cn.hutool.v7.core.text.StrUtil;
 import cn.hutool.v7.json.JSONUtil;
-import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.Map;
-
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_200;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_300;
-import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_400;
 
 /**
  * 请求日志记录
@@ -25,19 +20,18 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.CODE_400;
 @Component
 public class AccessLog {
 
-    @Resource
-    private EmbyConfig embyConfig;
-
     public void log(String method, String uri, String ip, String queryStr,
                     Map<String, String> cachedHeader,
-                    String apiKey, int status, long start) {
+                    int status, long start) {
         ThreadUtil.execute(() -> {
-            String logMessage = StrUtil.format("[{}][{}-{}:{}ms] {}?{}&api_key={} [{}]",
-                    ip, method, status, DateUtil.current() - start, uri, queryStr,
-                    StrUtil.isBlank(apiKey) ? embyConfig.getApiKey() : apiKey, JSONUtil.toJsonStr(cachedHeader));
-            if (status >= CODE_200 && status < CODE_300) {
+            String sanitizedQuery = LogSanitizer.sanitizeQueryString(queryStr);
+            String sanitizedUri = StrUtil.isBlank(sanitizedQuery) ? uri : uri + "?" + sanitizedQuery;
+            String logMessage = StrUtil.format("[{}][{}-{}:{}ms] {} [{}]",
+                    ip, method, status, DateUtil.current() - start, sanitizedUri,
+                    JSONUtil.toJsonStr(LogSanitizer.sanitizeHeadersForLog(cachedHeader)));
+            if (status >= 200 && status < 300) {
                 log.info(logMessage);
-            } else if (status >= CODE_300 && status < CODE_400) {
+            } else if (status >= 300 && status < 400) {
                 log.warn(logMessage);
             } else {
                 log.error(logMessage);

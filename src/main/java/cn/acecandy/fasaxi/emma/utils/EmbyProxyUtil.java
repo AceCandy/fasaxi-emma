@@ -4,6 +4,7 @@ package cn.acecandy.fasaxi.emma.utils;
 import cn.acecandy.fasaxi.emma.common.enums.EmbyPicType;
 import cn.acecandy.fasaxi.emma.common.ex.BaseException;
 import cn.acecandy.fasaxi.emma.config.DoubanConfig;
+import cn.acecandy.fasaxi.emma.config.EmbyConfig;
 import cn.acecandy.fasaxi.emma.config.EmbyContentCacheReqWrapper;
 import cn.acecandy.fasaxi.emma.config.TmdbConfig;
 import cn.acecandy.fasaxi.emma.dao.embyboss.entity.EmbyItemPic;
@@ -256,19 +257,33 @@ public final class EmbyProxyUtil {
      * @param mediaPath 媒体路径
      * @return {@link String }
      */
-    public static String getPtUrlOnHk(String mediaPath) {
+    public static String getPtUrlOnHk(String mediaPath, EmbyConfig embyConfig) {
         if (StrUtil.isBlank(mediaPath)) {
             return "";
         }
         mediaPath = UrlUtil.normalize(UrlDecoder.decode(mediaPath));
-        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby", "http://alist.rn238.worldline.fun/p/pt/Emby");
-        mediaPath = StrUtil.replace(mediaPath, "http://192.168.1.205:5244/d/pt/Emby1", "http://alist.rn238.worldline.fun/p/bt/Emby1");
-
-        // mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt",
-        // "http://8.210.221.216:5244/p/bt/Emby1/");
-        // mediaPath = StrUtil.replace(mediaPath, "https://alist.acecandy.cn:880/d/pt/Emby/",
-        // "http://8.210.221.216:5244/p/pt/Emby/");
+        String transPt = embyConfig == null ? null : embyConfig.getTransPt1();
+        if (StrUtil.isBlank(transPt) || !StrUtil.contains(mediaPath, "/d/pt/")) {
+            return mediaPath;
+        }
+        if (StrUtil.contains(mediaPath, "/d/pt/Emby1/")) {
+            return PathUtil.replaceAfterUrlPath(mediaPath, "/d/pt", buildBtTransferBase(transPt));
+        }
+        if (StrUtil.contains(mediaPath, "/d/pt/Emby/")) {
+            return PathUtil.replaceAfterUrlPath(mediaPath, "/d/pt", transPt);
+        }
         return mediaPath;
+    }
+
+    private static String buildBtTransferBase(String transPt) {
+        if (StrUtil.isBlank(transPt)) {
+            return "";
+        }
+        String normalized = StrUtil.removeSuffix(transPt, "/");
+        if (StrUtil.endWithIgnoreCase(normalized, "/pt")) {
+            return StrUtil.removeSuffix(normalized, "/pt") + "/bt";
+        }
+        return normalized + "/bt";
     }
 
     public static Range parseRangeHeader(String range, Long totalSize) {

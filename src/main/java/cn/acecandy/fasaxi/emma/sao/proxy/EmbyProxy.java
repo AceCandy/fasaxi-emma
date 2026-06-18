@@ -30,12 +30,10 @@ import cn.acecandy.fasaxi.emma.utils.SortUtil;
 import cn.acecandy.fasaxi.emma.utils.ThreadUtil;
 import cn.hutool.v7.core.collection.CollUtil;
 import cn.hutool.v7.core.collection.ListUtil;
-import cn.hutool.v7.core.date.DateFormatPool;
 import cn.hutool.v7.core.date.DateTime;
 import cn.hutool.v7.core.date.DateUtil;
 import cn.hutool.v7.core.exception.ExceptionUtil;
 import cn.hutool.v7.core.io.file.FileUtil;
-import cn.hutool.v7.core.lang.Console;
 import cn.hutool.v7.core.lang.mutable.MutableTriple;
 import cn.hutool.v7.core.map.MapUtil;
 import cn.hutool.v7.core.math.NumberUtil;
@@ -44,7 +42,6 @@ import cn.hutool.v7.core.net.url.UrlDecoder;
 import cn.hutool.v7.core.net.url.UrlPath;
 import cn.hutool.v7.core.net.url.UrlUtil;
 import cn.hutool.v7.core.text.StrUtil;
-import cn.hutool.v7.http.HttpUtil;
 import cn.hutool.v7.http.client.Request;
 import cn.hutool.v7.http.client.Response;
 import cn.hutool.v7.http.client.body.ResponseBody;
@@ -1081,50 +1078,6 @@ public class EmbyProxy {
             }
         } catch (Exception e) {
             log.warn("trans115To123 网络请求异常: ", e);
-        }
-    }
-
-    /*public static void main(String[] args) {
-
-        String strm = "http://192.168.1.249:5244/d/new115/emby2/电影/外语电影/侏罗纪世界：重生 (2025) [tmdbid=1234821]/侏罗纪世界：重生 (2025).2160p.DoVi.HDR.H.265.DDP Atmos 5.1.mkv" +
-                "";
-        UrlBuilder urlBuilder = UrlBuilder.of(UrlDecoder.decode(strm));
-        UrlPath urlPath = urlBuilder.getPath();
-        List<CharSequence> allPath = urlPath.getSegments();
-        List<CharSequence> path115Seq = CollUtil.sub(allPath, 2, -1);
-        List<CharSequence> path113Seq = CollUtil.sub(allPath, 2, -2);
-        String path115 = "/" + StrUtil.join("/", path115Seq);
-        String path123 = "/" + StrUtil.join("/", path113Seq);
-        String url = "http://192.168.1.249:9527" + "/api/v1/transfer_115_to_123";
-        try (Response res = HttpUtil.send(Request.of(url).method(Method.POST)
-                .body(JSONUtil.toJsonStr(MapUtil.<String, Object>builder("cookie_name_115", "115生活ios端")
-                        .put("path_in_115", path115)
-                        .put("cookie_name_123", "123cookie")
-                        .put("path_in_123", path123)
-                        .put("is_clear_records", "0").map())))) {
-
-            if (!res.isOk()) {
-                throw new BaseException(StrUtil.format("返回码异常[{}]: {}", res, url));
-            }
-            String resBody = res.bodyStr();
-            if (!JSONUtil.isTypeJSON(resBody)) {
-                throw new BaseException(StrUtil.format("返回结果异常[{}]: {}", url, resBody));
-            }
-        } catch (Exception e) {
-            log.warn("trans115To123 网络请求异常: ", e);
-        }
-    }*/
-
-    static void main() {
-        String itemPath = "/Users/mac/Library/CloudStorage/OneDrive-个人/workspace/github/java/fasaxi-emma/src/main/java/cn/acecandy/fasaxi/emma/sao/proxy/EmbyProxy.java";
-        DateTime nowStrmTime = DateUtil.date(FileUtil.lastModifiedTime(itemPath));
-        VideoPathRelation videoPathRelation = VideoPathRelation.x().setStrmTime(FileUtil.lastModifiedTime(itemPath));
-
-        Console.log(DateUtil.compare(nowStrmTime,
-                videoPathRelation.getStrmTime(), DateFormatPool.PURE_DATETIME_PATTERN));
-        if (null != videoPathRelation && DateUtil.compare(nowStrmTime,
-                videoPathRelation.getStrmTime(), DateFormatPool.PURE_DATETIME_PATTERN) == 0) {
-            return;
         }
     }
 }

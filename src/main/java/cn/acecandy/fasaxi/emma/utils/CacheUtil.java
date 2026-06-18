@@ -24,6 +24,8 @@ import static cn.acecandy.fasaxi.emma.common.constants.CacheConstant.DAY_7_MS;
  */
 public final class CacheUtil extends cn.hutool.v7.core.cache.CacheUtil {
     public static final String THREAD_LIMIT_KEY = "cache:a-thread-limit";
+    private static final String THREAD_LIMIT_DEVICE_STATE_KEY = THREAD_LIMIT_KEY + ":device:{}";
+    private static final String THREAD_LIMIT_GROUP_KEY = THREAD_LIMIT_KEY + ":group:{}";
 
     // 缓存key
     public static final String R_115_TOKEN = "cache:a-115-token";
@@ -64,6 +66,14 @@ public final class CacheUtil extends cn.hutool.v7.core.cache.CacheUtil {
 
     public static String buildThreadLimitKey(String deviceId) {
         return THREAD_LIMIT_KEY + ":" + deviceId;
+    }
+
+    public static String buildThreadLimitDeviceStateKey(String deviceId) {
+        return StrUtil.format(THREAD_LIMIT_DEVICE_STATE_KEY, deviceId);
+    }
+
+    public static String buildThreadLimitGroupKey(CloudStorageType cloudStorageType) {
+        return StrUtil.format(THREAD_LIMIT_GROUP_KEY, cloudStorageType.getValue());
     }
 
     /**
